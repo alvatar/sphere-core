@@ -42,9 +42,9 @@
 ;;     ((_ ?test ?form . ?forms)
 ;;      (if ?test #f (begin ?form . ?forms)))))
 (define-macro (unless ?test ?form1 . ?form+)
-  `(if ?test
+  `(if ,?test
        #f
-       (begin ?form1 . ?form+)))
+       (begin ,?form1 . ,?form+)))
 
 ;;; Letcc macro (hoping and skipping)
 
