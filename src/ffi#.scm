@@ -2,6 +2,7 @@
 
 (c-declare #<<c-declare-end
 
+// Unmanaged Scheme object
 ___SCMOBJ leave_alone(void *p)
 {
     return ___FIX(___NO_ERR);
