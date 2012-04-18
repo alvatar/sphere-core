@@ -168,6 +168,12 @@ c-declare-end
                        ,(string-append
                           "___result_voidstar = "
                           "___EXT(___alloc_rc)(sizeof(" c-type-name "));")))
+           (define ,(string->symbol (string-append "make-" scheme-type-name "-pointer"))
+             ; Pointer declaration
+             (c-lambda () (pointer ,scheme-type)
+                       ,(string-append
+                          c-type-name " *temp;"
+                          "___result_voidstar = temp;")))
            (define ,(string->symbol 
                       (string-append scheme-type-name "-pointer"))
              ; Take pointer.
