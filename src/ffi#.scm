@@ -5,7 +5,7 @@
   (lambda (type)
     (let ((type-str (symbol->string type)))
       `(define ,(string->symbol (string-append "sizeof-" type-str))
-         ((c-lambda () int
+         ((c-lambda () unsigned-int
                     ,(string-append "___result = sizeof(" type-str ");")))))))
 
 
@@ -208,10 +208,12 @@ c-declare-end
   (apply c-native 'union type fields))
 
 
-
+;;; Common types
 
 (c-define-type size-t unsigned-int)
 (c-define-type unsigned-int* (pointer unsigned-int))
+
+;;; Automatic memory freeing macro
 
 (define-macro (with-alloc ?b ?e . ?rest)
   `(let ((,?b ,?e))

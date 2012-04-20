@@ -70,3 +70,4 @@
             (unsigned-int*-set! buf i (vector-ref vec i))
             (loop (+ i 1)))
           buf))))
+
