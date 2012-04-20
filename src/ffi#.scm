@@ -1,3 +1,14 @@
+;;; Build a size-of value equivalent to the C operator
+;;; c-build-sizeof float -> sizeof-float
+
+(define-macro c-build-sizeof
+  (lambda (type)
+    (let ((type-str (symbol->string type)))
+      `(define ,(string->symbol (string-append "sizeof-" type-str))
+         ((c-lambda () int
+                    ,(string-append "___result = sizeof(" type-str ");")))))))
+
+
 ;; Code by Estevo Castro (on-progress)
 
 (c-declare #<<c-declare-end
@@ -201,18 +212,6 @@ c-declare-end
 
 (c-define-type size-t unsigned-int)
 (c-define-type unsigned-int* (pointer unsigned-int))
-
-(define make-int*
-  (c-lambda () (pointer int)
-    "___result_voidstar = ___EXT(___alloc_rc)(sizeof(int));\n"))
-
-(define dereference-write-int*
-  (c-lambda ((pointer int) int) void
-    "*(int*)___arg1_voidstar = ___arg2;"))
-
-(define dereference-read-int*
-  (c-lambda ((pointer int)) int
-    "___result = *(int*)___arg1_voidstar;"))
 
 (define-macro (with-alloc ?b ?e . ?rest)
   `(let ((,?b ,?e))

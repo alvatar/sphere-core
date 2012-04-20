@@ -4,8 +4,8 @@
 ; sizeof
 ;-------------------------------------------------------------------------------
 
-(define get-size-of-unsigned-char
-  (c-lambda () int "___result = sizeof(unsigned char);"))
+(define sizeof-unsigned-char
+  ((c-lambda () int "___result = sizeof(unsigned char);")))
 
 ;-------------------------------------------------------------------------------
 ; Operations
