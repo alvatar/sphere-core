@@ -198,6 +198,10 @@ c-declare-end
 
 
 
+
+(c-define-type size-t unsigned-int)
+(c-define-type unsigned-int* (pointer unsigned-int))
+
 (define make-int*
   (c-lambda () (pointer int)
     "___result_voidstar = ___EXT(___alloc_rc)(sizeof(int));\n"))
@@ -209,3 +213,9 @@ c-declare-end
 (define dereference-read-int*
   (c-lambda ((pointer int)) int
     "___result = *(int*)___arg1_voidstar;"))
+
+(define-macro (with-alloc ?b ?e . ?rest)
+  `(let ((,?b ,?e))
+     (let ((ret (begin ,@?rest)))
+       (free ,(car expr))
+       ret)))
