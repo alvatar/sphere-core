@@ -178,7 +178,7 @@
 (define (map* f l)
   (cond
    ((null? l) '())
-   ((atom? l) (f l))
+   ((not (pair? l)) (f l))
    (else
     (cons (map* f (car l)) (map* f (cdr l))))))
 
