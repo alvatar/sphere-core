@@ -18,10 +18,7 @@
 
 #include <malloc.h>
 
-___SCMOBJ leave_alone(void *p)
-{
-    return ___FIX(___NO_ERR);
-}
+___SCMOBJ leave_alone(void *p);
 
 #endif
 

@@ -1,3 +1,20 @@
+(c-declare #<<c-declare-end
+
+#ifndef FFI_MACRO_LEAVE_ALONE
+#define FFI_MACRO_LEAVE_ALONE
+
+#include <malloc.h>
+
+___SCMOBJ leave_alone(void *p)
+{
+    return ___FIX(___NO_ERR);
+}
+
+#endif
+
+c-declare-end
+)
+
 ;-------------------------------------------------------------------------------
 ; sizeof
 ;-------------------------------------------------------------------------------
