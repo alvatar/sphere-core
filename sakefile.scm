@@ -18,7 +18,7 @@
 (define-task compile-to-c (init)
   (gambit-eval-here
    `(begin
-      (compile-file-to-c
+      (compile-file-to-target
        "module.scm"
        output: ,(string-append (current-build-directory) lib-name c-suffix)))))
 

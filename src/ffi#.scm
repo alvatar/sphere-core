@@ -12,16 +12,12 @@
 ;; Code by Estevo Castro (on-progress)
 
 (c-declare #<<c-declare-end
-
 #ifndef FFI_MACRO_LEAVE_ALONE
 #define FFI_MACRO_LEAVE_ALONE
-
-#include <malloc.h>
 
 ___SCMOBJ leave_alone(void *p);
 
 #endif
-
 c-declare-end
 )
 
