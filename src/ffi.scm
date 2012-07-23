@@ -1,12 +1,45 @@
+(namespace ("ffi#"))
+(##include "~~/lib/gambit#.scm")
+
+;-------------------------------------------------------------------------------
+; Code needed by FFI-generation macros
+;-------------------------------------------------------------------------------
+
 (c-declare #<<c-declare-end
+
+#ifndef FFIMACRO
+#define FFIMACRO
+
 #include <malloc.h>
 
-___SCMOBJ leave_alone(void *p)
+___SCMOBJ ffimacro__leave_alone(void *p)
 {
     return ___FIX(___NO_ERR);
 }
+
+___SCMOBJ ffimacro__free_foreign(void *p)
+{
+    if (p)
+        free(p);
+    return ___FIX(___NO_ERR);
+}
+
+#endif
+
 c-declare-end
 )
+
+(define references
+  (if (table? references)
+    references
+    (make-table weak-keys: #t weak-values: #f test: eq?)))
+
+(define link
+  (if (procedure? link)
+    link
+    (lambda (parent child)
+      (table-set! references child parent)
+      (make-will child (lambda (x) (table-set! references x))))))
 
 ;-------------------------------------------------------------------------------
 ; sizeof

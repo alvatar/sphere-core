@@ -1,46 +1,10 @@
-;;; Build a size-of value equivalent to the C operator
-;;; c-build-sizeof float -> sizeof-float
-
-(define-macro c-build-sizeof
-  (lambda (type)
-    (let ((type-str (symbol->string type)))
-      `(define ,(string->symbol (string-append "sizeof-" type-str))
-         ((c-lambda () unsigned-int
-                    ,(string-append "___result = sizeof(" type-str ");")))))))
-
-
-;; Code by Estevo Castro (on-progress)
-
-(c-declare #<<c-declare-end
-#ifndef FFI_MACRO_LEAVE_ALONE
-#define FFI_MACRO_LEAVE_ALONE
-
-___SCMOBJ leave_alone(void *p);
-
-#endif
-c-declare-end
-)
-
-(define ffi-hierarchical-reference-table
-  (if (table? ffi-hierarchical-reference-table)
-      ffi-hierarchical-reference-table
-      (make-table weak-keys: #t weak-values: #f test: eq?)))
-
-; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
-(define-macro (at-expand-time-and-runtime . exprs)
-  (let ((l `(begin ,@exprs)))
-    (eval l)
-    l))
-
-(define-macro (at-expand-time . expr)
-  (eval (cons 'begin expr)))
+;;; C constants generation macro
 
 ;; Creating the bindings in a simple C function makes for more compact
 ;; binaries, as per Marc Feeley's advice.
 ;;
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
 ;; (Via 'Alvaro Castro-Castilla).
-
 (define-macro
   (c-constants . names)
   (define (interval lo hi)
@@ -68,13 +32,41 @@ c-declare-end
               (interval 0 nb-names)
               names))))
 
+;;; Struct and union generation macro
+;;; (code by Estevo Castro)
+
+; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
+(define-macro (at-expand-time-and-runtime . exprs)
+  (let ((l `(begin ,@exprs)))
+    (eval l)
+    l))
+
+(define-macro (at-expand-time . expr)
+  (eval (cons 'begin expr)))
+
+(c-declare #<<c-declare-end
+
+___SCMOBJ ffimacro__leave_alone(void *p);
+___SCMOBJ ffimacro__free_foreign(void *p);
+
+c-declare-end
+)
+
 (at-expand-time
+  (define (to-string x)
+    (cond ((string? x) x)
+          ((symbol? x) (symbol->string x))
+          (else (error "Unsupported type: " x))))
+  (define (mixed-append . args) (apply string-append (map to-string args)))
+  (define (symbol-append . args)
+    (string->symbol (apply mixed-append args)))
+  (define managed-prefix "managed-")
   (define unmanaged-prefix "unmanaged-")
   (define (c-native struct-or-union type . fields)
     (let*
       ((scheme-type (if (pair? type) (car type) type))
+       (pointer-type (symbol-append scheme-type "*"))
        (c-type (if (pair? type) (cadr type) type))
-       (scheme-type-name (symbol->string scheme-type))
        (c-type-name (symbol->string c-type))
        (attr-worker
          (lambda (fn)
@@ -111,15 +103,12 @@ c-declare-end
              (let ((_voidstar (if (or voidstar pointer) "_voidstar" ""))
                    (amperstand (if voidstar "&" ""))
                    (scheme-attr-type (if voidstar
-                                       (string->symbol
-                                         (string-append
-                                           unmanaged-prefix
-                                           (symbol->string scheme-attr-type)))
+                                       (symbol-append unmanaged-prefix
+                                                      scheme-attr-type)
                                        scheme-attr-type)))
-               `(define (,(string->symbol
-                            (string-append scheme-type-name
-                                           "-"
-                                           scheme-attr-name))
+               `(define (,(symbol-append scheme-type
+                                         "-"
+                                         scheme-attr-name)
                           parent)
                   (let ((ret
                           ((c-lambda
@@ -134,13 +123,7 @@ c-declare-end
                                 c-attr-name ");"))
                            parent)))
                     ,@(if voidstar
-                        '((table-set!
-                            ffi-hierarchical-reference-table ret parent)
-                          (make-will
-                            ret
-                            (lambda (x)
-                              (table-set!
-                                ffi-hierarchical-reference-table x))))
+                        '((ffi#link parent ret))
                         '())
                     ret))))))
        (mutator
@@ -151,52 +134,76 @@ c-declare-end
                    (cast
                      (cond
                        (voidstar
-                         (string-append "(" (symbol->string c-attr-type) "*)"))
+                         (mixed-append "(" c-attr-type "*)"))
                        (pointer
-                         (string-append "(" (symbol->string c-attr-type) ")"))
+                         (mixed-append "(" c-attr-type ")"))
                        ; XXX: cast primitive types too, should help with enums in C++
                        (else "")))
                    (dereference (if voidstar "*" "")))
-               `(define ,(string->symbol
-                           (string-append
-                             scheme-type-name "-" scheme-attr-name "-set!"))
-                  (c-lambda (,scheme-type ,scheme-attr-type) void
-                            ,(string-append
-                               "(*("
-                               c-type-name
-                               "*)___arg1_voidstar)."
-                               c-attr-name
-                               " = "
-                               dereference
-                               cast
-                               "___arg2"
-                               _voidstar
-                               ";"))))))))
+               `(define ,(symbol-append
+                           scheme-type "-" scheme-attr-name "-set!")
+                  (c-lambda
+                    (,scheme-type ,scheme-attr-type) void
+                    ,(string-append
+                       "(*(" c-type-name "*)___arg1_voidstar)." c-attr-name
+                       " = " dereference cast "___arg2" _voidstar ";"))))))))
       (append
         `(begin
            (c-define-type ,scheme-type (,struct-or-union ,c-type-name ,c-type))
            ; Unmanaged version of structure.
-           (c-define-type ,(string->symbol
-                             (string-append unmanaged-prefix scheme-type-name))
-                          (,struct-or-union ,c-type-name ,c-type "leave_alone"))
-           (c-define-type ,(string->symbol (string-append scheme-type-name "*"))
-                          (pointer ,scheme-type))
-           (define ,(string->symbol (string-append "make-" scheme-type-name))
+           (c-define-type ,(symbol-append unmanaged-prefix scheme-type)
+                          (,struct-or-union ,c-type-name ,c-type "ffimacro__leave_alone"))
+           (c-define-type
+             ,pointer-type
+             (pointer ,scheme-type ,pointer-type))
+           (c-define-type
+             ,(symbol-append managed-prefix pointer-type)
+             (pointer ,scheme-type ,pointer-type "ffimacro__free_foreign"))
+           (define ,(symbol-append "make-" scheme-type)
              ; Constructor.
-             (c-lambda () ,scheme-type
-                       ,(string-append
-                          "___result_voidstar = "
-                          "malloc(sizeof(" c-type-name "));")))
-           (define ,(string->symbol
-                      (string-append scheme-type-name "-pointer"))
+             (c-lambda
+               () ,scheme-type
+               ,(string-append "___result_voidstar = malloc(sizeof(" c-type-name "));")))
+           (define (,(symbol-append scheme-type "?") x)
+             ; Type predicate.
+             (and (foreign? x) (memq (quote ,c-type) (foreign-tags x)) #t))
+           (define (,(symbol-append scheme-type "-pointer?") x)
+             ; Pointer type predicate.
+             (and (foreign? x)
+                  (memq (quote ,pointer-type)
+                        (foreign-tags x))
+                  #t))
+           (define (,(symbol-append scheme-type "-pointer") x)
              ; Take pointer.
-             (c-lambda (,scheme-type) (pointer ,scheme-type)
-                       "___result_voidstar = ___arg1_voidstar;"))
-           (define ,(string->symbol
-                      (string-append "pointer->" scheme-type-name))
+             (let ((ret
+                     ((c-lambda
+                        (,scheme-type) ,pointer-type
+                        "___result_voidstar = ___arg1_voidstar;")
+                      x)))
+               (ffi#link x ret)
+               ret))
+           (define (,(symbol-append "pointer->" scheme-type) x)
              ; Pointer dereference
-             (c-lambda ((pointer ,scheme-type)) ,scheme-type
-                       "___result_voidstar = ___arg1_voidstar;")))
+             (let ((ret
+                     ((c-lambda
+                        (,pointer-type) ,(symbol-append unmanaged-prefix scheme-type)
+                        "___result_voidstar = ___arg1_voidstar;")
+                      x)))
+               (ffi#link x ret)
+               ret))
+           (define ,(symbol-append "make-" scheme-type "-array")
+             (c-lambda
+               (int) ,(symbol-append managed-prefix pointer-type)
+               ,(string-append
+                  "___result_voidstar = malloc(___arg1 * sizeof(" c-type-name "));")))
+           (define (,(symbol-append scheme-type "-pointer-offset") p i)
+             (let ((ret
+                     ((c-lambda
+                       (,pointer-type int) ,pointer-type
+                       ,(string-append "___result_voidstar = (" c-type-name "*)___arg1_voidstar + ___arg2;"))
+                      p i)))
+               (ffi#link p ret)
+               ret)))
         (map accessor fields)
         (map mutator fields)))))
 
@@ -212,6 +219,16 @@ c-declare-end
 
 (c-define-type size-t unsigned-int)
 (c-define-type unsigned-int* (pointer unsigned-int))
+
+;;; Build a size-of value equivalent to the C operator
+;;; c-build-sizeof float -> sizeof-float
+
+(define-macro c-build-sizeof
+  (lambda (type)
+    (let ((type-str (symbol->string type)))
+      `(define ,(string->symbol (string-append "sizeof-" type-str))
+         ((c-lambda () unsigned-int
+                    ,(string-append "___result = sizeof(" type-str ");")))))))
 
 ;;; Automatic memory freeing macro
 
