@@ -1,5 +1,11 @@
-(namespace ("ffi#"))
-(##include "~~/lib/gambit#.scm")
+;;;=============================================================================
+;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro
+;;; All Rights Reserved. See LICENSE
+;;;=============================================================================
+
+(##namespace ("ffi#"))
+(##include "~~lib/gambit#.scm")
+(##include "ffi#.scm")
 
 ;-------------------------------------------------------------------------------
 ; Code needed by FFI-generation macros

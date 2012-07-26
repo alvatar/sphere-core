@@ -1,3 +1,23 @@
+;;;=============================================================================
+;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro
+;;; All Rights Reserved. See LICENSE
+;;;=============================================================================
+
+(##namespace ("ffi#"
+              sizeof-unsigned-char
+              void*-offset
+              ->void*
+              void*->unsigned-char*
+              calloc
+              malloc
+              realloc
+              free
+              make-unsigned-int*
+              unsigned-int*-ref
+              unsigned-int*-set!
+              vector->unsigned-int* vec
+              ))
+
 ;;; C constants generation macro
 
 ;; Creating the bindings in a simple C function makes for more compact
