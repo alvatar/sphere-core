@@ -1,15 +1,22 @@
+(define lib-name "base")
 (define lib-directory "lib/")
 (define lib-suffix ".o1")
 (define c-suffix ".c")
 (define modules '("ffi"
                   "repl-server"))
 
+(define install-dir (string-append "~~" lib-name))
+
 (define-task init ()
-  (make-directory (current-build-directory)))
+  (make-directory (current-build-directory))
+  (make-directory install-dir))
 
 (define-task clean (init)
   (delete-file (current-build-directory))
   (delete-file lib-directory))
+
+(define-task uninstall ()
+  (delete-file install-dir))
 
 (define-task compile (init)
   (for-each
@@ -38,6 +45,9 @@
    modules))
 
 (define-task install (compile)
+  ;; Install prelude
+  (copy-file (string-append "src/prelude#.scm") "~~base/prelude#.scm")
+  ;; Prepare library
   (make-directory lib-directory)
   (for-each
    (lambda (m)
@@ -47,5 +57,5 @@
                 (string-append lib-directory m c-suffix)))
    modules))
 
-(define-task all (compile install)
-  '(compile and install))
+(define-task all (compile)
+  "compile")
