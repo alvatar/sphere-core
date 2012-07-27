@@ -313,71 +313,93 @@
     (new-str)
     (reverse result)))
 
+;-------------------------------------------------------------------------------
+; Modules
+;-------------------------------------------------------------------------------
 
 ;;; Load or include a module
-;;; If one argument is given, it acts as normal load/include, except displaying
-;;; information of module loading in stdout
-;;; If two arguments are given, the first one must finish with a colon and
-;;; describes names the library where this module can be found. For such purpose
-;;; a .paths file must be found in the current directory.
+;;; Two formats available: (%include module) or (%include lib: module)
+;;; The first one will look into current project src/ while the second will use
+;;; .paths file to determine the external library path. It uses the following
+;;; format, one line per library
+;;; lib-name=path
 
-(define^ (%%parse-path file.lib)
-  (let* ((lib (if (null? (cdr file.lib))
-                  #f
-                  (car file.lib)))
-         (file (if (null? (cdr file.lib))
-                   (car file.lib)
-                   (cadr file.lib)))
-         (lib-name (if lib
-                       (keyword->string lib)))
-         (file-name (symbol->string file))
-         (make-pairs (lambda (l*)
-                       (let recur ((l l*))
-                         (if (null? l)
-                             '()
-                             (cons (string-split #\= (car l))
-                                   (recur (cdr l)))))))
-         (prefix (if lib
-                     (string-append
-                      (let ((pair (assoc
-                                   lib-name
-                                   (make-pairs
-                                    (call-with-input-file ".paths"
-                                      (lambda (file)
-                                        (read-all file read-line)))))))
-                        (if pair
-                            (cadr pair)
-                            (error "Library not in .paths file:" (keyword->string lib))))
-                      "/")
-                     "")))
-    (values lib lib-name prefix file-name)))
+(define^ (%%parse-module module-or-lib&module)
+  (let ((here? (not (list? module-or-lib&module))))
+    (unless (if here?
+                (symbol? module-or-lib&module)
+                (and (keyword? (car module-or-lib&module))
+                     (symbol? (cadr module-or-lib&module))))
+            (error "Error parsing %include directive: wrong module format: " module-or-lib&module))
+    (let* ((lib (if here?
+                    #f
+                    (car module-or-lib&module)))
+           (module (if here?
+                       module-or-lib&module
+                       (cadr module-or-lib&module)))
+           (lib-name (unless here?
+                             (keyword->string lib)))
+           (module-name (symbol->string module))
+           (make-pairs (lambda (l*)
+                         (let recur ((l l*))
+                           (if (null? l)
+                               '()
+                               (cons (string-split #\= (car l))
+                                     (recur (cdr l)))))))
+           (path-prefix (if here?
+                            (current-directory)
+                            (string-append
+                             (let ((pair (assoc
+                                          lib-name
+                                          (make-pairs
+                                           (call-with-input-file ".paths"
+                                             (lambda (file)
+                                               (read-all file read-line)))))))
+                               (if pair
+                                   (cadr pair)
+                                   (error "Library not in .paths file:" (keyword->string lib))))
+                             "/"))))
+      (values lib lib-name path-prefix module-name))))
 
-(define-macro (%include . file.lib)
-  (receive (lib lib-name prefix file-name)
-           (%%parse-path file.lib)
+(define^ (%module-path lib&module)
+  (receive
+   (lib lib-name path filename)
+   (%%parse-module lib&module)
+   (string-append path "lib/")))
+
+(define^ (%module-name module)
+  (symbol->string (if (list? module)
+                      (cadr module)
+                      module)))
+
+(define^ (%module-lib module)
+  (keyword->string (if (list? module)
+                       (car module)
+                       #f)))
+
+(define-macro (%include . module.lib)
+  (receive (lib lib-name prefix module-name)
+           (%%parse-module (if (null? (cdr module.lib))
+                               (car module.lib)
+                               module.lib))
            (begin
              (display (if lib
-                          (string-append "-- including: " file-name " -- (" lib-name ")" "\n")
-                          (string-append "-- including: " file-name "\n")))
-             `(include ,(string-append prefix "src/" file-name ".scm")))))
+                          (string-append "-- including: " module-name " -- (" lib-name ")" "\n")
+                          (string-append "-- including: " module-name "\n")))
+             `(include ,(string-append prefix "src/" module-name ".scm")))))
 
-(define-macro (%load . file.lib)
-  (receive (lib lib-name prefix file-name)
-           (%%parse-path file.lib)
+(define-macro (%load . module.lib)
+  (receive (lib lib-name prefix module-name)
+           (%%parse-module (if (null? (cdr module.lib))
+                               (car module.lib)
+                               module.lib))
            (if lib
                (begin
-                 (display (string-append "-- loading: " file-name " -- (" lib-name ")" "\n"))
-                 `(load ,(string-append prefix "lib/" file-name)))
+                 (display (string-append "-- loading: " module-name " -- (" lib-name ")" "\n"))
+                 `(load ,(string-append prefix "lib/" module-name)))
                (begin
-                 (display (string-append "-- loading: " file-name "\n"))
-                 `(load ,(string-append prefix file-name))))))
-
-(define^ (module-path lib module)
-  (receive
-   (lib lib-name path file-name)
-   (%%parse-path (list lib module))
-   (values (string-append path "lib/")
-           (string-append file-name ".c"))))
+                 (display (string-append "-- loading: " module-name "\n"))
+                 `(load ,(string-append prefix module-name))))))
 
 (define-macro (%library lib)
   (let* ((lib-name (symbol->string lib))
