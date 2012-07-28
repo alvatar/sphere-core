@@ -132,7 +132,10 @@
        (step)
        (apply values args))))
 
+;;; Standard error output
 
+(define-macro (cerr . args)
+  `(display ,args (current-error-port)))
 
 ;;; Letcc macro (hoping and skipping)
 
@@ -199,7 +202,7 @@
 ; referenced in ?expr will be printed upon the assertion failure.
 
 (define-macro (assert expr . others)
-  ;; given the list of expressions or vars,
+    ;; given the list of expressions or vars,
   ;; make the list appropriate for cerr
   (define (make-print-list prefix lst)
     (cond
@@ -232,18 +235,18 @@
             (inner (cdr expr) (loop (car expr) vars)))))))))
   (cond
    ((null? others)                      ; the most common case
-    `(or ,expr (begin (cerr "failed assertion: " ',expr nl "bindings"
-                            ,@(make-print-list #\newline (vars-of expr)) nl)
+    `(or ,expr (begin (cerr "failed assertion: " ',expr "\n" "bindings"
+                            ,@(make-print-list #\newline (vars-of expr)) "\n")
                       (error "assertion failure"))))
    ((eq? (car others) 'report:)         ; another common case
     `(or ,expr (begin (cerr "failed assertion: " ',expr
-                            ,@(make-print-list #\newline (cdr others)) nl)
+                            ,@(make-print-list #\newline (cdr others)) "\n")
                       (error "assertion failure"))))
    ((not (memq 'report: others))
     `(or (and ,expr ,@others)
-         (begin (cerr "failed assertion: " '(,expr ,@others) nl "bindings"
+         (begin (cerr "failed assertion: " '(,expr ,@others) "\n" "bindings"
                       ,@(make-print-list #\newline
-                                         (vars-of (cons 'and (cons expr others)))) nl)
+                                         (vars-of (cons 'and (cons expr others)))) "\n")
                 (error "assertion failure"))))
    (else                        ; report: occurs somewhere in 'others'
     (let loop ((exprs (list expr)) (reported others))
@@ -251,7 +254,7 @@
        ((eq? (car reported) 'report:)
         `(or (and ,@(reverse exprs))
              (begin (cerr "failed assertion: " ',(reverse exprs)
-                          ,@(make-print-list #\newline (cdr reported)) nl)
+                          ,@(make-print-list #\newline (cdr reported)) "\n")
                     (error "assertion failure"))))
        (else (loop (cons (car reported) exprs) (cdr reported))))))))
     
@@ -265,14 +268,7 @@
 
 (define^ (macro-append . args)
   (string->symbol
-   (apply string-append (map
-                         (lambda (e)
-                           (cond
-                            ((keyword? e) (string-append (keyword->string e) ":"))
-                            ((symbol? e) (symbol->string e))
-                            ((string? e) e)
-                            (else (error "macro-append doesn't append given type"))))
-                         args))))
+   (apply string-append (map object->string args))))
 
 (define^ (string-for-each fn str)
   (let ((len (string-length str)))
@@ -326,40 +322,41 @@
 
 (define^ (%%parse-module module-or-lib&module)
   (let ((here? (not (list? module-or-lib&module))))
-    (unless (if here?
-                (symbol? module-or-lib&module)
-                (and (keyword? (car module-or-lib&module))
-                     (symbol? (cadr module-or-lib&module))))
-            (error "Error parsing %include directive: wrong module format: " module-or-lib&module))
-    (let* ((lib (if here?
-                    #f
-                    (car module-or-lib&module)))
-           (module (if here?
-                       module-or-lib&module
-                       (cadr module-or-lib&module)))
-           (lib-name (unless here?
-                             (keyword->string lib)))
-           (module-name (symbol->string module))
-           (make-pairs (lambda (l*)
-                         (let recur ((l l*))
-                           (if (null? l)
-                               '()
-                               (cons (string-split #\= (car l))
-                                     (recur (cdr l)))))))
-           (path-prefix (if here?
-                            (current-directory)
-                            (string-append
-                             (let ((pair (assoc
-                                          lib-name
-                                          (make-pairs
-                                           (call-with-input-file ".paths"
-                                             (lambda (file)
-                                               (read-all file read-line)))))))
-                               (if pair
-                                   (cadr pair)
-                                   (error "Library not in .paths file:" (keyword->string lib))))
-                             "/"))))
-      (values lib lib-name path-prefix module-name))))
+    (if (if here?
+            (symbol? module-or-lib&module)
+            (and (keyword? (car module-or-lib&module))
+                 (symbol? (cadr module-or-lib&module))))
+        (let* ((lib (if here?
+                        #f
+                        (car module-or-lib&module)))
+               (module (if here?
+                           module-or-lib&module
+                           (cadr module-or-lib&module)))
+               (lib-name (unless here?
+                                 (keyword->string lib)))
+               (module-name (symbol->string module))
+               (make-pairs (lambda (l*)
+                             (let recur ((l l*))
+                               (if (null? l)
+                                   '()
+                                   (cons (string-split #\= (car l))
+                                         (recur (cdr l)))))))
+               (path-prefix (if here?
+                                (current-directory)
+                                (string-append
+                                 (let ((pair (assoc
+                                              lib-name
+                                              (make-pairs
+                                               (call-with-input-file ".paths"
+                                                 (lambda (file)
+                                                   (read-all file read-line)))))))
+                                   (if pair
+                                       (cadr pair)
+                                       (error "Library not in .paths file:" (keyword->string lib))))
+                                 "/"))))
+          (values lib lib-name path-prefix module-name))
+        (values #f #f #f #f))))
+
 
 (define^ (%module-path lib&module)
   (receive
@@ -382,7 +379,10 @@
            (%%parse-module (if (null? (cdr module.lib))
                                (car module.lib)
                                module.lib))
+           
            (begin
+             (unless (and lib lib-name prefix module-name)
+                     (error "Error parsing %include: wrong module format: " module.lib))
              (display (if lib
                           (string-append "-- including: " module-name " -- (" lib-name ")" "\n")
                           (string-append "-- including: " module-name "\n")))
