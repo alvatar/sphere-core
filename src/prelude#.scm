@@ -326,14 +326,9 @@
             (symbol? module-or-lib&module)
             (and (keyword? (car module-or-lib&module))
                  (symbol? (cadr module-or-lib&module))))
-        (let* ((lib (if here?
-                        #f
-                        (car module-or-lib&module)))
-               (module (if here?
-                           module-or-lib&module
-                           (cadr module-or-lib&module)))
-               (lib-name (unless here?
-                                 (keyword->string lib)))
+        (let* ((lib (if here? #f (car module-or-lib&module)))
+               (module (if here? module-or-lib&module (cadr module-or-lib&module)))
+               (lib-name (unless here? (keyword->string lib)))
                (module-name (symbol->string module))
                (make-pairs (lambda (l*)
                              (let recur ((l l*))
@@ -352,17 +347,36 @@
                                                    (read-all file read-line)))))))
                                    (if pair
                                        (cadr pair)
-                                       (error "Library not in .paths file:" (keyword->string lib))))
+                                       (error "Library not in .paths file:" lib)))
                                  "/"))))
           (values lib lib-name path-prefix module-name))
         (values #f #f #f #f))))
-
 
 (define^ (%module-path lib&module)
   (receive
    (lib lib-name path filename)
    (%%parse-module lib&module)
    (string-append path "lib/")))
+
+(define^ (%library-path lib)
+  (let ((libname (symbol->string lib))
+        (make-pairs (lambda (l*)
+                      (let recur ((l l*))
+                        (if (null? l)
+                            '()
+                            (cons (string-split #\= (car l))
+                                  (recur (cdr l))))))))
+    (string-append
+     (let ((pair (assoc
+                  libname
+                  (make-pairs
+                   (call-with-input-file ".paths"
+                     (lambda (file)
+                       (read-all file read-line)))))))
+       (if pair
+           (cadr pair)
+           (error "Library not in .paths file:" lib)))
+     "/")))
 
 (define^ (%module-name module)
   (symbol->string (if (list? module)
@@ -381,7 +395,7 @@
                                module.lib))
            
            (begin
-             (unless (and lib lib-name prefix module-name)
+             (unless (and lib-name prefix module-name) ; lib would be false if is current library
                      (error "Error parsing %include: wrong module format: " module.lib))
              (display (if lib
                           (string-append "-- including: " module-name " -- (" lib-name ")" "\n")
