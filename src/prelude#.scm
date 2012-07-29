@@ -383,10 +383,10 @@
                       (cadr module)
                       module)))
 
-(define^ (%module-lib module)
-  (keyword->string (if (list? module)
-                       (car module)
-                       #f)))
+(define^ (%module-library module)
+  (if (list? module)
+      (string->symbol (keyword->string (car module)))
+      #f))
 
 (define-macro (%include . module.lib)
   (receive (lib lib-name prefix module-name)
