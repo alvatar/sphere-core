@@ -388,6 +388,12 @@
       (string->symbol (keyword->string (car module)))
       #f))
 
+(define^ (%module-library-string module)
+  (let ((ml (%module-library module)))
+    (if ml
+        (symbol->string ml)
+        "")))
+
 (define-macro (%include . module.lib)
   (receive (lib lib-name prefix module-name)
            (%%parse-module (if (null? (cdr module.lib))
