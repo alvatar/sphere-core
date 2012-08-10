@@ -278,45 +278,6 @@
   (string->symbol
    (apply string-append (map object->string args))))
 
-(define^ (string-for-each fn str)
-  (let ((len (string-length str)))
-    (let loop ((i 0))
-      (cond
-       ((= i len) #!void)
-       (else
-        (fn (string-ref str i))
-        (loop (+ i 1)))))))
-
-(define^ (reverse-list->string list)
-  (let* ((len (length list))
-         (str (make-string len)))
-    (let loop ((i (- len 1))
-               (list list))
-      (cond
-       ((pair? list)
-        (string-set! str i (car list))
-        (loop (- i 1) (cdr list)))))
-    str))
-
-(define^ (string-split chr str)
-  (let* ((curr-str '())
-         (result '())
-         (new-str (lambda ()
-                    (push! result (reverse-list->string curr-str))
-                    (set! curr-str '())))
-         (add-char (lambda (chr)
-                     (push! curr-str chr))))
-    (string-for-each (lambda (c)
-                       (cond
-                        ((eq? c chr)
-                         (if (not (null? curr-str))
-                             (new-str)))
-                        (else
-                         (add-char c))))
-                     str)
-    (new-str)
-    (reverse result)))
-
 ;-------------------------------------------------------------------------------
 ; Modules
 ;-------------------------------------------------------------------------------
@@ -324,7 +285,7 @@
 ;;; Load or include a module
 ;;; Two formats available: (%include module) or (%include lib: module)
 ;;; The first one will look into current project src/ while the second will use
-;;; .paths file to determine the external library path. It uses the following
+;;; configuration file to determine the external library path. It uses the following
 ;;; format, one line per library
 ;;; lib-name=path
 
