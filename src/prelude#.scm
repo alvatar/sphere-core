@@ -23,6 +23,14 @@
   `(eval-in-macro-environment-no-result
     (define ,pattern ,@body)))
 
+(define-macro (at-expand-time-and-runtime . exprs)
+  (let ((l `(begin ,@exprs)))
+    (eval l)
+    l))
+
+(define-macro (at-expand-time . expr)
+  (eval (cons 'begin expr)))
+
 (define^ (macro-expand expr)
   expr)
 
@@ -320,44 +328,71 @@
 ;;; format, one line per library
 ;;; lib-name=path
 
-(define^ (%%parse-module module-or-lib&module)
-  (let ((here? (not (list? module-or-lib&module))))
-    (if (if here?
-            (symbol? module-or-lib&module)
-            (and (keyword? (car module-or-lib&module))
-                 (symbol? (cadr module-or-lib&module))))
-        (let* ((lib (if here? #f (car module-or-lib&module)))
-               (module (if here? module-or-lib&module (cadr module-or-lib&module)))
-               (lib-name (unless here? (keyword->string lib)))
-               (module-name (symbol->string module))
-               (make-pairs (lambda (l*)
-                             (let recur ((l l*))
-                               (if (null? l)
-                                   '()
-                                   (cons (string-split #\= (car l))
-                                         (recur (cdr l)))))))
-               (path-prefix (if here?
-                                (current-directory)
-                                (string-append
-                                 (let ((pair (assoc
-                                              lib-name
-                                              (make-pairs
-                                               (call-with-input-file ".paths"
-                                                 (lambda (file)
-                                                   (read-all file read-line)))))))
-                                   (if pair
-                                       (cadr pair)
-                                       (error "Library not in .paths file:" lib)))
-                                 "/"))))
-          (values lib lib-name path-prefix module-name))
-        (values #f #f #f #f))))
+(define^ (%module? module)
+  (or (symbol? module)
+      (and (list? module)
+           (keyword? (car module))
+           (not (null? (cdr module)))
+           (symbol? (cadr module))
+           (null? (cddr module)))))
+;;; Module structure
 
-(define^ (%module-path lib&module)
+(define^ (%module-library module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (if (list? module)
+      (string->symbol (keyword->string (car module)))
+      #f))
+
+(define^ (%module-module module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (if (list? module)
+      (cadr module)
+      module))
+
+;;; Parse
+;;; returns (library path mo
+
+(define^ (%%parse-module module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (let* ((config (call-with-input-file "config.scm" read-all))
+         (paths (cdr (assq paths: config)))
+         (library (%module-library module))
+         (library-path (if library
+                           (uif (assq library paths)
+                                (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
+                                (error "Library path not found in configuration file:" library))
+                           #f))
+         (module-name (%module-name module)))
+   (values library library-path module-name)))
+
+(define^ (%module-library-name module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (let ((ml (%module-library module)))
+    (if ml
+        (symbol->string ml)
+        "")))
+
+(define^ (%module-path module)
   (receive
-   (lib lib-name path filename)
-   (%%parse-module lib&module)
-   (string-append path "lib/")))
+   (_ path __)
+   (%%parse-module module)
+   path))
 
+(define^ (%module-path-src module)
+  (string-append (%module-path module) "src/"))
+
+(define^ (%module-path-lib module)
+  (string-append (%module-path module) "lib/"))
+
+(define^ (%library-path library)
+  (let* ((config (call-with-input-file "config.scm" read-all))
+         (paths (cdr (assq paths: config))))
+    (if library
+        (uif (assq library paths)
+             (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
+             (error "Library path not found in configuration file:" library))
+        #f)))
+#;
 (define^ (%library-path lib)
   (let ((libname (symbol->string lib))
         (make-pairs (lambda (l*)
@@ -379,34 +414,29 @@
      "/")))
 
 (define^ (%module-name module)
-  (symbol->string (if (list? module)
-                      (cadr module)
-                      module)))
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (symbol->string (%module-module module)))
 
-(define^ (%module-library module)
-  (if (list? module)
-      (string->symbol (keyword->string (car module)))
-      #f))
+(define^ (%module-filename-c module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (string-append (%module-library-name module) "__" (%module-name module) ".c"))
 
-(define^ (%module-library-string module)
-  (let ((ml (%module-library module)))
-    (if ml
-        (symbol->string ml)
-        "")))
+(define^ (%module-filename-scm module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (string-append (%module-name module) ".scm"))
 
 (define-macro (%include . module.lib)
-  (receive (lib lib-name prefix module-name)
+  (receive (lib prefix module-name)
            (%%parse-module (if (null? (cdr module.lib))
                                (car module.lib)
                                module.lib))
-           
-           (begin
-             (unless (and lib-name prefix module-name) ; lib would be false if is current library
-                     (error "Error parsing %include: wrong module format: " module.lib))
-             (display (if lib
-                          (string-append "-- including: " module-name " -- (" lib-name ")" "\n")
-                          (string-append "-- including: " module-name "\n")))
-             `(include ,(string-append prefix "src/" module-name ".scm")))))
+           (if lib
+               (begin
+                 (display (string-append "-- including: " module-name " -- (" (symbol->string lib) ")" "\n"))
+                 `(include ,(string-append prefix "src/" module-name ".scm")))
+               (begin
+                 (display (string-append "-- including: " module-name "\n"))
+                 `(include ,(string-append "src/" module-name ".scm"))))))
 
 (define-macro (%load . module.lib)
   (receive (lib lib-name prefix module-name)
@@ -416,28 +446,9 @@
            (if lib
                (begin
                  (display (string-append "-- loading: " module-name " -- (" lib-name ")" "\n"))
-                 `(load ,(string-append prefix "lib/" module-name)))
+                 `(load ,(string-append prefix "src/" module-name)))
                (begin
                  (display (string-append "-- loading: " module-name "\n"))
-                 `(load ,(string-append prefix module-name))))))
+                 `(load ,(string-append "lib/" module-name))))))
 
-(define-macro (%library lib)
-  (let* ((lib-name (symbol->string lib))
-         (make-pairs (lambda (l*)
-                       (let recur ((l l*))
-                         (if (null? l)
-                             '()
-                             (cons (string-split #\= (car l))
-                                   (recur (cdr l)))))))
-         (prefix (let ((pair (assoc
-                              lib-name
-                              (make-pairs
-                               (call-with-input-file ".paths"
-                                 (lambda (file)
-                                   (read-all file read-line)))))))
-                   (if pair (cadr pair) (error "Error parsing .paths file"))))
-         (file-name (string-append prefix "/loader")))
-    `(begin
-       (display ,(string-append "-- loading library: \"" lib-name "\"\n"))
-       (include ,(string-append file-name ".scm")))))
 

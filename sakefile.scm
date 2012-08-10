@@ -54,7 +54,7 @@
      (copy-file (string-append (current-build-directory) m lib-suffix)
                 (string-append lib-directory m lib-suffix))
      (copy-file (string-append (current-build-directory) m c-suffix)
-                (string-append lib-directory m c-suffix)))
+                (string-append lib-directory "base__" m c-suffix)))
    modules))
 
 (define-task all (compile)
