@@ -40,19 +40,19 @@
 
 ;;; Mutable increment
 
-(define-macro (++! x) `(set! ,x (fix:+ 1 ,x)))
+(define-macro (++! x) `(set! ,x (fx+ 1 ,x)))
 
 ;;; Read-only increment
 
-(define-macro (++ x) `(fix:+ 1 ,x))
+(define-macro (++ x) `(fx+ 1 ,x))
 
 ;;; Mutable decrement
 
-(define-macro (--! x) `(set! ,x (fix:- ,x 1)))
+(define-macro (--! x) `(set! ,x (fx- ,x 1)))
 
 ;;; Read-only decrement
 
-(define-macro (-- x) `(fix:- ,x 1))
+(define-macro (-- x) `(fx- ,x 1))
 
 ;;; Unhygienic anaphoric if
 
@@ -289,7 +289,7 @@
 ;;; format, one line per library
 ;;; lib-name=path
 
-;;; Module structure
+;;; Module structure: (library module-id
 
 (define^ (%module? module)
   (or (symbol? module)
@@ -305,27 +305,78 @@
       (string->symbol (keyword->string (car module)))
       #f))
 
-(define^ (%module-module module)
+(define^ (%module-id module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
   (if (list? module)
       (cadr module)
       module))
 
+(define^ default-src-directory
+  (make-parameter "src/"))
+
+(define^ default-lib-directory
+  (make-parameter "lib/"))
+
+(define^ default-scm-extension
+  (make-parameter ".scm"))
+
+(define^ default-o-extension
+  (make-parameter ".o"))
+
+(define^ default-c-extension
+  (make-parameter ".c"))
+
 (define^ (%library-path library)
-  (let* ((config (call-with-input-file "config.scm" read-all))
+  (let* ((config (with-exception-catcher
+                  (lambda (e) (if (no-such-file-or-directory-exception? e)
+                             (error "config.scm file not found - Please read Playground configuration instructions")
+                             (raise e)))
+                  (lambda () (call-with-input-file "config.scm" read-all))))
          (paths (cdr (assq paths: config))))
+    (unless paths
+            (error "No paths structure found in config.scm"))
     (if library
         (uif (assq library paths)
              (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
              (error "Library path not found in configuration file:" library))
         #f)))
 
+(define^ (%check-module-exists? library-path module)
+  (let ((check-path-1
+         ;; if it's an external library, then search in the src directory for C files
+         (string-append (unless library-path "")
+                        (default-lib-directory)
+                        (%module-filename-c module)))
+        (check-path-2
+         ;; if it's an external library, then search in the src directory for object files
+         (string-append (unless library-path "")
+                        (default-lib-directory)
+                        (%module-filename-o module)))
+        (check-path-3
+         ;; if it's a local library (no library-path), then search in the src directory
+         (string-append (unless library-path "")
+                        (default-src-directory)
+                        (%module-path-scm module))))
+    (unless (or (file-exists? check-path-1)
+                (file-exists? check-path-2)
+                (file-exists? check-path-3))
+            (error (string-append "Module cannot be found: "
+                                  (%module-name module)
+                                  " looked into: "
+                                  check-path-1
+                                  check-path-2
+                                  check-path-3)))))
+
 (define^ (%module-info module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (let ((library (%module-library module)))
+  (let* ((library (%module-library module))
+         (library-path (%library-path library))
+         (module-name (%module-name module)))
+    ;; Check if the module exists, signal error if it doesn't
+    (%check-module-exists? library-path module)
     (values library
-            (%library-path library)
-            (%module-name module))))
+            library-path
+            module-name)))
 
 (define^ (%module-library-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
@@ -338,25 +389,37 @@
   (receive
    (_ path __)
    (%module-info module)
-   path))
+   (unless path "")))
 
 (define^ (%module-path-src module)
-  (string-append (%module-path module) "src/"))
+  (string-append (%module-path module) (default-src-directory)))
 
 (define^ (%module-path-lib module)
-  (string-append (%module-path module) "lib/"))
+  (string-append (%module-path module) (default-lib-directory)))
+
+;; Module name (transforms / into _)
 
 (define^ (%module-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (symbol->string (%module-module module)))
+  (let ((name (string-copy (symbol->string (%module-id module)))))
+    (let recur ((i (-- (string-length name))))
+      (if (= i 0)
+          name
+          (begin (when (eq? (string-ref name i) #\/)
+                       (string-set! name i #\_))
+                 (recur (-- i)))))))
 
 (define^ (%module-filename-c module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%module-library-name module) "__" (%module-name module) ".c"))
+  (string-append (%module-library-name module) "__" (%module-name module) (default-c-extension)))
 
-(define^ (%module-filename-scm module)
+(define^ (%module-filename-o module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%module-name module) ".scm"))
+  (string-append (%module-library-name module) "__" (%module-name module) (default-o-extension)))
+
+(define^ (%module-path-scm module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (string-append (symbol->string (%module-id module)) (default-scm-extension)))
 
 (define-macro (%include . module.lib)
   (receive (lib prefix module-name)
@@ -366,10 +429,10 @@
            (if lib
                (begin
                  (display (string-append "-- including: " module-name " -- (" (symbol->string lib) ")" "\n"))
-                 `(include ,(string-append prefix "src/" module-name ".scm")))
+                 `(include ,(string-append prefix (default-src-directory) module-name (default-scm-extension))))
                (begin
                  (display (string-append "-- including: " module-name "\n"))
-                 `(include ,(string-append "src/" module-name ".scm"))))))
+                 `(include ,(string-append (default-src-directory) module-name (default-scm-extension)))))))
 
 (define-macro (%load . module.lib)
   (receive (lib lib-name prefix module-name)
@@ -379,8 +442,8 @@
            (if lib
                (begin
                  (display (string-append "-- loading: " module-name " -- (" lib-name ")" "\n"))
-                 `(load ,(string-append prefix "src/" module-name)))
+                 `(load ,(string-append prefix (default-lib-directory) module-name)))
                (begin
                  (display (string-append "-- loading: " module-name "\n"))
-                 `(load ,(string-append "lib/" module-name))))))
+                 `(load ,(string-append (default-lib-directory) module-name))))))
 
