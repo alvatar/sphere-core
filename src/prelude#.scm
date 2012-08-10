@@ -289,6 +289,8 @@
 ;;; format, one line per library
 ;;; lib-name=path
 
+;;; Module structure
+
 (define^ (%module? module)
   (or (symbol? module)
       (and (list? module)
@@ -296,7 +298,6 @@
            (not (null? (cdr module)))
            (symbol? (cadr module))
            (null? (cddr module)))))
-;;; Module structure
 
 (define^ (%module-library module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
