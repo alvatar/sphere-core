@@ -349,21 +349,21 @@
       (cadr module)
       module))
 
-;;; Parse
-;;; returns (library path mo
-
-(define^ (%%parse-module module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+(define^ (%library-path library)
   (let* ((config (call-with-input-file "config.scm" read-all))
-         (paths (cdr (assq paths: config)))
-         (library (%module-library module))
-         (library-path (if library
-                           (uif (assq library paths)
-                                (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
-                                (error "Library path not found in configuration file:" library))
-                           #f))
-         (module-name (%module-name module)))
-   (values library library-path module-name)))
+         (paths (cdr (assq paths: config))))
+    (if library
+        (uif (assq library paths)
+             (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
+             (error "Library path not found in configuration file:" library))
+        #f)))
+
+(define^ (%module-info module)
+  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (let ((library (%module-library module)))
+    (values library
+            (%library-path library)
+            (%module-name module))))
 
 (define^ (%module-library-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
@@ -375,7 +375,7 @@
 (define^ (%module-path module)
   (receive
    (_ path __)
-   (%%parse-module module)
+   (%module-info module)
    path))
 
 (define^ (%module-path-src module)
@@ -383,35 +383,6 @@
 
 (define^ (%module-path-lib module)
   (string-append (%module-path module) "lib/"))
-
-(define^ (%library-path library)
-  (let* ((config (call-with-input-file "config.scm" read-all))
-         (paths (cdr (assq paths: config))))
-    (if library
-        (uif (assq library paths)
-             (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
-             (error "Library path not found in configuration file:" library))
-        #f)))
-#;
-(define^ (%library-path lib)
-  (let ((libname (symbol->string lib))
-        (make-pairs (lambda (l*)
-                      (let recur ((l l*))
-                        (if (null? l)
-                            '()
-                            (cons (string-split #\= (car l))
-                                  (recur (cdr l))))))))
-    (string-append
-     (let ((pair (assoc
-                  libname
-                  (make-pairs
-                   (call-with-input-file ".paths"
-                     (lambda (file)
-                       (read-all file read-line)))))))
-       (if pair
-           (cadr pair)
-           (error "Library not in .paths file:" lib)))
-     "/")))
 
 (define^ (%module-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
@@ -427,9 +398,9 @@
 
 (define-macro (%include . module.lib)
   (receive (lib prefix module-name)
-           (%%parse-module (if (null? (cdr module.lib))
-                               (car module.lib)
-                               module.lib))
+           (%module-info (if (null? (cdr module.lib))
+                             (car module.lib)
+                             module.lib))
            (if lib
                (begin
                  (display (string-append "-- including: " module-name " -- (" (symbol->string lib) ")" "\n"))
@@ -440,9 +411,9 @@
 
 (define-macro (%load . module.lib)
   (receive (lib lib-name prefix module-name)
-           (%%parse-module (if (null? (cdr module.lib))
-                               (car module.lib)
-                               module.lib))
+           (%module-info (if (null? (cdr module.lib))
+                             (car module.lib)
+                             module.lib))
            (if lib
                (begin
                  (display (string-append "-- loading: " module-name " -- (" lib-name ")" "\n"))
@@ -450,5 +421,4 @@
                (begin
                  (display (string-append "-- loading: " module-name "\n"))
                  `(load ,(string-append "lib/" module-name))))))
-
 
