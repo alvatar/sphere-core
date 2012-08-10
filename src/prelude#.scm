@@ -362,9 +362,9 @@
                 (file-exists? check-path-3))
             (error (string-append "Module cannot be found: "
                                   (%module-name module)
-                                  " looked into: "
-                                  check-path-1
-                                  check-path-2
+                                  "\n-- Looked into: \n"
+                                  check-path-1 "\n"
+                                  check-path-2 "\n"
                                   check-path-3)))))
 
 (define^ (%module-info module)
