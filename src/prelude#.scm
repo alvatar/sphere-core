@@ -1,8 +1,5 @@
-;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Prelude
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;-------------------------------------------------------------------------------
 ; Macro environment
@@ -329,14 +326,20 @@
 (define^ (%library-path library)
   (let* ((config (with-exception-catcher
                   (lambda (e) (if (no-such-file-or-directory-exception? e)
-                             (error "config.scm file not found - Please read Playground configuration instructions")
+                             ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
+                             (with-exception-catcher
+                              (lambda (e2) (if (unbound-global-exception? e2)
+                                          (error "cannot find modules: config.scm file not found and %paths variable undefined")
+                                          (raise e2)))
+                              ;; inject %paths variable if no config.scm found
+                              (lambda () `((paths: ,@%paths))))
                              (raise e)))
                   (lambda () (call-with-input-file "config.scm" read-all))))
          (paths (cdr (assq paths: config))))
     (unless paths
             (error "No paths structure found in config.scm"))
     (if library
-        (uif (assq library paths)
+        (uif (assq (string->keyword (symbol->string library)) paths)
              (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
              (error "Library path not found in configuration file:" library))
         #f)))
