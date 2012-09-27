@@ -311,6 +311,9 @@
 (define^ default-src-directory
   (make-parameter "src/"))
 
+(define^ default-build-directory
+  (make-parameter "build/"))
+
 (define^ default-lib-directory
   (make-parameter "lib/"))
 
@@ -359,12 +362,12 @@
          ;; if it's a local library (no library-path), then search in the src directory
          (string-append (unless library-path "")
                         (default-src-directory)
-                        (%module-path-scm module))))
+                        (%module-filename-scm module))))
     (unless (or (file-exists? check-path-1)
                 (file-exists? check-path-2)
                 (file-exists? check-path-3))
             (error (string-append "Module cannot be found: "
-                                  (%module-name module)
+                                  (%module-flat-name module)
                                   "\n-- Looked into: \n"
                                   check-path-1 "\n"
                                   check-path-2 "\n"
@@ -374,7 +377,7 @@
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
   (let* ((library (%module-library module))
          (library-path (%library-path library))
-         (module-name (%module-name module)))
+         (module-name (%module-flat-name module)))
     ;; Check if the module exists, signal error if it doesn't
     (%check-module-exists? library-path module)
     (values library
@@ -400,9 +403,12 @@
 (define^ (%module-path-lib module)
   (string-append (%module-path module) (default-lib-directory)))
 
-;; Module name (transforms / into _)
+(define^ (%features->string features)
+  (apply string-append (map (lambda (s) (string-append (symbol->string s) "___")) features)))
 
-(define^ (%module-name module)
+;;; Transforms / into _
+
+(define^ (%module-flat-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
   (let ((name (string-copy (symbol->string (%module-id module)))))
     (let recur ((i (-- (string-length name))))
@@ -412,17 +418,26 @@
                        (string-set! name i #\_))
                  (recur (-- i)))))))
 
-(define^ (%module-filename-c module)
+(define^ (%module-filename-scm module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%module-library-name module) "__" (%module-name module) (default-c-extension)))
+  (string-append (symbol->string (%module-id module))
+                 (default-scm-extension)))
 
-(define^ (%module-filename-o module)
+(define^ (%module-filename-c module #!key (features '()))
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%module-library-name module) "__" (%module-name module) (default-o-extension)))
+  (string-append (%features->string features)
+                 (%module-library-name module)
+                 "__"
+                 (%module-flat-name module)
+                 (default-c-extension)))
 
-(define^ (%module-path-scm module)
+(define^ (%module-filename-o module #!key (features '()))
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (symbol->string (%module-id module)) (default-scm-extension)))
+  (string-append (%features->string features)
+                 (%module-library-name module)
+                 "__"
+                 (%module-flat-name module)
+                 (default-o-extension)))
 
 (define-macro (%include . module.lib)
   (receive (lib prefix module-name)
