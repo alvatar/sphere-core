@@ -275,9 +275,45 @@
   (string->symbol
    (apply string-append (map object->string args))))
 
+;;; symbol->keyword
+
+(define^ (symbol->keyword s)
+  (string->keyword (symbol->string s)))
+
+;;; keyword->symbol
+
+(define^ (keyword->symbol k)
+  (string->symbol (keyword->string k)))
+
 ;-------------------------------------------------------------------------------
 ; Modules
 ;-------------------------------------------------------------------------------
+
+;;; Config data
+
+(define^ (%config)
+  (with-exception-catcher
+   (lambda (e) (if (no-such-file-or-directory-exception? e)
+              ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
+              (with-exception-catcher
+               (lambda (e2) (if (unbound-global-exception? e2)
+                           (error "cannot find modules: config.scm file not found and %paths variable undefined")
+                           (raise e2)))
+               ;; inject %paths variable if no config.scm found
+               (lambda () `((paths: ,@%paths))))
+              (raise e)))
+   (lambda () (call-with-input-file "config.scm" read-all))))
+
+(define^ (%project-name)
+  (let ((project-name (assq project-name: (%config))))
+    (if project-name
+        (string->symbol (cadr project-name))
+        (error "No project-name provided in config file"))))
+
+(define^ (%paths)
+  (cons
+   (list (symbol->keyword (%project-name)) (current-directory))
+   (cdr (assq paths: (%config)))))
 
 ;;; Load or include a module
 ;;; Two formats available: (%include module) or (%include lib: module)
@@ -299,8 +335,8 @@
 (define^ (%module-library module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
   (if (list? module)
-      (string->symbol (keyword->string (car module)))
-      #f))
+      (keyword->symbol (car module))
+      (%project-name)))
 
 (define^ (%module-id module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
@@ -327,20 +363,9 @@
   (make-parameter ".c"))
 
 (define^ (%library-path library)
-  (let* ((config (with-exception-catcher
-                  (lambda (e) (if (no-such-file-or-directory-exception? e)
-                             ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
-                             (with-exception-catcher
-                              (lambda (e2) (if (unbound-global-exception? e2)
-                                          (error "cannot find modules: config.scm file not found and %paths variable undefined")
-                                          (raise e2)))
-                              ;; inject %paths variable if no config.scm found
-                              (lambda () `((paths: ,@%paths))))
-                             (raise e)))
-                  (lambda () (call-with-input-file "config.scm" read-all))))
-         (paths (cdr (assq paths: config))))
+  (let ((paths (%paths)))
     (unless paths
-            (error "No paths structure found in config.scm"))
+            (error "No paths structure found in config file"))
     (if library
         (uif (assq (string->keyword (symbol->string library)) paths)
              (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
@@ -387,7 +412,7 @@
 (define^ (%module-library-name module)
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
   (let ((ml (%module-library module)))
-    (if ml
+    (if ml ; Not really necessary since all modules are normalized to have a library
         (symbol->string ml)
         "")))
 
