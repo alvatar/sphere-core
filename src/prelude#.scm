@@ -403,8 +403,26 @@
 (define^ (%module-path-lib module)
   (string-append (%module-path module) (default-lib-directory)))
 
+;;; Features and compiler options. Basically "features" are properties of compiled
+;;; modules that are persistent (i.e. debug, profiling... compiler options that are not
+;;; considered features are those that are lost after compilation process (i.e. verbose)
+
 (define^ (%features->string features)
   (apply string-append (map (lambda (s) (string-append (symbol->string s) "___")) features)))
+
+(define^ (%compiler-options->features options)
+  ;; Filters compiler options that are allowed as a module feature
+  (let ((allowed-options '(debug))
+        (any-eq? (lambda (k l)
+                   (let recur ((l l))
+                     (cond ((null? l) #f)
+                           ((eq? k (car l)) #t)
+                           (else (recur (cdr l))))))))
+    (let recur ((output options))
+      (cond ((null? output) '())
+            ((any-eq? (car output) allowed-options)
+             (cons (car output) (recur (cdr output))))
+            (else (recur (cdr output)))))))
 
 ;;; Transforms / into _
 
