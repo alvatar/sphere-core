@@ -295,19 +295,20 @@
   (let ((cached #f))
     (lambda ()
       (or cached
-          (set! cached
-                (with-exception-catcher
-                 (lambda (e) (if (no-such-file-or-directory-exception? e)
-                            ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
-                            (with-exception-catcher
-                             (lambda (e2) (if (unbound-global-exception? e2)
-                                         (error "cannot find modules: config.scm file not found and %paths variable undefined")
-                                         (raise e2)))
-                             ;; inject %paths variable if no config.scm found
-                             (lambda () `((paths: ,@%paths))))
-                            (raise e)))
-                 (lambda () (call-with-input-file "config.scm" read-all)))))
-      cached)))
+          (begin
+            (set! cached
+                  (with-exception-catcher
+                   (lambda (e) (if (no-such-file-or-directory-exception? e)
+                              ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
+                              (with-exception-catcher
+                               (lambda (e2) (if (unbound-global-exception? e2)
+                                           (error "cannot find modules: config.scm file not found and %paths variable undefined")
+                                           (raise e2)))
+                               ;; inject %paths variable if no config.scm found
+                               (lambda () `((paths: ,@%paths))))
+                              (raise e)))
+                   (lambda () (call-with-input-file "config.scm" read-all))))
+            cached)))))
 
 (define^ (%project-name)
   (let ((project-name (assq project-name: (%config))))
