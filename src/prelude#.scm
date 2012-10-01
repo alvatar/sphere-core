@@ -311,9 +311,14 @@
             cached)))))
 
 (define^ (%project-name)
-  (let ((project-name (assq project-name: (%config))))
-    (if project-name
-        (string->symbol (cadr project-name))
+  (let ((blacklist '(bin doc include info lib share))
+        (project-name-info (assq project-name: (%config))))
+    (if project-name-info
+        (let ((project-name (string->symbol (cadr project-name-info))))
+          ;; Check that the name is not blacklisted
+          (if (memq project-name blacklist)
+              (error "Project name is blacklisted. These names are forbidden:" blacklist))
+          project-name)
         (error "No project-name provided in config file"))))
 
 (define^ (%paths)
@@ -339,13 +344,13 @@
            (null? (cddr module)))))
 
 (define^ (%module-library module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
   (if (list? module)
       (keyword->symbol (car module))
       (%project-name)))
 
 (define^ (%module-id module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
   (if (list? module)
       (cadr module)
       module))
@@ -370,12 +375,15 @@
 
 (define^ (%library-path library)
   (let ((paths (%paths)))
-    (unless paths
-            (error "No paths structure found in config file"))
     (if library
+        ;; First try with paths: in config file
         (uif (assq (string->keyword (symbol->string library)) paths)
              (string-append (path-strip-trailing-directory-separator (cadr ?it)) "/")
-             (error "Library path not found in configuration file:" library))
+             ;; Otherwise, try with ~~ directory
+             (let ((installed-library (string-append "~~" (symbol->string library) "/")))
+               (if (file-exists? installed-library)
+                   installed-library
+                   (error (string-append "Library not found: " (object->string library) " -- Please set a path in config file or install the library in the ~~ directory")))))
         #f)))
 
 (define^ (%check-module-exists? library-path module)
