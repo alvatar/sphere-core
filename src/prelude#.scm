@@ -449,7 +449,9 @@
 
 ;;; Removes symbols that cannot be features (i.e. they are non-persistent compiler options)
 
-(define^ (%clean-blacklisted-features features)
+;; TODO: Needs to remove duplicates too
+
+(define^ (%clean-features features)
   (let ((non-persistent-compiler-options '(verbose report expansion gvm))
         (any-eq?
          (lambda (k l)
@@ -465,7 +467,7 @@
 
 (define^ (%features->string features)
   (apply string-append (map (lambda (s) (string-append (symbol->string s) "___"))
-                            (%clean-blacklisted-features features))))
+                            (%clean-features features))))
 
 ;;; Split features into compiler-options and cond-expand-features
 
@@ -491,6 +493,16 @@
              (recur (cdr features)
                     compiler-options
                     (cons (car features) cond-expand-features)))))))
+
+(define^ (%select-compiler-options-from-features features)
+  (receive (compiler-options cond-expand-features)
+           (%split-features features)
+           compiler-options))
+
+(define^ (%select-cond-expand-features-from-features features)
+  (receive (compiler-options cond-expand-features)
+           (%split-features features)
+           cond-expand-features))
 
 (define^ (%features-from-file filename)
   (error "unimplemented"))
