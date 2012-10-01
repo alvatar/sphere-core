@@ -443,25 +443,57 @@
   (string-append (%module-path module) (default-lib-directory)))
 
 ;;; Features and compiler options. Basically "features" are properties of compiled
-;;; modules that are persistent (i.e. debug, profiling... compiler options that are not
-;;; considered features are those that are lost after compilation process (i.e. verbose)
+;;; modules that are persistent (i.e. debug, profiling, expanded cond-expand-features...
+;;; thus features can be compiler options or any other thing that defines a version of
+;;; compiled code
+
+;;; Removes symbols that cannot be features (i.e. they are non-persistent compiler options)
+
+(define^ (%clean-blacklisted-features features)
+  (let ((non-persistent-compiler-options '(verbose report expansion gvm))
+        (any-eq?
+         (lambda (k l)
+           (let recur ((l l))
+             (cond ((null? l) #f)
+                   ((eq? k (car l)) #t)
+                   (else (recur (cdr l))))))))
+    (let recur ((features features))
+      (cond ((null? features) '())
+            ((any-eq? (car features) non-persistent-compiler-options)
+             (recur (cdr features)))
+            (else (cons (car features) (recur (cdr features))))))))
 
 (define^ (%features->string features)
-  (apply string-append (map (lambda (s) (string-append (symbol->string s) "___")) features)))
+  (apply string-append (map (lambda (s) (string-append (symbol->string s) "___"))
+                            (%clean-blacklisted-features features))))
 
-(define^ (%compiler-options->features options)
-  ;; Filters compiler options that are allowed as a module feature
-  (let ((allowed-options '(debug))
-        (any-eq? (lambda (k l)
-                   (let recur ((l l))
-                     (cond ((null? l) #f)
-                           ((eq? k (car l)) #t)
-                           (else (recur (cdr l))))))))
-    (let recur ((output options))
-      (cond ((null? output) '())
-            ((any-eq? (car output) allowed-options)
-             (cons (car output) (recur (cdr output))))
-            (else (recur (cdr output)))))))
+;;; Split features into compiler-options and cond-expand-features
+
+(define^ (%split-features features)
+  (let ((gambit-options '(verbose report expansion gvm debug))
+        (any-eq?
+         (lambda (k l)
+           (let recur ((l l))
+             (cond ((null? l) #f)
+                   ((eq? k (car l)) #t)
+                   (else (recur (cdr l))))))))
+    (let recur ((features features)
+                (compiler-options '())
+                (cond-expand-features '()))
+      (cond ((null? features) (values compiler-options cond-expand-features))
+            ;; Is a compiler-option
+            ((any-eq? (car features) gambit-options)
+             (recur (cdr features)
+                    (cons (car features) compiler-options)
+                    cond-expand-features))
+            ;; Is a cond-expand-feature
+            (else
+             (recur (cdr features)
+                    compiler-options
+                    (cons (car features) cond-expand-features)))))))
+
+(define^ (%features-from-file filename)
+  (error "unimplemented"))
 
 ;;; Transforms / into _
 

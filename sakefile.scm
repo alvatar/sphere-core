@@ -20,7 +20,7 @@
   ;; Compile both with and without debugging options
   (for-each (lambda (m)
               (sake:compile-c-file (sake:generate-c-file m))
-              (sake:compile-c-file (sake:generate-c-file m options: '(debug))))
+              (sake:compile-c-file (sake:generate-c-file m features: '(debug))))
             modules))
 
 (define-task install (compile)
