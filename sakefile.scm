@@ -20,7 +20,9 @@
   ;; Compile both with and without debugging options
   (for-each (lambda (m)
               (sake:compile-c-file (sake:generate-c-file m))
-              (sake:compile-c-file (sake:generate-c-file m features: '(debug))))
+              (sake:compile-c-file (sake:generate-c-file m
+                                                         version: '(debug)
+                                                         compiler-options: '(debug))))
             modules))
 
 (define-task install (compile)
@@ -31,11 +33,11 @@
   ;; Install compiled module files
   (for-each (lambda (m)
               (sake:install-compiled-module m)
-              (sake:install-compiled-module m features: '(debug)))
+              (sake:install-compiled-module m version: '(debug)))
             modules))
 
 (define-task uninstall ()
   (delete-file install-dir))
 
-(define-task all (compile)
+(define-task all (compile install)
   'compile)

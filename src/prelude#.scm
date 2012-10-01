@@ -326,34 +326,41 @@
    (list (symbol->keyword (%project-name)) (current-directory))
    (cdr (assq paths: (%config)))))
 
-;;; Load or include a module
-;;; Two formats available: (%include module) or (%include lib: module)
-;;; The first one will look into current project src/ while the second will use
-;;; configuration file to determine the external library path. It uses the following
-;;; format, one line per library
-;;; lib-name=path
+;;; Module structure: (library: module-id [version: '(list-of-version-features)])
 
-;;; Module structure: (library module-id
+(define^ %module-reduced-form? symbol?)
+
+(define^ (%module-normal-form? module)
+  (and (list? module)
+       (keyword? (car module))
+       (not (null? (cdr module)))
+       (symbol? (cadr module))))
 
 (define^ (%module? module)
-  (or (symbol? module)
-      (and (list? module)
-           (keyword? (car module))
-           (not (null? (cdr module)))
-           (symbol? (cadr module))
-           (null? (cddr module)))))
+  (or (%module-reduced-form? module)
+      (%module-normal-form? module)))
 
 (define^ (%module-library module)
   (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
-  (if (list? module)
+  (if (%module-normal-form? module)
       (keyword->symbol (car module))
       (%project-name)))
 
 (define^ (%module-id module)
   (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
-  (if (list? module)
+  (if (%module-normal-form? module)
       (cadr module)
       module))
+
+(define^ (%module-version module)
+  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
+  (if (%module-normal-form? module)
+      ;; Search for version: from the third element on
+      (let ((version (memq version: (cddr module))))
+        (if version
+            (cadr version)
+            '()))
+      '()))
 
 (define^ default-src-directory
   (make-parameter "src/"))
@@ -442,70 +449,11 @@
 (define^ (%module-path-lib module)
   (string-append (%module-path module) (default-lib-directory)))
 
-;;; Features and compiler options. Basically "features" are properties of compiled
-;;; modules that are persistent (i.e. debug, profiling, expanded cond-expand-features...
-;;; thus features can be compiler options or any other thing that defines a version of
-;;; compiled code
+;;; Module versions identify debug, architecture or any compiled-in features
 
-;;; Removes symbols that cannot be features (i.e. they are non-persistent compiler options)
-
-;; TODO: Needs to remove duplicates too
-
-(define^ (%clean-features features)
-  (let ((non-persistent-compiler-options '(verbose report expansion gvm))
-        (any-eq?
-         (lambda (k l)
-           (let recur ((l l))
-             (cond ((null? l) #f)
-                   ((eq? k (car l)) #t)
-                   (else (recur (cdr l))))))))
-    (let recur ((features features))
-      (cond ((null? features) '())
-            ((any-eq? (car features) non-persistent-compiler-options)
-             (recur (cdr features)))
-            (else (cons (car features) (recur (cdr features))))))))
-
-(define^ (%features->string features)
+(define^ (%version->string version-symbol-list)
   (apply string-append (map (lambda (s) (string-append (symbol->string s) "___"))
-                            (%clean-features features))))
-
-;;; Split features into compiler-options and cond-expand-features
-
-(define^ (%split-features features)
-  (let ((gambit-options '(verbose report expansion gvm debug))
-        (any-eq?
-         (lambda (k l)
-           (let recur ((l l))
-             (cond ((null? l) #f)
-                   ((eq? k (car l)) #t)
-                   (else (recur (cdr l))))))))
-    (let recur ((features features)
-                (compiler-options '())
-                (cond-expand-features '()))
-      (cond ((null? features) (values compiler-options cond-expand-features))
-            ;; Is a compiler-option
-            ((any-eq? (car features) gambit-options)
-             (recur (cdr features)
-                    (cons (car features) compiler-options)
-                    cond-expand-features))
-            ;; Is a cond-expand-feature
-            (else
-             (recur (cdr features)
-                    compiler-options
-                    (cons (car features) cond-expand-features)))))))
-
-(define^ (%select-compiler-options-from-features features)
-  (receive (compiler-options cond-expand-features)
-           (%split-features features)
-           compiler-options))
-
-(define^ (%select-cond-expand-features-from-features features)
-  (receive (compiler-options cond-expand-features)
-           (%split-features features)
-           cond-expand-features))
-
-(define^ (%features-from-file filename)
-  (error "unimplemented"))
+                            version-symbol-list)))
 
 ;;; Transforms / into _
 
@@ -524,17 +472,21 @@
   (string-append (symbol->string (%module-id module))
                  (default-scm-extension)))
 
-(define^ (%module-filename-c module #!key (features '()))
+(define^ (%module-filename-c module #!key (version '()))
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%features->string features)
+  (string-append (if (null? version)
+                     (%version->string (%module-version module))
+                     (%version->string version))
                  (%module-library-name module)
                  "__"
                  (%module-flat-name module)
                  (default-c-extension)))
 
-(define^ (%module-filename-o module #!key (features '()))
+(define^ (%module-filename-o module #!key (version '()))
   (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (string-append (%features->string features)
+  (string-append (if (null? version)
+                     (%version->string (%module-version module))
+                     (%version->string version))
                  (%module-library-name module)
                  "__"
                  (%module-flat-name module)
