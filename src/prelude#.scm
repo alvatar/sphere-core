@@ -450,10 +450,36 @@
   (string-append (%module-path module) (default-lib-directory)))
 
 ;;; Module versions identify debug, architecture or any compiled-in features
-
+;;; Normalizes removing duplicates and sorting alphabetically
+ 
 (define^ (%version->string version-symbol-list)
-  (apply string-append (map (lambda (s) (string-append (symbol->string s) "___"))
-                            version-symbol-list)))
+  (letrec ((delete-duplicates
+            (lambda (l)
+              (cond ((null? l)
+                     '())
+                    ((member (car l) (cdr l))
+                     (delete-duplicates (cdr l)))
+                    (else
+                     (cons (car l) (delete-duplicates (cdr l)))))))
+           (insertion-sort
+            (letrec ((insert
+                      (lambda (x lst)
+                        (if (null? lst)
+                            (list x)
+                            (let ((y (car lst))
+                                  (ys (cdr lst)))
+                              (if (string<=? x y)
+                                  (cons x lst)
+                                  (cons y (insert x ys))))))))
+              (lambda (lst)
+                (if (null? lst)
+                    '()
+                    (insert (car lst)
+                            (insertion-sort (cdr lst))))))))
+    (apply string-append (map (lambda (s) (string-append s "___"))
+                              (insertion-sort
+                               (map symbol->string
+                                    (delete-duplicates version-symbol-list)))))))
 
 ;;; Transforms / into _
 
