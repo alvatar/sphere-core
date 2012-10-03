@@ -1,3 +1,3 @@
-(project-name: "base")
+(sphere: "base")
 (paths:
  (sake: "/data/projects/scheme-sake"))
