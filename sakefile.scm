@@ -19,11 +19,10 @@
             modules))
 
 (define-task clean ()
-  (delete-file (default-build-directory))
-  (delete-file (default-lib-directory)))
+  (sake:default-clean))
 
 (define-task install ()
-  ;; Install prelude
+  ;; Install prelude directly in the spheres directory
   (copy-file "src/prelude#.scm"
              prelude-system-path)
   ;; Install compiled module files
@@ -31,11 +30,10 @@
               (sake:install-compiled-module m)
               (sake:install-compiled-module m version: '(debug)))
             modules)
-  (sake:install-system-sphere (%current-sphere)))
+  (sake:install-system-sphere))
 
 (define-task uninstall ()
-  (delete-file (%sphere-system-path (%current-sphere)))
-  (delete-file prelude-system-path))
+  (sake:uninstall-system-sphere))
 
 (define-task all (compile install)
   'all)
