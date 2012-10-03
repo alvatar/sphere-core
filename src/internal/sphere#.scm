@@ -18,7 +18,7 @@
   (make-parameter ".scm"))
 
 (define^ default-o-extension
-  (make-parameter ".o"))
+  (make-parameter ".o1"))
 
 (define^ default-c-extension
   (make-parameter ".c"))
