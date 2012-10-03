@@ -110,22 +110,28 @@
             '()))
       '()))
 
-(define^ (%check-module-exists? sphere-path module)
-  (let ((check-path-1
-         ;; if it's an external sphere, then search in the src directory for C files
-         (string-append (unless sphere-path "")
-                        (default-lib-directory)
-                        (%module-filename-c module)))
-        (check-path-2
-         ;; if it's an external sphere, then search in the src directory for object files
-         (string-append (unless sphere-path "")
-                        (default-lib-directory)
-                        (%module-filename-o module)))
-        (check-path-3
-         ;; if it's a local sphere (no sphere-path), then search in the src directory
-         (string-append (unless sphere-path "")
-                        (default-src-directory)
-                        (%module-filename-scm module))))
+(define^ (%check-module-exists? module)
+  ;; TODO: now only checks sphere
+  (unless (file-exists? (%sphere-path (%module-sphere module)))
+          (error "%check-module-exists?: sphere path can't be found"))
+  #;
+  (let* ((sphere-path (%sphere-path (%module-sphere module)))
+         (check-)
+         (check-path-1
+          ;; if it's an external sphere, then search in the src directory for C files
+          (string-append sphere-path
+                         (default-lib-directory)
+                         (%module-filename-c module)))
+         (check-path-2
+          ;; if it's an external sphere, then search in the src directory for object files
+          (string-append (unless sphere-path "")
+                         (default-lib-directory)
+                         (%module-filename-o module)))
+         (check-path-3
+          ;; if it's a local sphere (no sphere-path), then search in the src directory
+          (string-append (unless sphere-path "")
+                         (default-src-directory)
+                         (%module-filename-scm module))))
     (unless (or (file-exists? check-path-1)
                 (file-exists? check-path-2)
                 (file-exists? check-path-3))
@@ -142,7 +148,7 @@
          (sphere-path (%sphere-path sphere))
          (module-name (%module-flat-name module)))
     ;; Check if the module exists, signal error if it doesn't
-    (%check-module-exists? sphere-path module)
+    (%check-module-exists? module)
     (values sphere
             sphere-path
             module-name)))
