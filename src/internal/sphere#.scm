@@ -67,7 +67,9 @@
 (define^ (%paths)
   (cons
    (list (symbol->keyword (%current-sphere)) (current-directory))
-   (cdr (assq paths: (%config)))))
+   (uif (assq paths: (%config))
+        (cdr ?it)
+        '())))
 
 ;-------------------------------------------------------------------------------
 ; Module
