@@ -96,9 +96,38 @@ c-declare-end
 
 ;;; unsigned-int array
 
+(c-declare #<<end-of-c-declare
+#include <stdint.h>
+end-of-c-declare
+)
+
+(define make-int*
+  (c-lambda (int) int*
+            "___result_voidstar = malloc( ___arg1*sizeof(int) );"))
+
+(define int*-set!
+  (c-lambda (int* int) void
+            "*___arg1 = ___arg2;"))
+
+(define pointer->int
+  (c-lambda (int*) int
+            "___result = *___arg1;"))
+
+(define make-unsigned-int32*
+  (c-lambda (int) unsigned-int32*
+            "___result_voidstar = malloc( ___arg1*sizeof(uint32_t) );"))
+
+(define pointer->unsigned-int32
+  (c-lambda (unsigned-int32*) unsigned-int32
+            "___result = *___arg1;"))
+
+
+
+;;; TODO: make from macro and apply to all types
+
 (define make-unsigned-int*
   (c-lambda (int) unsigned-int*
-            "___result_voidstar = malloc(___arg1*sizeof(unsigned int));"))
+            "___result_voidstar = malloc( ___arg1*sizeof(unsigned int) );"))
 
 (define unsigned-int*-ref
   (c-lambda (unsigned-int* int) unsigned-int

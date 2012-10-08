@@ -1,7 +1,5 @@
-;;;=============================================================================
 ;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro
 ;;; All Rights Reserved. See LICENSE
-;;;=============================================================================
 
 (##namespace ("ffi#"
               sizeof-unsigned-char
@@ -12,6 +10,11 @@
               malloc
               realloc
               free
+              make-int*
+              int*-set!
+              pointer->int
+              make-unsigned-int32*
+              pointer->unsigned-int32
               make-unsigned-int*
               unsigned-int*-ref
               unsigned-int*-set!
@@ -237,8 +240,29 @@ c-declare-end
 
 ;;; Common types
 
-(c-define-type size-t unsigned-int)
+(c-define-type void* (pointer void))
+(c-define-type bool* (pointer bool))
+(c-define-type short* (pointer short))
+(c-define-type unsigned-short* (pointer unsigned-short))
+(c-define-type int* (pointer int))
 (c-define-type unsigned-int* (pointer unsigned-int))
+(c-define-type long* (pointer long))
+(c-define-type unsigned-long* (pointer unsigned-long))
+(c-define-type long-long* (pointer long-long))
+(c-define-type unsigned-long-long* (pointer unsigned-long-long))
+(c-define-type float* (pointer float))
+(c-define-type double* (pointer double))
+
+(c-define-type int8* (pointer int8))
+(c-define-type unsigned-int8* (pointer unsigned-int8))
+(c-define-type int16* (pointer int16))
+(c-define-type unsigned-int16* (pointer unsigned-int16))
+(c-define-type int32* (pointer int32))
+(c-define-type unsigned-int32* (pointer unsigned-int32))
+(c-define-type int64* (pointer int64))
+(c-define-type unsigned-int64* (pointer unsigned-int64))
+
+(c-define-type size-t unsigned-int)
 
 ;;; Build a size-of value equivalent to the C operator
 ;;; c-build-sizeof float -> sizeof-float

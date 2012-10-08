@@ -33,7 +33,8 @@
   (sake:install-system-sphere))
 
 (define-task uninstall ()
-  (sake:uninstall-system-sphere))
+  (sake:uninstall-system-sphere)
+  (delete-file prelude-system-path))
 
 (define-task all (compile install)
   'all)
