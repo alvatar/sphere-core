@@ -152,38 +152,6 @@ fig.scm file"))
             '()))
       '()))
 
-(define^ (%check-module-exists? module)
-  ;; TODO: now only checks sphere
-  (unless (file-exists? (%sphere-path (%module-sphere module)))
-          (error "%check-module-exists?: sphere path can't be found"))
-  #;
-  (let* ((sphere-path (%sphere-path (%module-sphere module)))
-         (check-)
-         (check-path-1
-          ;; if it's an external sphere, then search in the src directory for C files
-          (string-append sphere-path
-                         (default-lib-directory)
-                         (%module-filename-c module)))
-         (check-path-2
-          ;; if it's an external sphere, then search in the src directory for object files
-          (string-append (unless sphere-path "")
-                         (default-lib-directory)
-                         (%module-filename-o module)))
-         (check-path-3
-          ;; if it's a local sphere (no sphere-path), then search in the src directory
-          (string-append (unless sphere-path "")
-                         (default-src-directory)
-                         (%module-filename-scm module))))
-    (unless (or (file-exists? check-path-1)
-                (file-exists? check-path-2)
-                (file-exists? check-path-3))
-            (error (string-append "Module cannot be found: "
-                                  (%module-flat-name module)
-                                  "\n-- Looked into: \n"
-                                  check-path-1 "\n"
-                                  check-path-2 "\n"
-                                  check-path-3)))))
-
 (define^ (%module-path module)
   (let ((sphere (%module-sphere module)))
     (if sphere
