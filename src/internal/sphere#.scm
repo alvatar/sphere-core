@@ -21,10 +21,11 @@
   (make-parameter ".o1"))
 
 (define^ default-c-extension
-  (make-parameter ".c"))
+  (make-parameter ".o1.c"))
 
 ;;; Read config data
-(define^ %config
+;;; Returns null list if no config data found
+(define^ %current-config
   (let ((cached #f))
     (lambda ()
       (or cached
@@ -32,22 +33,22 @@
             (set! cached
                   (with-exception-catcher
                    (lambda (e) (if (no-such-file-or-directory-exception? e)
-                              ;; If config.scm not found try to find global %paths variable, otherwise signal both errors
+                              ;; If config.scm not found try to find global %paths variable
                               (with-exception-catcher
                                (lambda (e2) (if (unbound-global-exception? e2)
-                                           (error "cannot find modules: config.scm file not found and %paths variable undefined")
+                                           '()
                                            (raise e2)))
-                               ;; inject %paths variable if no config.scm found
-                               (lambda () `((paths: ,@%paths))))
+                               ;; inject global %paths variable if no config.scm found
+                               (lambda () `((paths: ,@%system-paths))))
                               (raise e)))
                    (lambda () (call-with-input-file "config.scm" read-all))))
             cached)))))
 
 (define^ (%current-sphere)
-  (let ((current-sphere-info (assq sphere: (%config))))
+  (let ((current-sphere-info (assq sphere: (%current-config))))
     (if current-sphere-info
         (string->symbol (cadr current-sphere-info))
-        (error "No sphere: tag provided in config file"))))
+        #f)))
 
 (define^ (%sphere-system-path sphere)
   (string-append "~~spheres/" (symbol->string sphere) "/"))
@@ -65,15 +66,56 @@
         #f)))
 
 (define^ (%paths)
-  (cons
-   (list (symbol->keyword (%current-sphere)) (current-directory))
-   (uif (assq paths: (%config))
-        (cdr ?it)
-        '())))
+  (let ((paths (uif (assq paths: (%current-config))
+                    (cdr ?it)
+                    '())))
+    (uif (%current-sphere)
+         (cons
+          (list (symbol->keyword ?it) (current-directory))
+          paths)
+         paths)))
+
+(define^ (%dependencies)
+  (uif (assq dependencies: (%current-config))
+       (cdr ?it)
+       '()))
+
+;;; Used for getting a specific sphere config data
+(define^ %sphere-config
+  (let ((config-dict '()))
+    (lambda (sphere)
+      (if sphere
+          (uif (assq sphere config-dict)
+               (cadr ?it)
+               (let ((new-pair (list
+                                sphere
+                                (with-exception-catcher
+                                 (lambda (e) (if (no-such-file-or-directory-exception? e)
+                                            (error (string-append "Sphere \"" (symbol->string sphere) "\" doesn't have a con
+fig.scm file"))
+                                            (raise e)))
+                                 (lambda () (call-with-input-file
+                                           (string-append (or (%sphere-path sphere) "")
+                                                          "config.scm")
+                                         read-all))))))
+                 (set! config-dict
+                       (cons new-pair config-dict))
+                 (cadr new-pair)))
+          '()))))
+
+;;; Get dependencies of sphere's modules
+(define^ (%sphere-dependencies sphere)
+  (uif (assq dependencies: (%sphere-config sphere))
+       (cdr ?it)
+       '()))
 
 ;-------------------------------------------------------------------------------
 ; Module
 ;-------------------------------------------------------------------------------
+
+;;; Signal error when module has a wrong format
+(define^ (module-error module)
+  (error "Error parsing module directive (wrong module format): " module))
 
 ;;; Module structure: (sphere: module-id [version: '(list-of-version-features)])
 (define^ %module-reduced-form? symbol?)
@@ -89,19 +131,19 @@
       (%module-normal-form? module)))
 
 (define^ (%module-sphere module)
-  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (if (%module-normal-form? module)
       (keyword->symbol (car module))
       (%current-sphere)))
 
 (define^ (%module-id module)
-  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (if (%module-normal-form? module)
       (cadr module)
       module))
 
 (define^ (%module-version module)
-  (assure (%module? module) (error "Error parsing %include -- Wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (if (%module-normal-form? module)
       ;; Search for version: from the third element on
       (let ((version (memq version: (cddr module))))
@@ -142,22 +184,11 @@
                                   check-path-2 "\n"
                                   check-path-3)))))
 
-(define^ (%module-info module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
-  (let* ((sphere (%module-sphere module))
-         (sphere-path (%sphere-path sphere))
-         (module-name (%module-flat-name module)))
-    ;; Check if the module exists, signal error if it doesn't
-    (%check-module-exists? module)
-    (values sphere
-            sphere-path
-            module-name)))
-
 (define^ (%module-path module)
-  (receive
-   (_ path __)
-   (%module-info module)
-   (unless path "")))
+  (let ((sphere (%module-sphere module)))
+    (if sphere
+        (%sphere-path sphere)
+        "")))
 
 (define^ (%module-path-src module)
   (string-append (%module-path module) (default-src-directory)))
@@ -167,7 +198,6 @@
 
 ;;; Module versions identify debug, architecture or any compiled-in features
 ;;; Normalizes removing duplicates and sorting alphabetically
- 
 (define^ (%version->string version-symbol-list)
   (letrec ((delete-duplicates
             (lambda (l)
@@ -198,9 +228,8 @@
                                     (delete-duplicates version-symbol-list)))))))
 
 ;;; Transforms / into _
-
 (define^ (%module-flat-name module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (let ((name (string-copy (symbol->string (%module-id module)))))
     (let recur ((i (-- (string-length name))))
       (if (= i 0)
@@ -210,12 +239,12 @@
                  (recur (-- i)))))))
 
 (define^ (%module-filename-scm module)
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (string-append (symbol->string (%module-id module))
                  (default-scm-extension)))
 
 (define^ (%module-filename-c module #!key (version '()))
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -225,7 +254,7 @@
                  (default-c-extension)))
 
 (define^ (%module-filename-o module #!key (version '()))
-  (assure (%module? module) (error "Error parsing %include: wrong module format:" module))
+  (assure (%module? module) (module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -234,33 +263,77 @@
                  (%module-flat-name module)
                  (default-o-extension)))
 
+;;; Module dependecies
+(define^ (%module-dependencies module)
+  (assure (%module? module) (module-error module))
+  (assq (%module-id module) (%sphere-dependencies (%module-sphere module))))
+
+(define^ (%module-dependencies-select type)
+  (lambda (module)
+    (assure (%module? module) (module-error module))
+    (uif (assq (%module-id module) (%sphere-dependencies (%module-sphere module)))
+         (uif (assq type (cdr ?it))
+              (cdr ?it)
+              '())
+         '())))
+
+(define^ (%module-dependencies-to-include module)
+  ((%module-dependencies-select 'include) module))
+
+(define^ (%module-dependencies-to-load module)
+  ((%module-dependencies-select 'load) module))
+
 ;-------------------------------------------------------------------------------
 ; Including and loading
 ;-------------------------------------------------------------------------------
 
+(define *%included-modules* '((base: prelude#)))
+
 (define-macro (%include . module.lib)
-  (receive (lib prefix module-name)
-           (%module-info (if (null? (cdr module.lib))
-                             (car module.lib)
-                             module.lib))
-           (if lib
-               (begin
-                 (display (string-append "-- including: " module-name " -- (" (symbol->string lib) ")" "\n"))
-                 `(include ,(string-append prefix (default-src-directory) module-name (default-scm-extension))))
-               (begin
-                 (display (string-append "-- including: " module-name "\n"))
-                 `(include ,(string-append (default-src-directory) module-name (default-scm-extension)))))))
+  (let* ((module (if (null? (cdr module.lib))
+                     (car module.lib)
+                     module.lib))
+         (module-name (symbol->string (%module-id module)))
+         (sphere (%module-sphere module)))
+    (if sphere
+        (begin
+          (display (string-append "-- including: " module-name " -- (" (symbol->string sphere) ")" "\n"))
+          `(include ,(string-append (%sphere-path sphere) (default-src-directory) module-name (default-scm-extension))))
+        (begin
+          (display (string-append "-- loading -- " module-name ")\n"))
+          `(include ,(%module-filename-scm module))))))
 
-(define-macro (%load . module.lib)
-  (receive (lib lib-name prefix module-name)
-           (%module-info (if (null? (cdr module.lib))
-                             (car module.lib)
-                             module.lib))
-           (if lib
-               (begin
-                 (display (string-append "-- loading: " module-name " -- (" lib-name ")" "\n"))
-                 `(load ,(string-append prefix (default-lib-directory) module-name)))
-               (begin
-                 (display (string-append "-- loading: " module-name "\n"))
-                 `(load ,(string-append (default-lib-directory) module-name))))))
+(define *%loaded-modules* '())
 
+(define-macro (%load #!key (verbose #t) #!rest module)
+  (define (load-module module)
+    (let ((sphere (%module-sphere module))
+          (module-name (symbol->string (%module-id module))))
+      (if sphere
+          (begin (if verbose
+                     (display (string-append "-- loading -- ("
+                                             (symbol->string sphere)
+                                             ": "
+                                             module-name
+                                             ")\n")))
+                 (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                       (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                  (cond ((file-exists? file-o)
+                         (load file-o))
+                        ((file-exists? file-scm)
+                         (load file-scm))
+                        (else
+                         (error (string-append "Module: " module-name " cannot be found in its sphere's path"))))))
+          (begin (if verbose
+                     (display (string-append "-- loading -- " module-name ")\n")))
+                 (load (%module-filename-scm module))))))
+  (define (load-deps module)
+    (if (not (member module *%loaded-modules*))
+        (begin (for-each load-deps (%module-dependencies-to-load module))
+               (load-module module)
+               (set! *%loaded-modules* (cons module *%loaded-modules*)))))
+  (let ((module (if (null? (cdr module))
+                    (car module)
+                    module)))
+    (assure (%module? module) (module-error module))
+    (load-deps module)))
