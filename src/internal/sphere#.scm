@@ -126,6 +126,12 @@ fig.scm file"))
        (not (null? (cdr module)))
        (symbol? (cadr module))))
 
+(define^ (%module-normalized module #!key (override-sphere #f))
+  (list (symbol->keyword (if override-sphere override-sphere (%module-sphere module)))
+        (%module-id module)
+        version:
+        (%module-version module)))
+
 (define^ (%module? module)
   (or (%module-reduced-form? module)
       (%module-normal-form? module)))
@@ -231,19 +237,28 @@ fig.scm file"))
                  (%module-flat-name module)
                  (default-o-extension)))
 
-;;; Module dependecies
+;;; Module dependecies, as directly read from the %config
 (define^ (%module-dependencies module)
   (assure (%module? module) (module-error module))
   (assq (%module-id module) (%sphere-dependencies (%module-sphere module))))
 
 (define^ (%module-dependencies-select type)
-  (lambda (module)
-    (assure (%module? module) (module-error module))
-    (uif (assq (%module-id module) (%sphere-dependencies (%module-sphere module)))
-         (uif (assq type (cdr ?it))
-              (cdr ?it)
-              '())
-         '())))
+  (letrec ((find-normalized
+            (lambda (module sphere sphere-deps)
+              (cond ((null? sphere-deps) #f)
+                    ((equal? (%module-normalized module)
+                             (%module-normalized (caar sphere-deps)
+                                                 override-sphere: sphere))
+                     (car sphere-deps))
+                    (else (assq-normalized module (cdr sphere-deps)))))))
+    (lambda (module)
+      (assure (%module? module) (module-error module))
+      (let ((module-sphere (%module-sphere module)))
+        (uif (find-normalized module module-sphere (%sphere-dependencies module-sphere))
+             (uif (assq type (cdr ?it))
+                  (cdr ?it)
+                  '())
+             '())))))
 
 (define^ (%module-dependencies-to-include module)
   ((%module-dependencies-select 'include) module))
@@ -251,10 +266,37 @@ fig.scm file"))
 (define^ (%module-dependencies-to-load module)
   ((%module-dependencies-select 'load) module))
 
+;;; Gets the full tree of dependencies, building a list in the right order
+(define^ (%module-deep-dependencies-select type)
+  (lambda (module)
+    (let ((deps '()))
+      (let recur ((module module))
+        (for-each recur ((%module-dependencies-select type) module))
+        (unless (member (%module-normalized module) deps)
+                (set! deps (cons (%module-normalized module) deps))))
+      (reverse deps))))
+
+(define^ (%module-deep-dependencies-to-load module)
+  ((%module-deep-dependencies-select 'load) module))
+
+(define^ (%module-deep-dependencies-to-include module)
+  ((%module-deep-dependencies-select 'include) module))
+
 ;-------------------------------------------------------------------------------
 ; Including and loading
 ;-------------------------------------------------------------------------------
 
+;;; Builds a new list of dependencies merging two
+;;; Not optimized
+(define^ (%merge-dependencies dep1 dep2)
+  (letrec ((delete-duplicates
+            (lambda (l) (cond ((null? l) '())
+                         ((member (car l) (cdr l)) (delete-duplicates (cdr l)))
+                         (else (cons (car l) (delete-duplicates (cdr l))))))))
+    ;; We work on reversed list to keep the first occurence
+    (reverse (delete-duplicates (reverse (append dep1 dep2))))))
+
+;;; Include module and dependencies
 (define *%included-modules* '((base: prelude#)))
 
 (define-macro (%include . module.lib)
@@ -271,6 +313,7 @@ fig.scm file"))
           (display (string-append "-- loading -- " module-name ")\n"))
           `(include ,(%module-filename-scm module))))))
 
+;;; Load module and dependencies
 (define *%loaded-modules* '())
 
 (define-macro (%load #!key (verbose #t) #!rest module)
@@ -296,10 +339,10 @@ fig.scm file"))
                      (display (string-append "-- loading -- " module-name ")\n")))
                  (load (%module-filename-scm module))))))
   (define (load-deps module)
-    (if (not (member module *%loaded-modules*))
+    (if (not (member (%module-normalized module) *%loaded-modules*))
         (begin (for-each load-deps (%module-dependencies-to-load module))
                (load-module module)
-               (set! *%loaded-modules* (cons module *%loaded-modules*)))))
+               (set! *%loaded-modules* (cons (%module-normalized module) *%loaded-modules*)))))
   (let ((module (if (null? (cdr module))
                     (car module)
                     module)))
