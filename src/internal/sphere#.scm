@@ -297,7 +297,7 @@ fig.scm file"))
   ((%module-deep-dependencies-select 'include) module))
 
 ;-------------------------------------------------------------------------------
-; Including and loading
+; Utils
 ;-------------------------------------------------------------------------------
 
 ;;; Builds a new list of dependencies merging two
@@ -309,6 +309,24 @@ fig.scm file"))
                          (else (cons (car l) (delete-duplicates (cdr l))))))))
     ;; We work on reversed list to keep the first occurence
     (reverse (delete-duplicates (reverse (append dep1 dep2))))))
+
+;;; Select modules from a list belonging to a sphere
+(define^ (%select-modules modules spheres)
+  (let* ((select (if (pair? spheres) spheres (list spheres)))
+         (any-eq? (lambda (k l)
+                    (let recur ((l l))
+                      (cond ((null? l) #f)
+                            ((eq? k (car l)) #t)
+                            (else (recur (cdr l))))))))
+    (let recur ((output modules))
+      (cond ((null? output) '())
+            ((any-eq? (%module-sphere (car output)) select)
+             (cons (car output) (recur (cdr output))))
+            (else (recur (cdr output)))))))
+
+;-------------------------------------------------------------------------------
+; Including and loading
+;-------------------------------------------------------------------------------
 
 ;;; Include module and dependencies
 (define *%included-modules* '((base: prelude#)))
