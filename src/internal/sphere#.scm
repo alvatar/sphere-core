@@ -124,7 +124,10 @@ fig.scm file"))
   (and (list? module)
        (keyword? (car module))
        (not (null? (cdr module)))
-       (symbol? (cadr module))))
+       (symbol? (cadr module))
+       (unless (null? (cddr module))
+               (and (eq? version: (caddr module))
+                    (list? (cadddr module))))))
 
 (define^ (%module-normalize module #!key (override-sphere #f))
   (list (symbol->keyword (if override-sphere override-sphere (%module-sphere module)))
@@ -300,9 +303,9 @@ fig.scm file"))
 ; Utils
 ;-------------------------------------------------------------------------------
 
-;;; Builds a new list of dependencies merging two
+;;; Builds a new list of modules merging two lists
 ;;; Not optimized
-(define^ (%merge-dependencies dep1 dep2)
+(define^ (%merge-module-lists dep1 dep2)
   (letrec ((delete-duplicates
             (lambda (l) (cond ((null? l) '())
                          ((member (car l) (cdr l)) (delete-duplicates (cdr l)))
