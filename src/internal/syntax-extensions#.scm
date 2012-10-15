@@ -68,6 +68,27 @@
     (else
      (error "Too many arguments passed to unhygienic anaphoric if"))))
 
+;;; Hygienic anaphoric if
+(define-macro (aif it arg1 . rest-args)
+  (case (length rest-args)
+    ((1)
+     `(let ((,it ,arg1))
+        (if ,it
+            ,(car rest-args)
+            #f)))
+    ((2)
+     `(let ((,it ,arg1))
+        (if ,it
+            ,(car rest-args)
+            ,(cadr rest-args))))
+    ((3)
+     `(let ((,it ,(car rest-args)))
+        (if ,(arg1 ,it)
+            (cadr rest-args)
+            (caddr rest-args))))
+    (else
+     (error "Too many arguments passed to unhygienic anaphoric if"))))
+
 ;;; R5RS standard states that an if with only one branch returns an unspecified
 ;;; value if the test is false. This macro places an #f automatically
 (define-macro (when condition . stmts)
