@@ -75,10 +75,25 @@
           paths)
          paths)))
 
+;;; TODO: Merge with version below
+(define (expand-wildcards deps sphere)
+  (let recur ((deps deps))
+    (cond ((null? deps) '())
+          ((not (pair? deps))
+           (if (eq? '= deps)
+               (symbol->keyword sphere)
+               deps))
+          (else (cons (recur (car deps)) (recur (cdr deps)))))))
 (define^ (%dependencies)
   (uif (assq dependencies: (%current-config))
-       (cdr ?it)
+       (expand-wildcards (cdr ?it) (%current-sphere))
        '()))
+;;; Get dependencies of sphere's modules
+(define^ (%sphere-dependencies sphere)
+  (aif it (assq dependencies: (%sphere-config sphere))
+       (expand-wildcards (cdr it) sphere)
+       '()))
+
 
 ;;; Used for getting a specific sphere config data
 (define^ %sphere-config
@@ -103,12 +118,6 @@ fig.scm file"))
                  (cadr new-pair)))
           '()))))
 
-;;; Get dependencies of sphere's modules
-(define^ (%sphere-dependencies sphere)
-  (uif (assq dependencies: (%sphere-config sphere))
-       (cdr ?it)
-       '()))
-
 ;-------------------------------------------------------------------------------
 ; Module
 ;-------------------------------------------------------------------------------
@@ -122,7 +131,8 @@ fig.scm file"))
 
 (define^ (%module-normal-form? module)
   (and (list? module)
-       (keyword? (car module))
+       (or (keyword? (car module))
+           (eq? '= (car module))) ; Wildcard = represents the "this" sphere
        (not (null? (cdr module)))
        (symbol? (cadr module))
        (unless (null? (cddr module))
@@ -249,6 +259,16 @@ fig.scm file"))
   (letrec ((find-normalized
             (lambda (module sphere sphere-deps)
               (cond ((null? sphere-deps) #f)
+                    ;; Check if module is from this sphere
+                    ((not (eq? (%module-sphere (caar sphere-deps)) sphere))
+                     ;;;;;;;;; HERE
+                     (pp sphere-depsp)
+                     (display "in the file: ")
+                     (pp (%module-sphere (caar sphere-deps)))
+                     (display "sphere: ")
+                     (pp sphere)
+                     ;;;;;;;;; HERE
+                     (error "Dependency lists can't be done for non-local modules (tip: you can use = to identify local spheres)"))
                     ;; First check for the right version of the module
                     ((equal? (%module-normalize module)
                              (%module-normalize (caar sphere-deps)
