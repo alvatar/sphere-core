@@ -23,7 +23,10 @@
 (define^ default-c-extension
   (make-parameter ".o1.c"))
 
-;;; Read config data
+(define^ config-file
+  (make-parameter "config.scm"))
+
+;;; Read current sphere config data
 ;;; Returns null list if no config data found
 (define^ %current-config
   (let ((cached #f))
@@ -33,22 +36,23 @@
             (set! cached
                   (with-exception-catcher
                    (lambda (e) (if (no-such-file-or-directory-exception? e)
-                              ;; If config.scm not found try to find global %paths variable
+                              ;; If config file not found try to find global %paths variable
                               (with-exception-catcher
                                (lambda (e2) (if (unbound-global-exception? e2)
                                            '()
                                            (raise e2)))
-                               ;; inject global %paths variable if no config.scm found
+                               ;; inject global %paths variable if no config file found
                                (lambda () `((paths: ,@%system-paths))))
                               (raise e)))
-                   (lambda () (call-with-input-file "config.scm" read-all))))
+                   (lambda () (call-with-input-file (config-file) read-all))))
             cached)))))
 
-(define^ (%current-sphere)
-  (let ((current-sphere-info (assq sphere: (%current-config))))
-    (if current-sphere-info
-        (string->symbol (cadr current-sphere-info))
-        #f)))
+(define^ %current-sphere
+  (make-parameter
+   (let ((current-sphere-info (assq sphere: (%current-config))))
+     (if current-sphere-info
+         (string->symbol (cadr current-sphere-info))
+         #f))))
 
 (define^ (%sphere-system-path sphere)
   (string-append "~~spheres/" (symbol->string sphere) "/"))
@@ -75,26 +79,6 @@
           paths)
          paths)))
 
-;;; TODO: Merge with version below
-(define (expand-wildcards deps sphere)
-  (let recur ((deps deps))
-    (cond ((null? deps) '())
-          ((not (pair? deps))
-           (if (eq? '= deps)
-               (symbol->keyword sphere)
-               deps))
-          (else (cons (recur (car deps)) (recur (cdr deps)))))))
-(define^ (%dependencies)
-  (uif (assq dependencies: (%current-config))
-       (expand-wildcards (cdr ?it) (%current-sphere))
-       '()))
-;;; Get dependencies of sphere's modules
-(define^ (%sphere-dependencies sphere)
-  (aif it (assq dependencies: (%sphere-config sphere))
-       (expand-wildcards (cdr it) sphere)
-       '()))
-
-
 ;;; Used for getting a specific sphere config data
 (define^ %sphere-config
   (let ((config-dict '()))
@@ -111,12 +95,30 @@ fig.scm file"))
                                             (raise e)))
                                  (lambda () (call-with-input-file
                                            (string-append (or (%sphere-path sphere) "")
-                                                          "config.scm")
+                                                          (config-file))
                                          read-all))))))
                  (set! config-dict
                        (cons new-pair config-dict))
                  (cadr new-pair)))
           '()))))
+
+;;; Get dependencies of sphere's modules
+(define^ (%sphere-dependencies sphere)
+  (let ((expand-wildcards-for
+         (lambda (deps)
+           (map (lambda (e)
+                  (let ((module (car e))
+                        (rest (cdr e)))
+                    (cons
+                     (cond
+                      ((%module-reduced-form? module) (%module-normalize module override-sphere: sphere))
+                      ((eq? '= (car module)) (cons (symbol->keyword sphere) (cdr module)))
+                      (else module))
+                     rest)))
+                deps))))
+    (aif it (assq dependencies: (%sphere-config sphere))
+         (expand-wildcards-for (cdr it))
+         '())))
 
 ;-------------------------------------------------------------------------------
 ; Module
@@ -261,14 +263,7 @@ fig.scm file"))
               (cond ((null? sphere-deps) #f)
                     ;; Check if module is from this sphere
                     ((not (eq? (%module-sphere (caar sphere-deps)) sphere))
-                     ;;;;;;;;; HERE
-                     (pp sphere-depsp)
-                     (display "in the file: ")
-                     (pp (%module-sphere (caar sphere-deps)))
-                     (display "sphere: ")
-                     (pp sphere)
-                     ;;;;;;;;; HERE
-                     (error "Dependency lists can't be done for non-local modules (tip: you can use = to identify local spheres)"))
+                     (error (string-append "Dependency lists can't be done for non-local modules -> change " (config-file) " (tip: you can use = to identify local spheres)")))
                     ;; First check for the right version of the module
                     ((equal? (%module-normalize module)
                              (%module-normalize (caar sphere-deps)
