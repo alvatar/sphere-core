@@ -365,11 +365,13 @@ fig.scm file"))
 
 ;;; Load module and dependencies
 
-(define^ %load-dependencies
+(define^ %load-module
   (let ((*%loaded-modules* '()))
-    (lambda (module #!key (verbose #f))
-      (let recur ((module module))
-        (define (load-module module)
+    (lambda (root-module #!key
+                    (verbose #f)
+                    (no-root #f))
+      (let recur ((module root-module))
+        (define (load-single-module module)
           (let ((sphere (%module-sphere module))
                 (module-name (symbol->string (%module-id module))))
             (if sphere
@@ -393,11 +395,19 @@ fig.scm file"))
                        (load (%module-filename-scm module))))))
         (if (not (member (%module-normalize module) *%loaded-modules*))
             (begin (for-each recur (%module-dependencies-to-load module))
-                   (load-module module)))))))
+                   (unless (and no-root (equal? root-module module))
+                           (load-single-module module))))))))
 
-(define-macro (%load #!key (verbose #t) #!rest module)
-      (let ((module (if (null? (cdr module))
+(define-macro (%load-module-dependencies #!key (verbose #t) #!rest module)
+  (let ((module (if (null? (cdr module))
                     (car module)
                     module)))
     (assure (%module? module) (module-error module))
-    (%load-dependencies module verbose: verbose)))
+    (%load-module module no-root: #t verbose: verbose)))
+
+(define-macro (%load #!key (verbose #t) #!rest module)
+  (let ((module (if (null? (cdr module))
+                    (car module)
+                    module)))
+    (assure (%module? module) (module-error module))
+    (%load-module module verbose: verbose)))
