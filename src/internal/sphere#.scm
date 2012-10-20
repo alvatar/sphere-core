@@ -364,37 +364,40 @@ fig.scm file"))
           `(include ,(%module-filename-scm module))))))
 
 ;;; Load module and dependencies
-(define *%loaded-modules* '())
+
+(define^ %load-dependencies
+  (let ((*%loaded-modules* '()))
+    (lambda (module #!key (verbose #f))
+      (let recur ((module module))
+        (define (load-module module)
+          (let ((sphere (%module-sphere module))
+                (module-name (symbol->string (%module-id module))))
+            (if sphere
+                (begin (if verbose
+                           (display (string-append "-- loading -- ("
+                                                   (symbol->string sphere)
+                                                   ": "
+                                                   module-name
+                                                   ")\n")))
+                       (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                             (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                         (cond ((file-exists? file-o)
+                                (load file-o))
+                               ((file-exists? file-scm)
+                                (load file-scm))
+                               (else
+                                (error (string-append "Module: " module-name " cannot be found in its sphere's path"))))
+                         (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*))))
+                (begin (if verbose
+                           (display (string-append "-- loading -- " module-name ")\n")))
+                       (load (%module-filename-scm module))))))
+        (if (not (member (%module-normalize module) *%loaded-modules*))
+            (begin (for-each recur (%module-dependencies-to-load module))
+                   (load-module module)))))))
 
 (define-macro (%load #!key (verbose #t) #!rest module)
-  (define (load-module module)
-    (let ((sphere (%module-sphere module))
-          (module-name (symbol->string (%module-id module))))
-      (if sphere
-          (begin (if verbose
-                     (display (string-append "-- loading -- ("
-                                             (symbol->string sphere)
-                                             ": "
-                                             module-name
-                                             ")\n")))
-                 (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
-                       (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
-                  (cond ((file-exists? file-o)
-                         (load file-o))
-                        ((file-exists? file-scm)
-                         (load file-scm))
-                        (else
-                         (error (string-append "Module: " module-name " cannot be found in its sphere's path"))))))
-          (begin (if verbose
-                     (display (string-append "-- loading -- " module-name ")\n")))
-                 (load (%module-filename-scm module))))))
-  (define (load-deps module)
-    (if (not (member (%module-normalize module) *%loaded-modules*))
-        (begin (for-each load-deps (%module-dependencies-to-load module))
-               (load-module module)
-               (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*)))))
-  (let ((module (if (null? (cdr module))
+      (let ((module (if (null? (cdr module))
                     (car module)
                     module)))
     (assure (%module? module) (module-error module))
-    (load-deps module)))
+    (%load-dependencies module verbose: verbose)))

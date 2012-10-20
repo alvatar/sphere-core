@@ -67,13 +67,39 @@
 (define-macro (at-expand-time . expr)
   (eval (cons 'begin expr)))
 
-(c-declare #<<c-declare-end
+(cond-expand
+ (compile-to-o
+  (c-declare #<<c-declare-end
 
-___SCMOBJ ffimacro__leave_alone(void *p);
-___SCMOBJ ffimacro__free_foreign(void *p);
+             #ifndef FFIMACRO
+             #define FFIMACRO
+
+             #include <malloc.h>
+
+             ___SCMOBJ ffimacro__leave_alone(void *p)
+             {
+              return ___FIX(___NO_ERR)  ;
+              }
+
+             ___SCMOBJ ffimacro__free_foreign(void *p)
+             {
+              if (p)
+              free(p)                   ;
+              return ___FIX(___NO_ERR)  ;
+              }
+
+             #endif
 
 c-declare-end
-)
+             ))
+ (else
+  (c-declare #<<c-declare-end
+
+             ___SCMOBJ ffimacro__leave_alone(void *p)  ;
+             ___SCMOBJ ffimacro__free_foreign(void *p) ;
+
+c-declare-end
+             )))
 
 (at-expand-time
   (define (to-string x)
