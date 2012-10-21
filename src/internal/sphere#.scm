@@ -388,7 +388,7 @@ fig.scm file"))
                                ((file-exists? file-scm)
                                 (load file-scm))
                                (else
-                                (error (string-append "Module: " module-name " cannot be found in its sphere's path"))))
+                                (error (string-append "Module: " module-name " cannot be found in current sphere's path"))))
                          (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*))))
                 (begin (if verbose
                            (display (string-append "-- loading -- " module-name ")\n")))
