@@ -71,32 +71,32 @@
  (compile-to-o
   (c-declare #<<c-declare-end
 
-             #ifndef FFIMACRO
-             #define FFIMACRO
+#ifndef FFIMACRO
+#define FFIMACRO
 
-             #include <malloc.h>
+#include <malloc.h>
 
-             ___SCMOBJ ffimacro__leave_alone(void *p)
-             {
-              return ___FIX(___NO_ERR)  ;
-              }
+___SCMOBJ ffimacro__leave_alone(void *p)
+{
+  return ___FIX(___NO_ERR);
+}
 
-             ___SCMOBJ ffimacro__free_foreign(void *p)
-             {
-              if (p)
-              free(p)                   ;
-              return ___FIX(___NO_ERR)  ;
-              }
+___SCMOBJ ffimacro__free_foreign(void *p)
+{
+  if (p)
+    free(p);
+  return ___FIX(___NO_ERR);
+}
 
-             #endif
+#endif
 
 c-declare-end
              ))
  (compile-to-c
   (c-declare #<<c-declare-end
 
-             ___SCMOBJ ffimacro__leave_alone(void *p)  ;
-             ___SCMOBJ ffimacro__free_foreign(void *p) ;
+             ___SCMOBJ ffimacro__leave_alone(void *p);
+             ___SCMOBJ ffimacro__free_foreign(void *p);
 
 c-declare-end
              ))

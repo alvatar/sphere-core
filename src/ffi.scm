@@ -11,29 +11,7 @@
 ; Code needed by FFI-generation macros
 ;-------------------------------------------------------------------------------
 
-(c-declare #<<c-declare-end
-
-#ifndef FFIMACRO
-#define FFIMACRO
-
-#include <malloc.h>
-
-___SCMOBJ ffimacro__leave_alone(void *p)
-{
-    return ___FIX(___NO_ERR);
-}
-
-___SCMOBJ ffimacro__free_foreign(void *p)
-{
-    if (p)
-        free(p);
-    return ___FIX(___NO_ERR);
-}
-
-#endif
-
-c-declare-end
-)
+(c-declare "#include <malloc.h>")
 
 (define references
   (if (table? references)
