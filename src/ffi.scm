@@ -1,7 +1,5 @@
-;;;=============================================================================
-;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro
-;;; All Rights Reserved. See LICENSE
-;;;=============================================================================
+;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro. All Rights Reserved.
+;;; Foreign Function Interface functionality
 
 (##namespace ("ffi#"))
 (##include "~~lib/gambit#.scm")
