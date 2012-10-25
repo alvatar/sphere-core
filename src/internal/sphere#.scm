@@ -104,7 +104,45 @@ fig.scm file"))
 
 ;;; Get dependencies of sphere's modules
 (define^ (%sphere-dependencies sphere)
-  (let ((expand-wildcards-for
+  (let ((expand-cond-features
+         (lambda (deps)
+           (let ((any-eq? (lambda (k l)
+                            (let recur ((l l))
+                              (cond ((null? l) #f)
+                                    ((eq? k (car l)) #t)
+                                    (else (recur (cdr l))))))))
+             (let expand-cond-features ((deps deps))
+               (cond ((null? deps) '())
+                     ((not (pair? deps)) deps)
+                     ((eq? 'cond-expand (car deps))
+                      ;; cond-expand found
+                      (let find-condition ((conditions (cdr deps)))
+                        (cond ((null? conditions)
+                               (error "cond-expand in dependencies not met"))
+                              ((not (pair? (car conditions)))
+                               (error "incorrect cond-expand syntax"))
+                              ((and (symbol? (caar conditions))
+                                    (any-eq? (caar conditions) ##cond-expand-features))
+                               (cadar conditions))
+                              ((and (symbol? (caar conditions))
+                                    (eq? (caar conditions) 'else))
+                               (cadar conditions))
+                              ((and (pair? (caar conditions))
+                                    (eq? (caaar conditions) 'or))
+                               (error "OR clauses in dependencies not implemented yet"))
+                              ((and (pair? (caar conditions))
+                                    (eq? (caaar conditions) 'and))
+                               (error "AND clauses in dependencies not implemented yet"))
+                              ((and (pair? (caar conditions))
+                                    (eq? (caaar conditions) 'not))
+                               (error "NOT clauses in dependencies not implemented yet"))
+                              ((and (pair? (caar conditions)))
+                               (error "incorrect cond-expand syntax: must use OR, AND, NOT lists or single symbols"))
+                              (else
+                               (find-condition (cdr conditions))))))
+                     (else (cons (expand-cond-features (car deps))
+                                 (expand-cond-features (cdr deps)))))))))
+        (expand-wildcards
          (lambda (deps)
            (map (lambda (e)
                   (let ((module (car e))
@@ -117,7 +155,9 @@ fig.scm file"))
                      rest)))
                 deps))))
     (aif it (assq dependencies: (%sphere-config sphere))
-         (expand-wildcards-for (cdr it))
+         (expand-wildcards
+          (expand-cond-features
+           (cdr it)))
          '())))
 
 ;-------------------------------------------------------------------------------
