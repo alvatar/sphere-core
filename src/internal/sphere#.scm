@@ -164,6 +164,13 @@ fig.scm file"))
 ; Module
 ;-------------------------------------------------------------------------------
 
+(define^ (%make-module #!key (sphere #f) id (version '()))
+  (if sphere
+      (append (list (->keyword sphere)
+                    id: (->symbol id)
+                    version: version))
+      (->symbol id)))
+
 ;;; Signal error when module has a wrong format
 (define^ (module-error module)
   (error "Error parsing module directive (wrong module format): " module))
@@ -182,10 +189,9 @@ fig.scm file"))
                     (list? (cadddr module))))))
 
 (define^ (%module-normalize module #!key (override-sphere #f))
-  (list (symbol->keyword (if override-sphere override-sphere (%module-sphere module)))
-        (%module-id module)
-        version:
-        (%module-version module)))
+  (%make-module sphere: (if override-sphere override-sphere (%module-sphere module))
+                id: (%module-id module)
+                version: (%module-version module)))
 
 (define^ (%module? module)
   (or (%module-reduced-form? module)
@@ -351,9 +357,6 @@ fig.scm file"))
 (define^ (%module-deep-dependencies-to-load module)
   ((%module-deep-dependencies-select 'load) module))
 
-(define^ (%module-deep-dependencies-to-include module)
-  ((%module-deep-dependencies-select 'include) module))
-
 ;-------------------------------------------------------------------------------
 ; Utils
 ;-------------------------------------------------------------------------------
@@ -386,68 +389,79 @@ fig.scm file"))
 ; Including and loading
 ;-------------------------------------------------------------------------------
 
-;;; Include module and dependencies
-(define *%included-modules* '((base: prelude#)))
-
-(define-macro (%include . module.lib)
-  (let* ((module (if (null? (cdr module.lib))
-                     (car module.lib)
-                     module.lib))
+;;; Main include macro, doesn't load dependencies
+(define-macro (%include . module)
+  (let* ((module (if (null? (cdr module))
+                     (car module)
+                     module))
          (module-name (symbol->string (%module-id module)))
-         (sphere (%module-sphere module)))
+         (sphere (%module-sphere module))
+         (verbose #t))
+    (assure (%module? module) (module-error module))
     (if sphere
+        (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
+          (if verbose (display (string-append "-- including: " module-name " -- (" (symbol->string sphere) ")" "\n")))
+          `(include ,include-file))
         (begin
-          (display (string-append "-- including: " module-name " -- (" (symbol->string sphere) ")" "\n"))
-          `(include ,(string-append (%sphere-path sphere) (default-src-directory) module-name (default-scm-extension))))
-        (begin
-          (display (string-append "-- loading -- " module-name ")\n"))
+          (if verbose (display (string-append "-- loading -- " module-name ")\n")))
           `(include ,(%module-filename-scm module))))))
 
 ;;; Load module and dependencies
-
-(define^ %load-module
+(define^ %load-module-and-dependencies
   (let ((*%loaded-modules* '()))
     (lambda (root-module #!key
                     (verbose #f)
-                    (no-root #f))
+                    (omit-root #f))
       (let recur ((module root-module))
         (define (load-single-module module)
-          (let ((sphere (%module-sphere module))
-                (module-name (symbol->string (%module-id module))))
+          (let ((sphere (%module-sphere module)))
             (if sphere
                 (begin (if verbose
-                           (display (string-append "-- loading -- ("
-                                                   (symbol->string sphere)
-                                                   ": "
-                                                   module-name
-                                                   ")\n")))
+                           (display (string-append "-- loading -- "
+                                                   (object->string module)
+                                                   "\n")))
                        (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                              (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                         (pv file-o)
                          (cond ((file-exists? file-o)
                                 (load file-o))
                                ((file-exists? file-scm)
                                 (load file-scm))
                                (else
-                                (error (string-append "Module: " module-name " cannot be found in current sphere's path"))))
+                                (error (string-append "Module: "
+                                                      (object->string module)
+                                                      " cannot be found in current sphere's path"))))
                          (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*))))
                 (begin (if verbose
-                           (display (string-append "-- loading -- " module-name ")\n")))
+                           (display (string-append "-- loading -- " (object->string module) "\n")))
                        (load (%module-filename-scm module))))))
         (if (not (member (%module-normalize module) *%loaded-modules*))
             (begin (for-each recur (%module-dependencies-to-load module))
-                   (unless (and no-root (equal? root-module module))
+                   (unless (and omit-root (equal? root-module module))
                            (load-single-module module))))))))
 
-(define-macro (%load-module-dependencies #!key (verbose #t) #!rest module)
+;;; Load only module dependencies, do not load the module
+(define-macro (%load-module-dependencies . module)
   (let ((module (if (null? (cdr module))
                     (car module)
                     module)))
     (assure (%module? module) (module-error module))
-    (%load-module module no-root: #t verbose: verbose)))
+    (%load-module-and-dependencies module omit-root: #t verbose: #t)))
 
-(define-macro (%load #!key (verbose #t) #!rest module)
-  (let ((module (if (null? (cdr module))
-                    (car module)
-                    module)))
+;;; Main load macro, loads dependencies
+(define-macro (%load . module)
+  (let* ((module (if (null? (cdr module))
+                     (car module)
+                     module))
+         (header-id-string (string-append (symbol->string (%module-id module)) "#"))
+         (include-module (%make-module sphere: (%module-sphere module)
+                                       id: (string->symbol header-id-string)
+                                       version: (%module-version module)))
+         (include-file (string-append (%module-path-src include-module) (%module-filename-scm include-module))))
     (assure (%module? module) (module-error module))
-    (%load-module module verbose: verbose)))
+    (when (file-exists? include-file)
+          (eval `(##namespace (,header-id-string)))
+          (eval '(##include "~~lib/gambit#.scm"))
+          (eval `(##include ,include-file))
+          (display (string-append "-- including header -- " (object->string include-module) "\n")))
+    (%load-module-and-dependencies module verbose: #t)))

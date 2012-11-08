@@ -9,7 +9,10 @@
 ; Code needed by FFI-generation macros
 ;-------------------------------------------------------------------------------
 
-(c-declare "#include <malloc.h>")
+(cond-expand
+ ((or compile-to-o compile-to-c)
+  (c-declare "#include <malloc.h>"))
+  (else))
 
 (define references
   (if (table? references)

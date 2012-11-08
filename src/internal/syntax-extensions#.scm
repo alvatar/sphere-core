@@ -288,3 +288,11 @@
 ;;; keyword->symbol
 (define^ (keyword->symbol k)
   (string->symbol (keyword->string k)))
+
+;;; Anything to symbol
+(define^ (->symbol o)
+  (string->symbol (object->string o)))
+
+;;; Anything to keyword
+(define^ (->keyword o)
+  (string->keyword (object->string o)))
