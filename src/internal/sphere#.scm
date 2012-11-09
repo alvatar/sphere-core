@@ -167,7 +167,7 @@ fig.scm file"))
 (define^ (%make-module #!key (sphere #f) id (version '()))
   (if sphere
       (append (list (->keyword sphere)
-                    id: (->symbol id)
+                    (->symbol id)
                     version: version))
       (->symbol id)))
 
