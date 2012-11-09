@@ -389,6 +389,17 @@ fig.scm file"))
 ; Including and loading
 ;-------------------------------------------------------------------------------
 
+;;; Is there a header for this module? If so, return the header module
+(define^ (%module-header module)
+  (let ((header-module (%make-module
+                        sphere: (%module-sphere module)
+                        id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
+                        version: (%module-version module))))
+    (when (file-exists?
+           (string-append (%module-path-src header-module)
+                          (%module-filename-scm header-module)))
+          header-module)))
+
 ;;; Main include macro, doesn't load dependencies
 (define-macro (%include . module)
   (let* ((module (if (null? (cdr module))
@@ -453,15 +464,12 @@ fig.scm file"))
   (let* ((module (if (null? (cdr module))
                      (car module)
                      module))
-         (header-id-string (string-append (symbol->string (%module-id module)) "#"))
-         (include-module (%make-module sphere: (%module-sphere module)
-                                       id: (string->symbol header-id-string)
-                                       version: (%module-version module)))
-         (include-file (string-append (%module-path-src include-module) (%module-filename-scm include-module))))
+         (header-module (%module-header module)))
     (assure (%module? module) (module-error module))
-    (when (file-exists? include-file)
-          (eval `(##namespace (,header-id-string)))
+    (when header-module
+          (eval `(##namespace (,(symbol->string (%module-id header-module)))))
           (eval '(##include "~~lib/gambit#.scm"))
-          (eval `(##include ,include-file))
+          (eval `(##include ,(string-append (%module-path-src header-module)
+                                            (%module-filename-scm header-module))))
           (display (string-append "-- including header -- " (object->string include-module) "\n")))
     (%load-module-and-dependencies module verbose: #t)))
