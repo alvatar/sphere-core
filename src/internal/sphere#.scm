@@ -446,7 +446,7 @@ fig.scm file"))
                           ((file-exists? file-scm)
                            ;; Load all the include dependencies
                            (for-each (lambda (m)
-                                       (display (string-append "-- include dependency -- " (object->string m) "\n"))
+                                       (display (string-append "-- including header -- " (object->string m) "\n"))
                                        (eval `(##include ,(string-append (%module-path-src m)
                                                                          (%module-filename-scm m)))))
                                      (%module-dependencies-to-include module))
