@@ -411,10 +411,10 @@ fig.scm file"))
     (assure (%module? module) (module-error module))
     (if sphere
         (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
-          (if verbose (display (string-append "-- including: " module-name " -- (" (symbol->string sphere) ")" "\n")))
+          (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
           `(include ,include-file))
         (begin
-          (if verbose (display (string-append "-- loading -- " module-name ")\n")))
+          (if verbose (display (string-append "-- including -- " module-name ")\n")))
           `(include ,(%module-filename-scm module))))))
 
 ;;; Load module and dependencies
@@ -426,26 +426,47 @@ fig.scm file"))
       (let recur ((module root-module))
         (define (load-single-module module)
           (let ((sphere (%module-sphere module)))
-            (if sphere
-                (begin (if verbose
-                           (display (string-append "-- loading -- "
-                                                   (object->string module)
-                                                   "\n")))
-                       (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
-                             (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
-                         (pv file-o)
-                         (cond ((file-exists? file-o)
-                                (load file-o))
-                               ((file-exists? file-scm)
-                                (load file-scm))
-                               (else
-                                (error (string-append "Module: "
-                                                      (object->string module)
-                                                      " cannot be found in current sphere's path"))))
-                         (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*))))
-                (begin (if verbose
-                           (display (string-append "-- loading -- " (object->string module) "\n")))
-                       (load (%module-filename-scm module))))))
+            
+            (let ((header-module (%module-header module)))
+              ;; Create new namespace if there is a header file
+              (when header-module
+                    (eval `(##namespace (,(symbol->string (%module-id header-module))))))
+              ;; Load basic scheme names
+              (eval '(##include "~~lib/gambit#.scm"))
+              
+              
+              (if sphere
+                  (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                        (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                    (cond ((file-exists? file-o)
+                           (if verbose
+                               (display (string-append "-- loading -- " (object->string module) "\n")))
+                           (load file-o)
+                           (pv file-o))
+                          ((file-exists? file-scm)
+                           ;; Load all the include dependencies
+                           (for-each (lambda (m)
+                                       (display (string-append "-- include dependency -- " (object->string m) "\n"))
+                                       (eval `(##include ,(string-append (%module-path-src m)
+                                                                         (%module-filename-scm m)))))
+                                     (%module-dependencies-to-include module))
+                           ;; Load the header
+                           (when header-module
+                                 (eval `(##include ,(string-append (%module-path-src header-module)
+                                                                   (%module-filename-scm header-module)))))
+                           (if verbose
+                               (display (string-append "-- loading -- " (object->string module) "\n")))
+                           (load file-scm)
+                           (pv file-scm))
+                          (else
+                           (error (string-append "Module: "
+                                                 (object->string module)
+                                                 " cannot be found in current sphere's path"))))
+                    (set! *%loaded-modules* (cons (%module-normalize module) *%loaded-modules*)))
+                  (begin (if verbose
+                             (display (string-append "-- loading -- " (object->string module) "\n")))
+                         (load (%module-filename-scm module))))
+              (eval '(##namespace (""))))))
         (if (not (member (%module-normalize module) *%loaded-modules*))
             (begin (for-each recur (%module-dependencies-to-load module))
                    (unless (and omit-root (equal? root-module module))
@@ -463,13 +484,6 @@ fig.scm file"))
 (define-macro (%load . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
-                     module))
-         (header-module (%module-header module)))
+                     module)))
     (assure (%module? module) (module-error module))
-    (when header-module
-          (eval `(##namespace (,(symbol->string (%module-id header-module)))))
-          (eval '(##include "~~lib/gambit#.scm"))
-          (eval `(##include ,(string-append (%module-path-src header-module)
-                                            (%module-filename-scm header-module))))
-          (display (string-append "-- including header -- " (object->string header-module) "\n")))
     (%load-module-and-dependencies module verbose: #t)))
