@@ -444,7 +444,13 @@ fig.scm file"))
                            (load file-o)
                            (pv file-o))
                           ((file-exists? file-scm)
-                           ;; Load all the include dependencies
+                           ;; Include dependencies
+                           (for-each (lambda (m)
+                                       (display (string-append "-- including  -- " (object->string m) "\n"))
+                                       (eval `(##include ,(string-append (%module-path-src m)
+                                                                         (%module-filename-scm m)))))
+                                     (%module-dependencies-to-include module))
+                           ;; Include available header dependencies
                            (for-each (lambda (m)
                                        (let ((m (%module-header m)))
                                          (when m
@@ -452,6 +458,7 @@ fig.scm file"))
                                                (eval `(##include ,(string-append (%module-path-src m)
                                                                                  (%module-filename-scm m)))))))
                                      (%module-dependencies-to-load module))
+                           
                            ;; Load the header
                            (when header-module
                                  (eval `(##include ,(string-append (%module-path-src header-module)
