@@ -542,7 +542,7 @@
 
 ;;; Remove given an index
 
-(define (remove-at k lis)
+;(define (remove-at k lis)
 
 ;;; Remove first instance
 
