@@ -1,5 +1,6 @@
 (include "src/internal/base-macros.scm")
 (include "src/internal/sphere-macros.scm")
+(%include sake: utils#)
 
 (define modules '((base: ffi)
                   (base: repl-server)

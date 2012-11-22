@@ -18,7 +18,7 @@
 
 (define-macro (define^ pattern . body)
   `(eval-in-macro-environment-no-result
-    (define ,pattern ,@body)))
+    (##define ,pattern ,@body)))
 
 (define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
