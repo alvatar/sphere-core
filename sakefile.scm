@@ -1,5 +1,5 @@
-(include "src/internal/base-macros.scm")
-(include "src/internal/sphere-macros.scm")
+(include "src/base-macros.scm")
+(include "src/sphere-macros.scm")
 (%include sake: utils#)
 
 (define modules '((base: ffi)
