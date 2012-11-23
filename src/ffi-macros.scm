@@ -8,30 +8,30 @@
 ;; (Via 'Alvaro Castro-Castilla).
 (define-macro
   (c-constants . names)
-  (define (interval lo hi)
-    (if (< lo hi) (cons lo (interval (+ lo 1) hi)) '()))
   (let ((nb-names (length names))
         (wrapper (gensym)))
-    `(begin
-       (define ,wrapper
-         (c-lambda (int)
-                   int
-                   ,(string-append
-                      "static int _tmp_[] = {\n"
-                      (apply string-append
-                             (map (lambda (i name)
-                                    (let ((name-str (symbol->string name)))
-                                      (string-append
+    (letrec ((interval (lambda (lo hi)
+                         (if (< lo hi) (cons lo (interval (+ lo 1) hi)) '()))))
+      `(begin
+         (define ,wrapper
+           (c-lambda (int)
+                     int
+                     ,(string-append
+                       "static int _tmp_[] = {\n"
+                       (apply string-append
+                              (map (lambda (i name)
+                                     (let ((name-str (symbol->string name)))
+                                       (string-append
                                         (if (> i 0) "," "")
                                         name-str)))
-                                  (interval 0 nb-names)
-                                  names))
-                      "};\n"
-                      "___result = _tmp_[___arg1];\n")))
-       ,@(map (lambda (i name)
-                `(define ,name (,wrapper ,i)))
-              (interval 0 nb-names)
-              names))))
+                                   (interval 0 nb-names)
+                                   names))
+                       "};\n"
+                       "___result = _tmp_[___arg1];\n")))
+         ,@(map (lambda (i name)
+                  `(define ,name (,wrapper ,i)))
+                (interval 0 nb-names)
+                names)))))
 
 ;;; Struct and union generation macro
 ;;; (code by Estevo Castro)
@@ -236,12 +236,12 @@ c-declare-end
         (map mutator fields)))))
 
 (define-macro
-  (c-struct type . fields)
-  (apply c-native 'struct type fields))
+  (c-struct . type.fields)
+  (apply c-native 'struct (car type.fields) (cdr type.fields)))
 
 (define-macro
-  (c-union type . fields)
-  (apply c-native 'union type fields))
+  (c-union . type.fields)
+  (apply c-native 'union (car type.fields) (cdr type.fields)))
 
 ;;; Common types
 
@@ -286,6 +286,7 @@ c-declare-end
 
 ;;; Automatic memory freeing macro
 
+#;
 (define-macro (with-alloc ?b ?e . ?rest)
   `(let ((,?b ,?e))
      (let ((ret (begin ,@?rest)))
