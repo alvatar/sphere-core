@@ -16,9 +16,11 @@
     ,@exprs
     '(begin)))
 
-(define-macro (define^ pattern . body)
-  `(eval-in-macro-environment-no-result
-    (##define ,pattern ,@body)))
+(define-macro (define^ . args)
+  (let ((pattern (car args))
+        (body (cdr args)))
+    `(eval-in-macro-environment-no-result
+      (##define ,pattern ,@body))))
 
 (define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
@@ -48,62 +50,73 @@
 (define-macro (-- x) `(fx- ,x 1))
 
 ;;; Unhygienic anaphoric if
-(define-macro (uif arg1 . rest-args)
-  (case (length rest-args)
-    ((1)
-     `(let ((?it ,arg1))
-        (if ?it
-            ,(car rest-args)
-            #f)))
-    ((2)
-     `(let ((?it ,arg1))
-        (if ?it
-            ,(car rest-args)
-            ,(cadr rest-args))))
-    ((3)
-     `(let ((?it ,(car rest-args)))
-        (if ,(arg1 ?it)
-            (cadr rest-args)
-            (caddr rest-args))))
-    (else
-     (error "Too many arguments passed to unhygienic anaphoric if"))))
+(define-macro (uif . args)
+  (let ((arg1 (car args))
+        (rest-args (cdr args)))
+    (case (length rest-args)
+      ((1)
+       `(let ((?it ,arg1))
+          (if ?it
+              ,(car rest-args)
+              #f)))
+      ((2)
+       `(let ((?it ,arg1))
+          (if ?it
+              ,(car rest-args)
+              ,(cadr rest-args))))
+      ((3)
+       `(let ((?it ,(car rest-args)))
+          (if ,(arg1 ?it)
+              (cadr rest-args)
+              (caddr rest-args))))
+      (else
+       (error "Too many arguments passed to unhygienic anaphoric if")))))
 
 ;;; Hygienic anaphoric if
-(define-macro (aif it arg1 . rest-args)
-  (case (length rest-args)
-    ((1)
-     `(let ((,it ,arg1))
-        (if ,it
-            ,(car rest-args)
-            #f)))
-    ((2)
-     `(let ((,it ,arg1))
-        (if ,it
-            ,(car rest-args)
-            ,(cadr rest-args))))
-    ((3)
-     `(let ((,it ,(car rest-args)))
-        (if ,(arg1 ,it)
-            (cadr rest-args)
-            (caddr rest-args))))
-    (else
-     (error "Too many arguments passed to unhygienic anaphoric if"))))
+(define-macro (aif . args)
+  (let ((it (car args))
+        (arg1 (cadr args))
+        (rest-args (cddr args)))
+   (case (length rest-args)
+     ((1)
+      `(let ((,it ,arg1))
+         (if ,it
+             ,(car rest-args)
+             #f)))
+     ((2)
+      `(let ((,it ,arg1))
+         (if ,it
+             ,(car rest-args)
+             ,(cadr rest-args))))
+     ((3)
+      `(let ((,it ,(car rest-args)))
+         (if ,(arg1 ,it)
+             (cadr rest-args)
+             (caddr rest-args))))
+     (else
+      (error "Too many arguments passed to unhygienic anaphoric if")))))
 
 ;;; R5RS standard states that an if with only one branch returns an unspecified
 ;;; value if the test is false. This macro places an #f automatically
-(define-macro (when condition . stmts)
-  `(and ,condition (begin ,@stmts)))
+(define-macro (when . args)
+  (let ((condition (car args))
+        (forms (cdr args)))
+    `(and ,condition (begin ,@forms))))
 
 ;;; unless
-(define-macro (unless condition . stmts)
-  `(or ,condition (begin ,@stmts)))
+(define-macro (unless . args)
+  (let ((condition (car args))
+        (forms (cdr args)))
+    `(or ,condition (begin ,@forms))))
 
 ;;; Execute a sequence of forms and return the result of the _first_ one.
 ;;; Typically used to evaluate one or more forms with side effects and
 ;;; return a value that must be computed before
-(define-macro (begin0 form . forms)
-  (let ((var (gensym)))
-    `(let ((,var ,form)) ,@forms ,var)))
+(define-macro (begin0 . args)
+  (let ((form1 (car args))
+        (rest-forms (cdr args))
+        (var (gensym)))
+    `(let ((,var ,form1)) ,@rest-forms ,var)))
 
 ;;; push!
 (define-macro (push! list obj)
@@ -113,21 +126,23 @@
 (define-macro (string-null? str) `(zero? (string-length ,str)))
 
 ; Like let* but allowing for multiple-value bindings
-(define-macro (let-values* bindings . body)
-  (if (null? bindings) (cons 'begin body)
-      (apply (lambda (vars initializer)
-               (let ((cont 
-                      (cons 'let-values* 
-                            (cons (cdr bindings) body))))
-                 (cond
-                  ((not (pair? vars)) ; regular let case, a single var
-                   `(let ((,vars ,initializer)) ,cont))
-                  ((null? (cdr vars))  ; single var, see the prev case
-                   `(let ((,(car vars) ,initializer)) ,cont))
-                  (else                 ; the most generic case
-                   `(call-with-values (lambda () ,initializer)
-                      (lambda ,vars ,cont))))))
-             (car bindings))))
+(define-macro (let-values* . args)
+  (let ((bindings (car args))
+        (body (cadr args)))
+   (if (null? bindings) (cons 'begin body)
+       (apply (lambda (vars initializer)
+                (let ((cont 
+                       (cons 'let-values* 
+                             (cons (cdr bindings) body))))
+                  (cond
+                   ((not (pair? vars)) ; regular let case, a single var
+                    `(let ((,vars ,initializer)) ,cont))
+                   ((null? (cdr vars)) ; single var, see the prev case
+                    `(let ((,(car vars) ,initializer)) ,cont))
+                   (else                ; the most generic case
+                    `(call-with-values (lambda () ,initializer)
+                       (lambda ,vars ,cont))))))
+              (car bindings)))))
 
 ;;; Pretty-print for values, returning values too
 (define-macro (pv form)
@@ -213,62 +228,64 @@
 ; If the user specified no ?r-exp, the values of variables that are
 ; referenced in ?expr will be printed upon the assertion failure.
 
-(define-macro (assert expr . others)
-    ;; given the list of expressions or vars,
+(define-macro (assert . args)
+  ;; given the list of expressions or vars,
   ;; make the list appropriate for cerr
-  (define (make-print-list prefix lst)
+  (let ((expr (car args))
+        (others (cdr args)))
+    (define (make-print-list prefix lst)
+      (cond
+       ((null? lst) '())
+       ((symbol? (car lst))
+        (cons #\newline
+              (cons (list 'quote (car lst))
+                    (cons ": " (cons (car lst) (make-print-list #\newline (cdr lst)))))))
+       (else 
+        (cons prefix (cons (car lst) (make-print-list "" (cdr lst)))))))
+    ;; return the list of all unique "interesting"
+    ;; variables in the expr. Variables that are certain
+    ;; to be bound to procedures are not interesting.
+    (define (vars-of expr)
+      (let loop ((expr expr) (vars '()))
+        (cond
+         ((not (pair? expr)) vars)      ; not an application -- ignore
+         ((memq (car expr) 
+                '(quote let let* letrec let-values* lambda cond quasiquote
+                        case define do assert))
+          vars)                   ; won't go there
+         (else                    ; ignore the head of the application
+          (let inner ((expr (cdr expr)) (vars vars))
+            (cond 
+             ((null? expr) vars)
+             ((symbol? (car expr))
+              (inner (cdr expr)
+                     (if (memq (car expr) vars) vars (cons (car expr) vars))))
+             (else
+              (inner (cdr expr) (loop (car expr) vars)))))))))
     (cond
-     ((null? lst) '())
-     ((symbol? (car lst))
-      (cons #\newline
-            (cons (list 'quote (car lst))
-                  (cons ": " (cons (car lst) (make-print-list #\newline (cdr lst)))))))
-     (else 
-      (cons prefix (cons (car lst) (make-print-list "" (cdr lst)))))))
-  ;; return the list of all unique "interesting"
-  ;; variables in the expr. Variables that are certain
-  ;; to be bound to procedures are not interesting.
-  (define (vars-of expr)
-    (let loop ((expr expr) (vars '()))
-      (cond
-       ((not (pair? expr)) vars)        ; not an application -- ignore
-       ((memq (car expr) 
-              '(quote let let* letrec let-values* lambda cond quasiquote
-                      case define do assert))
-        vars)                     ; won't go there
-       (else                      ; ignore the head of the application
-        (let inner ((expr (cdr expr)) (vars vars))
-          (cond 
-           ((null? expr) vars)
-           ((symbol? (car expr))
-            (inner (cdr expr)
-                   (if (memq (car expr) vars) vars (cons (car expr) vars))))
-           (else
-            (inner (cdr expr) (loop (car expr) vars)))))))))
-  (cond
-   ((null? others)                      ; the most common case
-    `(or ,expr (begin (cerr "failed assertion: " ',expr "\n" "bindings"
-                            ,@(make-print-list #\newline (vars-of expr)) "\n")
+     ((null? others)                    ; the most common case
+      `(or ,expr (begin (cerr "failed assertion: " ',expr "\n" "bindings"
+                              ,@(make-print-list #\newline (vars-of expr)) "\n")
+                        (error "assertion failure"))))
+     ((eq? (car others) 'report:)       ; another common case
+      `(or ,expr (begin (cerr "failed assertion: " ',expr
+                              ,@(make-print-list #\newline (cdr others)) "\n")
+                        (error "assertion failure"))))
+     ((not (memq 'report: others))
+      `(or (and ,expr ,@others)
+           (begin (cerr "failed assertion: " '(,expr ,@others) "\n" "bindings"
+                        ,@(make-print-list #\newline
+                                           (vars-of (cons 'and (cons expr others)))) "\n")
+                  (error "assertion failure"))))
+     (else                      ; report: occurs somewhere in 'others'
+      (let loop ((exprs (list expr)) (reported others))
+        (cond
+         ((eq? (car reported) 'report:)
+          `(or (and ,@(reverse exprs))
+               (begin (cerr "failed assertion: " ',(reverse exprs)
+                            ,@(make-print-list #\newline (cdr reported)) "\n")
                       (error "assertion failure"))))
-   ((eq? (car others) 'report:)         ; another common case
-    `(or ,expr (begin (cerr "failed assertion: " ',expr
-                            ,@(make-print-list #\newline (cdr others)) "\n")
-                      (error "assertion failure"))))
-   ((not (memq 'report: others))
-    `(or (and ,expr ,@others)
-         (begin (cerr "failed assertion: " '(,expr ,@others) "\n" "bindings"
-                      ,@(make-print-list #\newline
-                                         (vars-of (cons 'and (cons expr others)))) "\n")
-                (error "assertion failure"))))
-   (else                        ; report: occurs somewhere in 'others'
-    (let loop ((exprs (list expr)) (reported others))
-      (cond
-       ((eq? (car reported) 'report:)
-        `(or (and ,@(reverse exprs))
-             (begin (cerr "failed assertion: " ',(reverse exprs)
-                          ,@(make-print-list #\newline (cdr reported)) "\n")
-                    (error "assertion failure"))))
-       (else (loop (cons (car reported) exprs) (cdr reported))))))))
+         (else (loop (cons (car reported) exprs) (cdr reported)))))))))
     
 (define-macro (assure exp error-msg) `(assert ,exp report: ,error-msg))
 
