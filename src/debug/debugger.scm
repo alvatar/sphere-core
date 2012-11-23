@@ -53,7 +53,7 @@
     (else
      (error "unknown function"))))
 
-(define (main #!optional port)
+(##define (main #!optional port)
   (set! rdi (rdi-create-server (and port (string->number port))))
   (rdi-force-connection rdi))
 

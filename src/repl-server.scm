@@ -2,10 +2,6 @@
 ;;; Copyright (c) 2011-2012 by Marc Feeley, All Rights Reserved.
 ;;;============================================================================
 
-(##namespace ("repl-server#"))
-(##include "~~lib/gambit#.scm")
-(##include "repl-server#.scm")
-
 (declare
  (standard-bindings)
  (extended-bindings)

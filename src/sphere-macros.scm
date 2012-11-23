@@ -71,7 +71,7 @@
         #f)))
 
 (define^ (%paths)
-  (let* ((paths-pair (assq paths: (%current-config)))
+  (let* ((paths-pair (assq (string->keyword "paths") (%current-config)))
          (paths (if paths-pair (cdr paths-pair) '())))
     (if (%current-sphere)
          (cons
@@ -150,12 +150,12 @@ fig.scm file"))
                         (rest (cdr e)))
                     (cons
                      (cond
-                      ((%module-reduced-form? module) (%module-normalize module override-sphere: sphere))
+                      ((%module-reduced-form? module) (%module-normalize module (string->keyword "override-sphere") sphere))
                       ((eq? '= (car module)) (cons (symbol->keyword sphere) (cdr module)))
                       (else module))
                      rest)))
                 deps))))
-    (let ((deps-pair (assq dependencies: (%sphere-config sphere))))
+    (let ((deps-pair (assq (string->keyword "dependencies") (%sphere-config sphere))))
       (if deps-pair
           (expand-wildcards
            (expand-cond-features
@@ -170,7 +170,7 @@ fig.scm file"))
   (if sphere
       (append (list (->keyword sphere)
                     (->symbol id)
-                    version: version))
+                    (string->keyword "version") version))
       (->symbol id)))
 
 ;;; Signal error when module has a wrong format
@@ -183,17 +183,20 @@ fig.scm file"))
 (define^ (%module-normal-form? module)
   (and (list? module)
        (or (keyword? (car module))
+           (and (symbol? (car module)) ; In case we don't have keywords (syntax-case)
+                (equal? #\: (let ((str (symbol->string (car module))))
+                                (string-ref str (- (string-length str) 1)))))
            (eq? '= (car module))) ; Wildcard = represents the "this" sphere
        (not (null? (cdr module)))
        (symbol? (cadr module))
        (or (null? (cddr module))
-           (and (eq? version: (caddr module))
+           (and (eq? (string->keyword "version") (caddr module))
                 (list? (cadddr module))))))
 
 (define^ (%module-normalize module #!key (override-sphere #f))
-  (%make-module sphere: (if override-sphere override-sphere (%module-sphere module))
-                id: (%module-id module)
-                version: (%module-version module)))
+  (%make-module (string->keyword "sphere") (if override-sphere override-sphere (%module-sphere module))
+                (string->keyword "id") (%module-id module)
+                (string->keyword "version") (%module-version module)))
 
 (define^ (%module? module)
   (or (%module-reduced-form? module)
@@ -202,7 +205,8 @@ fig.scm file"))
 (define^ (%module-sphere module)
   (or (%module? module) (module-error module))
   (if (%module-normal-form? module)
-      (keyword->symbol (car module))
+      (let ((first (car module)))
+        (if (keyword? first) (keyword->symbol first) first))
       (%current-sphere)))
 
 (define^ (%module-id module)
@@ -215,7 +219,7 @@ fig.scm file"))
   (or (%module? module) (module-error module))
   (if (%module-normal-form? module)
       ;; Search for version: from the third element on
-      (let ((version (memq version: (cddr module))))
+      (let ((version (memq 'version: (cddr module))))
         (if version
             (cadr version)
             '()))
@@ -315,7 +319,7 @@ fig.scm file"))
                     ;; First check for the right version of the module
                     ((equal? (%module-normalize module)
                              (%module-normalize (caar sphere-deps)
-                                                override-sphere: sphere))
+                                                (string->keyword "override-sphere") sphere))
                      (car sphere-deps))
                     (else (find-normalized module sphere (cdr sphere-deps))))))
            (find-unversioned
@@ -324,7 +328,7 @@ fig.scm file"))
                     ;; If not found, assume that unversioned dependencies can be used (only module is checked)
                     ((equal? (cadr (%module-normalize module))
                              (cadr (%module-normalize (caar sphere-deps)
-                                                      override-sphere: sphere)))
+                                                      (string->keyword "override-sphere") sphere)))
                      (display (string-append "*** WARNING -- No versioned dependencies found, using unversioned modules for "
                                              (object->string module)
                                              "\n"))
@@ -397,9 +401,9 @@ fig.scm file"))
 ;;; Is there a header for this module? If so, return the header module
 (define^ (%module-header module)
   (let ((header-module (%make-module
-                        sphere: (%module-sphere module)
-                        id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
-                        version: (%module-version module))))
+                        (string->keyword "sphere") (%module-sphere module)
+                        (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "#"))
+                        (string->keyword "version") (%module-version module))))
     (and (file-exists?
           (string-append (%module-path-src header-module)
                          (%module-filename-scm header-module)))
@@ -409,7 +413,16 @@ fig.scm file"))
 (define-macro (%include . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
-                     module))
+                     ;; If it defines the sphere, process the sphere name to make it a keyword
+                     (cons (let ((first (car module)))
+                             (if (keyword? first)
+                                 first
+                                 (let ((str (apply string
+                                                   (string->list
+                                                    (symbol->string first)))))
+                                   (string-shrink! str (- (string-length str) 1))
+                                   (string->keyword str))))
+                           (cdr module))))
          (module-name (symbol->string (%module-id module)))
          (sphere (%module-sphere module))
          (verbose #t))
@@ -501,6 +514,15 @@ fig.scm file"))
 (define-macro (%load . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
-                     module)))
+                     ;; If it defines the sphere, process the sphere name to make it a keyword
+                     (cons (let ((first (car module)))
+                             (if (keyword? first)
+                                 first
+                                 (let ((str (apply string
+                                                   (string->list
+                                                    (symbol->string first)))))
+                                   (string-shrink! str (- (string-length str) 1))
+                                   (string->keyword str))))
+                           (cdr module)))))
     (or (%module? module) (module-error module))
     (%load-module-and-dependencies module '(verbose))))
