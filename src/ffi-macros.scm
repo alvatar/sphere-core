@@ -116,7 +116,7 @@
                                 c-attr-name ");"))
                            parent)))
                     ,@(if voidstar
-                        '((ffi#link parent ret))
+                        '((ffi:link parent ret))
                         '())
                     ret))))))
        (mutator
@@ -173,7 +173,7 @@
                         (,scheme-type) ,pointer-type
                         "___result_voidstar = ___arg1_voidstar;")
                       x)))
-               (ffi#link x ret)
+               (ffi:link x ret)
                ret))
            (define (,(symbol-append "pointer->" scheme-type) x)
              ; Pointer dereference
@@ -182,7 +182,7 @@
                         (,pointer-type) ,(symbol-append unmanaged-prefix scheme-type)
                         "___result_voidstar = ___arg1_voidstar;")
                       x)))
-               (ffi#link x ret)
+               (ffi:link x ret)
                ret))
            (define ,(symbol-append "make-" scheme-type "-array")
              (c-lambda
@@ -195,7 +195,7 @@
                        (,pointer-type int) ,pointer-type
                        ,(string-append "___result_voidstar = (" c-type-name "*)___arg1_voidstar + ___arg2;"))
                       p i)))
-               (ffi#link p ret)
+               (ffi:link p ret)
                ret)))
         (map accessor fields)
         (map mutator fields)))))
@@ -226,3 +226,67 @@
      (let ((ret (begin ,@?rest)))
        (free ,(car expr))
        ret)))
+
+(cond-expand
+ ((or compile-to-o compile-to-c)
+  (c-define-type void* (pointer void))
+  (c-define-type bool* (pointer bool))
+  (c-define-type short* (pointer short))
+  (c-define-type unsigned-short* (pointer unsigned-short))
+  (c-define-type int* (pointer int))
+  (c-define-type unsigned-int* (pointer unsigned-int))
+  (c-define-type long* (pointer long))
+  (c-define-type unsigned-long* (pointer unsigned-long))
+  (c-define-type long-long* (pointer long-long))
+  (c-define-type unsigned-long-long* (pointer unsigned-long-long))
+  (c-define-type float* (pointer float))
+  (c-define-type double* (pointer double))
+
+  (c-define-type char* (pointer char))
+  (c-define-type unsigned-char* (pointer unsigned-char))
+  (c-define-type int8* (pointer int8))
+  (c-define-type unsigned-int8* (pointer unsigned-int8))
+  (c-define-type int16* (pointer int16))
+  (c-define-type unsigned-int16* (pointer unsigned-int16))
+  (c-define-type int32* (pointer int32))
+  (c-define-type unsigned-int32* (pointer unsigned-int32))
+  (c-define-type int64* (pointer int64))
+  (c-define-type unsigned-int64* (pointer unsigned-int64))
+
+  (c-define-type size-t unsigned-int))
+ (else))
+
+(cond-expand
+ (compile-to-o
+  (c-declare #<<c-declare-end
+
+#ifndef FFIMACRO
+#define FFIMACRO
+
+#include <malloc.h>
+
+___SCMOBJ ffimacro__leave_alone(void *p)
+{
+  return ___FIX(___NO_ERR);
+}
+
+___SCMOBJ ffimacro__free_foreign(void *p)
+{
+  if (p)
+    free(p);
+  return ___FIX(___NO_ERR);
+}
+
+#endif
+
+c-declare-end
+             ))
+ (compile-to-c
+  (c-declare #<<c-declare-end
+
+             ___SCMOBJ ffimacro__leave_alone(void *p);
+             ___SCMOBJ ffimacro__free_foreign(void *p);
+
+c-declare-end
+             ))
+ (else))
