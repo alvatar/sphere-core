@@ -399,34 +399,20 @@ fig.scm file"))
 ;-------------------------------------------------------------------------------
 
 ;;; Is there a header for this module? If so, return the header module
-(define^ (%module-header module)
-  (let ((header-module (%make-module
-                        (string->keyword "sphere") (%module-sphere module)
-                        (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "#"))
-                        (string->keyword "version") (%module-version module))))
-    (and (file-exists?
-          (string-append (%module-path-src header-module)
-                         (%module-filename-scm header-module)))
-         header-module)))
+;; (define^ (%module-header module)
+;;   (let ((header-module (%make-module
+;;                         (string->keyword "sphere") (%module-sphere module)
+;;                         (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "#"))
+;;                         (string->keyword "version") (%module-version module))))
+;;     (and (file-exists?
+;;           (string-append (%module-path-src header-module)
+;;                          (%module-filename-scm header-module)))
+;;          header-module)))
 
-;;; Main include macro, doesn't load dependencies
-(define-macro (%include . module)
-  (let* ((module (if (null? (cdr module))
-                     (car module)
-                     ;; If it defines the sphere, process the sphere name to make it a keyword
-                     (cons (let ((first (car module)))
-                             (if (keyword? first)
-                                 first
-                                 (let ((str (apply string
-                                                   (string->list
-                                                    (symbol->string first)))))
-                                   (string-shrink! str (- (string-length str) 1))
-                                   (string->keyword str))))
-                           (cdr module))))
-         (module-name (symbol->string (%module-id module)))
-         (sphere (%module-sphere module))
-         (verbose #t))
-    (or (%module? module) (module-error module))
+(define^ (%include-module-and-dependencies module options)
+  (let ((verbose (and (memq 'verbose options) #t))
+        (sphere (%module-sphere module))
+        (module-name (symbol->string (%module-id module))))
     (if sphere
         (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
           (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
@@ -434,6 +420,23 @@ fig.scm file"))
         (begin
           (if verbose (display (string-append "-- including -- " module-name ")\n")))
           `(include ,(%module-filename-scm module))))))
+
+;;; Main include macro, doesn't load dependencies
+(define-macro (%include . module)
+  (let ((module (if (null? (cdr module))
+                    (car module)
+                    ;; If it defines the sphere, process the sphere name to make it a keyword
+                    (cons (let ((first (car module)))
+                            (if (keyword? first)
+                                first
+                                (let ((str (apply string
+                                                  (string->list
+                                                   (symbol->string first)))))
+                                  (string-shrink! str (- (string-length str) 1))
+                                  (string->keyword str))))
+                          (cdr module)))))
+    (or (%module? module) (module-error module))
+    (%include-module-and-dependencies module '(verbose))))
 
 ;;; Load module and dependencies
 (define^ %load-module-and-dependencies
@@ -445,15 +448,12 @@ fig.scm file"))
         (let recur ((module root-module))
           (define (load-single-module module)
             (let ((sphere (%module-sphere module)))
-            
-              (let ((header-module (%module-header module)))
+              (let () ;; ((header-module (%module-header module)))
                 ;; Create new namespace if there is a header file
-                (and header-module
-                     (eval `(##namespace (,(symbol->string (%module-id header-module))))))
+                ;; (and header-module
+                ;;      (eval `(##namespace (,(symbol->string (%module-id header-module))))))
                 ;; Load basic scheme names
                 (eval '(##include "~~lib/gambit#.scm"))
-              
-              
                 (if sphere
                     (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                           (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
@@ -471,18 +471,17 @@ fig.scm file"))
                                                                            (%module-filename-scm m)))))
                                        (%module-dependencies-to-include module))
                              ;; Include available header dependencies
-                             (for-each (lambda (m)
-                                         (let ((m (%module-header m)))
-                                           (and m
-                                                (begin (display (string-append "-- including header -- " (object->string m) "\n"))
-                                                       (eval `(##include ,(string-append (%module-path-src m)
-                                                                                         (%module-filename-scm m))))))))
-                                       (%module-dependencies-to-load module))
-                           
+                             ;; (for-each (lambda (m)
+                             ;;             (let ((m (%module-header m)))
+                             ;;               (and m
+                             ;;                    (begin (display (string-append "-- including header -- " (object->string m) "\n"))
+                             ;;                           (eval `(##include ,(string-append (%module-path-src m)
+                             ;;                                                             (%module-filename-scm m))))))))
+                             ;;           (%module-dependencies-to-load module))
                              ;; Load the header
-                             (and header-module
-                                  (eval `(##include ,(string-append (%module-path-src header-module)
-                                                                    (%module-filename-scm header-module)))))
+                             ;; (and header-module
+                             ;;      (eval `(##include ,(string-append (%module-path-src header-module)
+                             ;;                                        (%module-filename-scm header-module)))))
                              (if verbose
                                  (display (string-append "-- loading -- " (object->string module) "\n")))
                              (load file-scm)
