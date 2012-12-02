@@ -241,9 +241,8 @@
   (c-define-type unsigned-long-long* (pointer unsigned-long-long))
   (c-define-type float* (pointer float))
   (c-define-type double* (pointer double))
-
-  (c-define-type char* (pointer char))
   (c-define-type unsigned-char* (pointer unsigned-char))
+  (c-define-type unsigned-char** (pointer unsigned-char*))
   (c-define-type int8* (pointer int8))
   (c-define-type unsigned-int8* (pointer unsigned-int8))
   (c-define-type int16* (pointer int16))
