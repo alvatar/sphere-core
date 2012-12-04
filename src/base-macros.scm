@@ -171,9 +171,11 @@
 ;;     ((_ c . body)
 ;;      (call-with-current-continuation
 ;;        (lambda (c) . body)))))
-    
-;;; Do a fixed number of times
+(define-macro (let/cc . args)
+  `(call-with-current-continuation
+    (lambda (,(car args)) ,@(cdr args))))
 
+;;; Do a fixed number of times
 ;; (define-syntax dotimes
 ;;   (syntax-rules ()
 ;;     ((_ (var n res) . body)

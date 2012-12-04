@@ -2,9 +2,12 @@
 (include "src/sphere-macros.scm")
 (include "src/sake-extensions.scm")
 
-(define modules '((base: ffi)
-                  (base: repl-server)
-                  (base: debug/debuggee)))
+(define modules '(debug/debuggee
+                  ffi
+                  functional
+                  mailbox
+                  profile
+                  repl-server))
 
 (define prelude-system-path "~~spheres/prelude-macros.scm")
 
