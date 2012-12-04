@@ -457,7 +457,7 @@ fig.scm file"))
 
 ;;; Load module and dependencies. Remembers what's been loaded and included by this procedure.
 ;;; A new include can be forced with (%include ...)
-(define^ %load-module-and-dependencies
+(define %load-module-and-dependencies
   (let ((*loaded-modules* '())
         (*included-modules* '()))
     (letrec
@@ -564,4 +564,4 @@ fig.scm file"))
                                    (string->keyword str))))
                            (cdr module)))))
     (or (%module? module) (module-error module))
-    (%load-module-and-dependencies module '(verbose))))
+    `(%load-module-and-dependencies ',module '(verbose))))
