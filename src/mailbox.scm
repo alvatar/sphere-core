@@ -1,8 +1,6 @@
-;;; In-RAM Mailbox object routines
-;;;
-;;; This code is from Gambit's documentation.
-;;;
 ;;; Copyright (c) 1994-2009 by Marc Feeley, All Rights Reserved.
+;;; In-RAM Mailbox object routines
+;;; This code is from Gambit's documentation.
 
 (define (make-empty-mailbox)
   (let ((mutex (make-mutex))
@@ -45,3 +43,4 @@
 (define (mailbox-put! m obj) ((m 'put!) obj))
 
 (define (mailbox-get! m) ((m 'get!)))
+
