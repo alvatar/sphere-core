@@ -95,6 +95,25 @@
              (caddr rest-args))))
      (else
       (error "Too many arguments passed to unhygienic anaphoric if")))))
+;; (define-syntax aif
+;;   (syntax-rules ()
+;;     ((_ var expr iftrue)
+;;      (let ((var expr))
+;;        (if var
+;;            iftrue
+;;            #f)))
+;;     ((_ var expr iftrue iffalse)
+;;      (let ((var expr))
+;;        (if var
+;;            iftrue
+;;            iffalse)))
+;;     ((_ var pred expr iftrue iffalse)
+;;      (let ((var expr))
+;;        (if (pred var)
+;;            iftrue
+;;            iffalse)))))
+
+
 
 ;;; R5RS standard states that an if with only one branch returns an unspecified
 ;;; value if the test is false. This macro places an #f automatically
@@ -102,12 +121,21 @@
   (let ((condition (car args))
         (forms (cdr args)))
     `(and ,condition (begin ,@forms))))
+;; (define-syntax when
+;;   (syntax-rules ()
+;;     ((_ ?pred ?form . ?forms)
+;;      (if ?pred (begin ?form . ?forms) #f))))
+
 
 ;;; unless
 (define-macro (unless . args)
   (let ((condition (car args))
         (forms (cdr args)))
     `(or ,condition (begin ,@forms))))
+;; (define-syntax unless
+;;   (syntax-rules ()
+;;     ((_ ?test ?form . ?forms)
+;;      (if ?test #f (begin ?form . ?forms)))))
 
 ;;; Execute a sequence of forms and return the result of the _first_ one.
 ;;; Typically used to evaluate one or more forms with side effects and
@@ -166,14 +194,15 @@
   `(display ,args (current-error-port)))
 
 ;;; Letcc macro (hoping and skipping)
+(define-macro (let/cc . args)
+  `(call-with-current-continuation
+    (lambda (,(car args)) ,@(cdr args))))
 ;; (define-syntax let/cc
 ;;   (syntax-rules ()
 ;;     ((_ c . body)
 ;;      (call-with-current-continuation
 ;;        (lambda (c) . body)))))
-(define-macro (let/cc . args)
-  `(call-with-current-continuation
-    (lambda (,(car args)) ,@(cdr args))))
+
 
 ;;; Do a fixed number of times
 ;; (define-syntax dotimes
