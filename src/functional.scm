@@ -1,10 +1,13 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Functional programming procedures
 
-(declare (standard-bindings)
-         (extended-bindings)
-         (block)
-         (mostly-generic))
+(cond-expand
+ (gambit
+  (declare (standard-bindings)
+           (extended-bindings)
+           (block)
+           (mostly-generic)))
+ (else))
 
 ;-------------------------------------------------------------------------------
 ; Functional operators
