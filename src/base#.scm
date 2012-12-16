@@ -5,29 +5,29 @@
 ; Macro environment
 ;-------------------------------------------------------------------------------
 
-(define-macro (eval-in-macro-environment . exprs)
+(##define-macro (eval-in-macro-environment . exprs)
   (if (pair? exprs)
       (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
             (interaction-environment))
       #f))
 
-(define-macro (eval-in-macro-environment-no-result . exprs)
+(##define-macro (eval-in-macro-environment-no-result . exprs)
   `(eval-in-macro-environment
     ,@exprs
     '(begin)))
 
-(define-macro (define^ . args)
+(##define-macro (define^ . args)
   (let ((pattern (car args))
         (body (cdr args)))
     `(eval-in-macro-environment-no-result
       (##define ,pattern ,@body))))
 
-(define-macro (at-expand-time-and-runtime . exprs)
+(##define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
     (eval l)
     l))
 
-(define-macro (at-expand-time . expr)
+(##define-macro (at-expand-time . expr)
   (eval (cons 'begin expr)))
 
 (define^ (macro-expand expr)
@@ -38,163 +38,163 @@
 ;-------------------------------------------------------------------------------
 
 ;;; Mutable increment
-(define-macro (++! x) `(set! ,x (fx+ 1 ,x)))
+;; (define-macro (++! x) `(set! ,x (fx+ 1 ,x)))
 
 ;;; Read-only increment
-(define-macro (++ x) `(fx+ 1 ,x))
+;; (define-macro (++ x) `(fx+ 1 ,x))
 
 ;;; Mutable decrement
-(define-macro (--! x) `(set! ,x (fx- ,x 1)))
+;; (define-macro (--! x) `(set! ,x (fx- ,x 1)))
 
 ;;; Read-only decrement
-(define-macro (-- x) `(fx- ,x 1))
+;; (define-macro (-- x) `(fx- ,x 1))
 
 ;;; Unhygienic anaphoric if
-(define-macro (uif . args)
-  (let ((arg1 (car args))
-        (rest-args (cdr args)))
-    (case (length rest-args)
-      ((1)
-       `(let ((?it ,arg1))
-          (if ?it
-              ,(car rest-args)
-              #f)))
-      ((2)
-       `(let ((?it ,arg1))
-          (if ?it
-              ,(car rest-args)
-              ,(cadr rest-args))))
-      ((3)
-       `(let ((?it ,(car rest-args)))
-          (if ,(arg1 ?it)
-              (cadr rest-args)
-              (caddr rest-args))))
-      (else
-       (error "Too many arguments passed to unhygienic anaphoric if")))))
+;; (define-macro (uif . args)
+;;   (let ((arg1 (car args))
+;;         (rest-args (cdr args)))
+;;     (case (length rest-args)
+;;       ((1)
+;;        `(let ((?it ,arg1))
+;;           (if ?it
+;;               ,(car rest-args)
+;;               #f)))
+;;       ((2)
+;;        `(let ((?it ,arg1))
+;;           (if ?it
+;;               ,(car rest-args)
+;;               ,(cadr rest-args))))
+;;       ((3)
+;;        `(let ((?it ,(car rest-args)))
+;;           (if ,(arg1 ?it)
+;;               (cadr rest-args)
+;;               (caddr rest-args))))
+;;       (else
+;;        (error "Too many arguments passed to unhygienic anaphoric if")))))
 
 ;;; Hygienic anaphoric if
-(define-macro (aif . args)
-  (let ((it (car args))
-        (arg1 (cadr args))
-        (rest-args (cddr args)))
-   (case (length rest-args)
-     ((1)
-      `(let ((,it ,arg1))
-         (if ,it
-             ,(car rest-args)
-             #f)))
-     ((2)
-      `(let ((,it ,arg1))
-         (if ,it
-             ,(car rest-args)
-             ,(cadr rest-args))))
-     ((3)
-      `(let ((,it ,(car rest-args)))
-         (if ,(arg1 ,it)
-             (cadr rest-args)
-             (caddr rest-args))))
-     (else
-      (error "Too many arguments passed to unhygienic anaphoric if")))))
-;; (define-syntax aif
-;;   (syntax-rules ()
-;;     ((_ var expr iftrue)
-;;      (let ((var expr))
-;;        (if var
-;;            iftrue
-;;            #f)))
-;;     ((_ var expr iftrue iffalse)
-;;      (let ((var expr))
-;;        (if var
-;;            iftrue
-;;            iffalse)))
-;;     ((_ var pred expr iftrue iffalse)
-;;      (let ((var expr))
-;;        (if (pred var)
-;;            iftrue
-;;            iffalse)))))
+;; (define-macro (aif . args)
+;;   (let ((it (car args))
+;;         (arg1 (cadr args))
+;;         (rest-args (cddr args)))
+;;    (case (length rest-args)
+;;      ((1)
+;;       `(let ((,it ,arg1))
+;;          (if ,it
+;;              ,(car rest-args)
+;;              #f)))
+;;      ((2)
+;;       `(let ((,it ,arg1))
+;;          (if ,it
+;;              ,(car rest-args)
+;;              ,(cadr rest-args))))
+;;      ((3)
+;;       `(let ((,it ,(car rest-args)))
+;;          (if ,(arg1 ,it)
+;;              (cadr rest-args)
+;;              (caddr rest-args))))
+;;      (else
+;;       (error "Too many arguments passed to unhygienic anaphoric if")))))
+(define-syntax aif
+  (syntax-rules ()
+    ((_ var expr iftrue)
+     (let ((var expr))
+       (if var
+           iftrue
+           #f)))
+    ((_ var expr iftrue iffalse)
+     (let ((var expr))
+       (if var
+           iftrue
+           iffalse)))
+    ((_ var pred expr iftrue iffalse)
+     (let ((var expr))
+       (if (pred var)
+           iftrue
+           iffalse)))))
 
 
 
 ;;; R5RS standard states that an if with only one branch returns an unspecified
 ;;; value if the test is false. This macro places an #f automatically
-(define-macro (when . args)
-  (let ((condition (car args))
-        (forms (cdr args)))
-    `(and ,condition (begin ,@forms))))
-;; (define-syntax when
-;;   (syntax-rules ()
-;;     ((_ ?pred ?form . ?forms)
-;;      (if ?pred (begin ?form . ?forms) #f))))
+;; (##define-macro (when . args)
+;;   (let ((condition (car args))
+;;         (forms (cdr args)))
+;;     `(and ,condition (begin ,@forms))))
+(define-syntax when
+  (syntax-rules ()
+    ((_ ?pred ?form . ?forms)
+     (if ?pred (begin ?form . ?forms) #f))))
 
 
 ;;; unless
-(define-macro (unless . args)
-  (let ((condition (car args))
-        (forms (cdr args)))
-    `(or ,condition (begin ,@forms))))
-;; (define-syntax unless
-;;   (syntax-rules ()
-;;     ((_ ?test ?form . ?forms)
-;;      (if ?test #f (begin ?form . ?forms)))))
+;; (##define-macro (unless . args)
+;;   (let ((condition (car args))
+;;         (forms (cdr args)))
+;;     `(or ,condition (begin ,@forms))))
+(define-syntax unless
+  (syntax-rules ()
+    ((_ ?test ?form . ?forms)
+     (if ?test #f (begin ?form . ?forms)))))
 
 ;;; Execute a sequence of forms and return the result of the _first_ one.
 ;;; Typically used to evaluate one or more forms with side effects and
 ;;; return a value that must be computed before
-(define-macro (begin0 . args)
-  (let ((form1 (car args))
-        (rest-forms (cdr args))
-        (var (gensym)))
-    `(let ((,var ,form1)) ,@rest-forms ,var)))
+;; (##define-macro (begin0 . args)
+;;   (let ((form1 (car args))
+;;         (rest-forms (cdr args))
+;;         (var (gensym)))
+;;     `(let ((,var ,form1)) ,@rest-forms ,var)))
 
 ;;; push!
-(define-macro (push! list obj)
-  `(set! ,list (cons ,obj ,list)))
+;; (##define-macro (push! list obj)
+;;   `(set! ,list (cons ,obj ,list)))
 
 ;;; string-null?
-(define-macro (string-null? str) `(zero? (string-length ,str)))
+;; (##define-macro (string-null? str) `(zero? (string-length ,str)))
 
 ; Like let* but allowing for multiple-value bindings
-(define-macro (let-values* . args)
-  (let ((bindings (car args))
-        (body (cadr args)))
-   (if (null? bindings) (cons 'begin body)
-       (apply (lambda (vars initializer)
-                (let ((cont 
-                       (cons 'let-values* 
-                             (cons (cdr bindings) body))))
-                  (cond
-                   ((not (pair? vars)) ; regular let case, a single var
-                    `(let ((,vars ,initializer)) ,cont))
-                   ((null? (cdr vars)) ; single var, see the prev case
-                    `(let ((,(car vars) ,initializer)) ,cont))
-                   (else                ; the most generic case
-                    `(call-with-values (lambda () ,initializer)
-                       (lambda ,vars ,cont))))))
-              (car bindings)))))
+;; (define-macro (let-values* . args)
+;;   (let ((bindings (car args))
+;;         (body (cadr args)))
+;;    (if (null? bindings) (cons 'begin body)
+;;        (apply (lambda (vars initializer)
+;;                 (let ((cont 
+;;                        (cons 'let-values* 
+;;                              (cons (cdr bindings) body))))
+;;                   (cond
+;;                    ((not (pair? vars)) ; regular let case, a single var
+;;                     `(let ((,vars ,initializer)) ,cont))
+;;                    ((null? (cdr vars)) ; single var, see the prev case
+;;                     `(let ((,(car vars) ,initializer)) ,cont))
+;;                    (else                ; the most generic case
+;;                     `(call-with-values (lambda () ,initializer)
+;;                        (lambda ,vars ,cont))))))
+;;               (car bindings)))))
 
 ;;; Pretty-print for values, returning values too
-(define-macro (pv form)
+(##define-macro (pv form)
   `(call-with-values
-     (lambda () ,form)
+       (lambda () ,form)
      (lambda args
        (for-each pp args)
        (apply values args))))
 
 ;;; Pretty-print for values, pause execution after (for debugging)
-(define-macro (ps form)
+(##define-macro (ps form)
   `(call-with-values
-     (lambda () ,form)
+       (lambda () ,form)
      (lambda args
        (for-each pp args)
        (step)
        (apply values args))))
 
 ;;; Standard error output
-(define-macro (cerr . args)
+(##define-macro (cerr . args)
   `(display ,args (current-error-port)))
 
 ;;; Letcc macro (hoping and skipping)
-(define-macro (let/cc . args)
+(##define-macro (let/cc . args)
   `(call-with-current-continuation
     (lambda (,(car args)) ,@(cdr args))))
 ;; (define-syntax let/cc
@@ -259,7 +259,7 @@
 ; If the user specified no ?r-exp, the values of variables that are
 ; referenced in ?expr will be printed upon the assertion failure.
 
-(define-macro (assert . args)
+(##define-macro (assert . args)
   ;; given the list of expressions or vars,
   ;; make the list appropriate for cerr
   (let ((expr (car args))
@@ -318,29 +318,4 @@
                       (error "assertion failure"))))
          (else (loop (cons (car reported) exprs) (cdr reported)))))))))
     
-(define-macro (assure exp error-msg) `(assert ,exp report: ,error-msg))
-
-;-------------------------------------------------------------------------------
-; Utils
-;-------------------------------------------------------------------------------
-
-;;; Append strings, keywords or symbols into a symbol
-(define^ (macro-append . args)
-  (string->symbol
-   (apply string-append (map object->string args))))
-
-;;; symbol->keyword
-(define^ (symbol->keyword s)
-  (string->keyword (symbol->string s)))
-
-;;; keyword->symbol
-(define^ (keyword->symbol k)
-  (string->symbol (keyword->string k)))
-
-;;; Anything to symbol
-(define^ (->symbol o)
-  (string->symbol (object->string o)))
-
-;;; Anything to keyword
-(define^ (->keyword o)
-  (string->keyword (object->string o)))
+(##define-macro (assure exp error-msg) `(assert ,exp report: ,error-msg))

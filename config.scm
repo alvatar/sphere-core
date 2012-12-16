@@ -1,4 +1,4 @@
 (sphere: "base")
 (dependencies:
   (ffi (include
-         (base: ffi-macros))))
+         (base: ffi#))))

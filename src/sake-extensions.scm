@@ -38,9 +38,9 @@
         (for-each thread-join! thread-pool)
         (let read-messages ()
           (let ((m (thread-receive 0 'finished)))
-            (unless (eq? m 'finished)
-                    (pp m)
-                    (read-messages))))))
+            (if (not (eq? m 'finished))
+                (begin (pp m)
+                       (read-messages)))))))
     (reverse results)))
 
 ;;; Generate a unique C file from a module or a file
@@ -166,11 +166,11 @@
                      (pp wrapper-code)
                      (println "Compiler-code")
                      (pp compiler-code)))
-          (unless (= 0
-                     (gambit-eval-here
-                      compiler-code
-                      verbose: #f))
-                  (error "error generating C file")))
+          (or (= 0
+                 (gambit-eval-here
+                  compiler-code
+                  verbose: #f))
+              (error "error generating C file")))
         output-file)))
 
 ;;; Compile a C file
@@ -183,10 +183,10 @@
                              (delete-c #f))
   (info "compiling C file to o -- "
         c-file)
-  (unless (= 0
-             (gambit-eval-here
-              `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
-          (error "error compiling C file"))
+  (or (= 0
+         (gambit-eval-here
+          `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
+      (error "error compiling C file"))
   (if delete-c
       (delete-file c-file recursive: #t)))
 
@@ -219,7 +219,7 @@
                  verbose: verbose)))
     (sake:compile-c-to-o
      c-file
-     output: (unless output (path-strip-extension c-file))
+     output: (or output (path-strip-extension c-file))
      cc-options: cc-options
      ld-options: ld-options
      delete-c: (not file-already-existed?))))

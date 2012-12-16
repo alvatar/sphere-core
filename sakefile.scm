@@ -1,5 +1,5 @@
-(include "src/base-macros.scm")
-(include "src/sphere-macros.scm")
+;(include "src/base#.scm")
+(include "src/sphere#.scm")
 (include "src/sake-extensions.scm")
 
 (define modules '(debug/debuggee
@@ -9,7 +9,7 @@
                   profile
                   repl-server))
 
-(define prelude-system-path "~~spheres/prelude-macros.scm")
+(define prelude-system-path "~~spheres/prelude#.scm")
 
 (define-task compile ()
   ;; Compile both with and without debugging options
@@ -26,7 +26,7 @@
 
 (define-task install ()
   ;; Install prelude directly in the spheres directory
-  (copy-file "src/prelude-macros.scm"
+  (copy-file "src/prelude#.scm"
              prelude-system-path)
   ;; Install compiled module files
   (for-each (lambda (m)

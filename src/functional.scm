@@ -81,12 +81,6 @@
       (lambda x
         (apply fun (cons arg1 x)))))
 
-;;; Some helpful curry functions
-
-(define (lambda-eq? x) (curry eq? x))
-(define (lambda-eqv? x) (curry eqv? x))
-(define (lambda-equal? x) (curry equal? x))
-
 ;;; Uncurrying
 ;;;
 ;;; (uncurry (lambda (a) (lambda (b) (lambda (c) (+ a b c)))) 5 2 1)
@@ -100,28 +94,33 @@
 ;-------------------------------------------------------------------------------
 
 ;;; Function computation memoization specifying a key generation procedure
-
 (define (memoize/key-gen key-gen f)
-  (let ((memos '())) ; OPTIMIZE: hash table!
+  (let ((memos '()))                    ; OPTIMIZE: hash table!
     (lambda args
       (let ((key (apply key-gen args)))
         (apply
-          values
-          (cond
-           ((assoc key memos)
-            => cdr)
-           (else
-             (call-with-values
+         values
+         (cond
+          ((assoc key memos)
+           => cdr)
+          (else
+           (call-with-values
                (lambda ()
                  (apply f args))
-               (lambda results
-                 (set! memos ; Put the new result in memos
-                   (cons (cons key results)
-                         memos))
-                 results)))))))))
+             (lambda results
+               (set! memos              ; Put the new result in memos
+                     (cons (cons key results)
+                           memos))
+               results)))))))))
 
 ;;; Function computation memoization with default key generation
-
 (define (memoize f)
-  (memoize/key-gen values f))
-
+  (let ((cache (make-table))
+	(not-found (gensym)))
+    (lambda k
+      (let ((v (table-ref cache k not-found)))
+	(if (eq? v not-found)
+	    (let ((res (apply f k)))
+	      (table-set! cache k res)
+	      res)
+	    v)))))

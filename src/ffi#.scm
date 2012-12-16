@@ -6,7 +6,7 @@
 ;;
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
 ;; (Via 'Alvaro Castro-Castilla).
-(define-macro
+(##define-macro
   (c-constants . names)
   (let ((nb-names (length names))
         (wrapper (gensym)))
@@ -37,12 +37,12 @@
 ;;; (code by Estevo Castro)
 
 ; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
-(define-macro (at-expand-time-and-runtime . exprs)
+(##define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
     (eval l)
     l))
 
-(define-macro (at-expand-time . expr)
+(##define-macro (at-expand-time . expr)
   (eval (cons 'begin expr)))
 
 (at-expand-time
@@ -200,18 +200,18 @@
         (map accessor fields)
         (map mutator fields)))))
 
-(define-macro
+(##define-macro
   (c-struct . type.fields)
   (apply c-native 'struct (car type.fields) (cdr type.fields)))
 
-(define-macro
+(##define-macro
   (c-union . type.fields)
   (apply c-native 'union (car type.fields) (cdr type.fields)))
 
 ;;; Build a size-of value equivalent to the C operator
 ;;; c-build-sizeof float -> sizeof-float
 
-(define-macro c-build-sizeof
+(##define-macro c-build-sizeof
   (lambda (type)
     (let ((type-str (symbol->string type)))
       `(define ,(string->symbol (string-append "sizeof-" type-str))
