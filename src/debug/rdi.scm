@@ -1,7 +1,3 @@
-;;; File: "rdi.scm"
-
-;;;----------------------------------------------------------------------------
-
 (define default-remote-debugger-address "192.168.1.162")
 (define default-remote-debugger-port-num 20000)
 
@@ -35,16 +31,13 @@
               (else
                #f))))))
 
-;;;----------------------------------------------------------------------------
-
 (define-type rdi
   address
   port-num
   seq-num
   call-table
   connection
-  writer-thread
-)
+  writer-thread)
 
 (define (rdi-create-client remote-debugger-address)
   (and remote-debugger-address
@@ -162,21 +155,17 @@
 
 (define (rdi-handle-message rdi msg)
   (if (pair? msg)
-
       (case (car msg)
-
         ((reader-thread-terminated)
          ;; (pretty-print
          ;;  '(rdi reader-thread is terminating)
          ;;  ##stdout-port)
          #t)
-
         ((terminate)
          ;; (pretty-print
          ;;  '(rdi writer-thread is terminating)
          ;;  ##stdout-port)
          #f)
-
         ((call)
          (let* ((seq-num
                  (cadr msg))
@@ -187,7 +176,6 @@
                         (cdr call))))
            (rdi-send rdi (list 'return seq-num result))
            #t))
-
         ((remote-call)
          (let* ((result-mutex (cadr msg))
                 (call (caddr msg))
@@ -197,7 +185,6 @@
                        seq-num
                        result-mutex)
            #t))
-
         ((return)
          (let* ((seq-num (cadr msg))
                 (result (caddr msg))
@@ -210,13 +197,11 @@
                  (mutex-specific-set! result-mutex result)
                  (mutex-unlock! result-mutex)
                  #t))))
-
         (else
          (pretty-print
           (list 'unhandled-message msg)
           ##stdout-port)
          #t))
-
       #f))
 
 (define (rdi-send rdi msg)
@@ -234,4 +219,3 @@
     (mutex-lock! result-mutex) ;; wait until result is ready
     (mutex-specific result-mutex)))
 
-;;;-----------------------------------------------------------------------------

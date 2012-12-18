@@ -7,13 +7,12 @@
 (include "src/sphere#.scm")
 (include "src/sake-extensions.scm")
 
-(define modules '(;debug/debuggee
+(define modules '(debug/debuggee
                   ;ffi
                   functional
                   mailbox
                   profile
-                  ;repl-server
-                  ))
+                  repl-server))
 
 (define prelude-system-path "~~spheres/prelude#.scm")
 

@@ -89,9 +89,10 @@
 
 ;;;-----------------------------------------------------------------------------
 
-(##define (remote-debug ip #!key (port 20000))
-  (make-rdi-host (string-append ip ":" (number->string port)))
-  (thread-start!
-   (make-thread
-    (lambda () (##repl-debug-main)))))
+(define (remote-debug ip . options)
+  (let ((port (or (assq 'port: options) 20000)))
+    (make-rdi-host (string-append ip ":" (number->string port)))
+    (thread-start!
+     (make-thread
+      (lambda () (##repl-debug-main))))))
 

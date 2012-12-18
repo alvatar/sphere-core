@@ -179,6 +179,7 @@
                                       flags-string: "-f"))
                                   (error "error compiling generated C file")))))
             ;; Portable syntax-case works by compiling a wrapper module that includes all necessary code
+            ;; Currently deactivated
             ((syntax-case) (let ((generated-code
                                   `(,(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
                                     ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
@@ -192,7 +193,7 @@
                                      ,intermediate-file
                                      output: ,output-file
                                      options: ',compiler-options))))
-                             (error "Syntax-case currently unsopported")
+                             (error "Syntax-case currently unsupported")
                              (if verbose
                                  (begin (display "Expander: ")
                                         (pp expander)

@@ -89,7 +89,7 @@
         (ide-repl-pump ide-repl-connection out-rd-port in-wr-port tgroup)
         (values in-rd-port out-wr-port)))))
 
-(define repl-channel-table (make-table test: eq?))
+(define repl-channel-table (make-table (string->keyword "test") eq?))
 
 (set! ##thread-make-repl-channel
       (lambda (thread)
@@ -108,9 +108,9 @@
 (define (repl-server password)
   (let ((server
          (open-tcp-server
-          (list server-address: repl-server-address
-                eol-encoding: 'cr-lf
-                reuse-address: #t))))
+          (list (string->keyword "server-address") repl-server-address
+                (string->keyword "eol-encoding") 'cr-lf
+                (string->keyword "reuse-address") #t))))
     (let loop1 ()
       (let* ((ide-repl-connection
               (read server))
