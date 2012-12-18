@@ -3,7 +3,7 @@
 
 ;;; Explicit definition
 
-(define-macro (%define-timed name+args . body)
+(##define-macro (%define-timed name+args . body)
   (if (list? name+args)
       `(##define ,name+args
          (%%accum-time ',(car name+args)
@@ -13,7 +13,7 @@
 
 ;;; Activate implicit definition
 
-(define-macro (%activate-profiling)
+(##define-macro (%activate-profiling)
   '(define-macro (define name+args . body)
      (if (list? name+args)
          `(##define ,name+args

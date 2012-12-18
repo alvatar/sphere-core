@@ -53,7 +53,7 @@
                            (version '())
                            (cond-expand-features '())
                            (compiler-options '())
-                           (syntax-case #t)
+                           (expander 'alexpander)
                            (output #f)
                            (verbose #f))
   (or (file-exists? (default-build-directory))
@@ -61,12 +61,13 @@
   (if (string? module-or-file)
       (error "unimplemented")
       (let* ((module module-or-file)
+             (header-module (%module-header module))
              (version (if (null? version) (%module-version module) version))
              (input-file (string-append (default-src-directory) (%module-filename-scm module)))
-             (tmp-file (string-append (default-build-directory)
-                                      "_%_"
-                                      (%module-flat-name module)
-                                      (default-scm-extension)))
+             (intermediate-file (string-append (default-build-directory)
+                                               "_%_"
+                                               (%module-flat-name module)
+                                               (default-scm-extension)))
              (output-file (or output
                               (string-append (current-build-directory)
                                              (%module-filename-c module version: version)))))
@@ -77,100 +78,142 @@
               (if (null? version) "" (string-append " version: " (object->string version))))
         (let* ((generate-cond-expand-code
                 (lambda (features)
-                  `(define-syntax cond-expand
-                     (syntax-rules (and or not else ,@features)
-                       ((cond-expand) (syntax-error "Unfulfilled cond-expand"))
-                       ((cond-expand (else body ...))
-                        (begin body ...))
-                       ((cond-expand ((and) body ...) more-clauses ...)
-                        (begin body ...))
-                       ((cond-expand ((and req1 req2 ...) body ...) more-clauses ...)
-                        (cond-expand
-                         (req1
-                          (cond-expand
-                           ((and req2 ...) body ...)
-                           more-clauses ...))
-                         more-clauses ...))
-                       ((cond-expand ((or) body ...) more-clauses ...)
-                        (cond-expand more-clauses ...))
-                       ((cond-expand ((or req1 req2 ...) body ...) more-clauses ...)
-                        (cond-expand
-                         (req1
-                          (begin body ...))
-                         (else
-                          (cond-expand
-                           ((or req2 ...) body ...)
-                           more-clauses ...))))
-                       ((cond-expand ((not req) body ...) more-clauses ...)
-                        (cond-expand
-                         (req
-                          (cond-expand more-clauses ...))
-                         (else body ...)))
-                       ,@(map
-                          (lambda (cef)
-                            `((cond-expand (,cef body ...) more-clauses ...)
-                              (begin body ...)))
-                          features)
-                       ((cond-expand (feature-id body ...) more-clauses ...)
-                        (cond-expand more-clauses ...))))))
-               ;; (header-module (%module-header module))
-               ;; Include # header if available
-               ;; ,@(if header-module
-               ;;       `((##namespace (,(symbol->string (%module-id header-module))))
-               ;;         (##include "~~lib/gambit#.scm"))
-               ;;       '())
-               ;; Include dependencies
-               ;; ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
-               ;;        (if header-module
-               ;;            (append (%module-dependencies-to-include module) (list header-module))
-               ;;            (%module-dependencies-to-include module)))
-               ;; filter-map and include the available headers
-               ;; ,@((lambda (f l)
-               ;;      (let recur ((l l))
-               ;;        (if (null? l) '()
-               ;;            (aif result (f (car l))
-               ;;                 (cons result (recur (cdr l)))
-               ;;                 (recur (cdr l))))))
-               ;;    (lambda (m)
-               ;;      (aif module-header (%module-header m)
-               ;;           `(eval '(include ,(string-append (%module-path-src module-header)
-               ;;                                            (%module-filename-scm module-header))))))
-               ;;    (%module-dependencies-to-load module))
-               ;; ,@(if header-module '((##namespace (""))) '())
-               (wrapper-code `(,(if syntax-case
-                                    (generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
-                                    (map (lambda (f) `(define-cond-expand-feature ,f)) cond-expand-features))
-                               ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
-                                      (%module-dependencies-to-include module))
-                               (include ,(string-append (%module-path-src module) (%module-filename-scm module)))))
-               (compiler-code `(,(if syntax-case
-                                     '(load "~~lib/syntax-case")
-                                     ;; '()
-                                     (error "sake:compile-to-c implemented only for syntax-case"))
-                                ;; ,(if syntax-case
-                                ;;      `(eval ',(generate-cond-expand-code cond-expand-features))
-                                ;;      ;; (map (lambda (f) `(define-cond-expand-feature ,f)) cond-expand-features)
-                                ;;      (error "sake:compile-to-c implemented only for syntax-case"))
-                                ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
-                                       (%module-dependencies-to-include module))
-                                (compile-file-to-target
-                                 ,tmp-file
-                                 output: ,output-file
-                                 options: ',compiler-options))))
-          (call-with-output-file
-              tmp-file
-            (lambda (f)
-              (for-each (lambda (c) (pp c f)) wrapper-code)))
-          (if verbose
-              (begin (println "Module wrapper code:")
-                     (pp wrapper-code)
-                     (println "Compiler-code")
-                     (pp compiler-code)))
-          (or (= 0
-                 (gambit-eval-here
-                  compiler-code
-                  verbose: #f))
-              (error "error generating C file")))
+                  `((define-syntax syntax-error
+                      (syntax-rules ()
+                        ((_) (0))))
+                    (define-syntax cond-expand
+                      (syntax-rules (and or not else ,@features)
+                        ((cond-expand) (syntax-error "Unfulfilled cond-expand"))
+                        ((cond-expand (else body ...))
+                         (begin body ...))
+                        ((cond-expand ((and) body ...) more-clauses ...)
+                         (begin body ...))
+                        ((cond-expand ((and req1 req2 ...) body ...) more-clauses ...)
+                         (cond-expand
+                          (req1
+                           (cond-expand
+                            ((and req2 ...) body ...)
+                            more-clauses ...))
+                          more-clauses ...))
+                        ((cond-expand ((or) body ...) more-clauses ...)
+                         (cond-expand more-clauses ...))
+                        ((cond-expand ((or req1 req2 ...) body ...) more-clauses ...)
+                         (cond-expand
+                          (req1
+                           (begin body ...))
+                          (else
+                           (cond-expand
+                            ((or req2 ...) body ...)
+                            more-clauses ...))))
+                        ((cond-expand ((not req) body ...) more-clauses ...)
+                         (cond-expand
+                          (req
+                           (cond-expand more-clauses ...))
+                          (else body ...)))
+                        ,@(map
+                           (lambda (cef)
+                             `((cond-expand (,cef body ...) more-clauses ...)
+                               (begin body ...)))
+                           features)
+                        ((cond-expand (feature-id body ...) more-clauses ...)
+                         (cond-expand more-clauses ...))))))))
+          (define map* (lambda (f l) (cond ((null? l) '())
+                                      ((not (pair? l)) (f l))
+                                      (else (cons (map* f (car l)) (map* f (cdr l)))))))
+          (define filter-map (lambda (f l)
+                               (let recur ((l l))
+                                 (if (null? l) '()
+                                     (let ((result (f (car l))))
+                                       (if result
+                                           (cons result (recur (cdr l)))
+                                           (recur (cdr l))))))))
+          (case expander
+            ;; Alexpander works by creating macro-expanded code, which is then compiled by Gambit
+            ((alexpander) (let ((compilation-code
+                                 `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+                                   ,@(if header-module
+                                         `(,@(map (lambda (m) `(##import-syntax ,m))
+                                                  (append (%module-dependencies-to-include module)
+                                                          (if header-module (list header-module) '()))))
+                                         '()))))
+                            (if verbose
+                                (begin
+                                  (info/color 'light-green "compilation environment code:")
+                                  (for-each pp compilation-code)))
+                            ;; Eval compilation code in current environment
+                            (for-each eval compilation-code)
+                            ;; Generate code: 1) alexpander 2) substitute alexpander's renamed symbols 3) namespaces and includes
+                            (let* ((code-pass-1 (alexpand (with-input-from-file input-file read-all)))
+                                   (code-pass-2 (map* (lambda (atom) (case atom
+                                                                  ((_eqv?_17) 'eqv?)
+                                                                  (else atom)))
+                                                      code-pass-1)) ; TODO!! Filter symbols!!""
+                                   (intermediate-code
+                                    `(,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
+                                      ,@(if header-module '((##include "~~lib/gambit#.scm")) '())
+                                      ,@(filter-map
+                                         (lambda (m) (let ((module-header (%module-header m)))
+                                                  (and module-header
+                                                       `(##include ,(string-append
+                                                                     (%module-path-src module-header)
+                                                                     (%module-filename-scm module-header))))))
+                                         (%module-dependencies-to-load module))
+                                      ,@(if header-module
+                                            `((##include ,(string-append
+                                                           (%module-path-src header-module)
+                                                           (%module-filename-scm header-module))))
+                                            '())
+                                      ,@code-pass-2)))
+                              (if verbose
+                                  (begin (info/color 'light-green "macro-expanded code:")
+                                         (for-each pp intermediate-code)))
+                              (call-with-output-file
+                                  intermediate-file
+                                (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
+                              (or (= 0
+                                     (gambit-eval-here
+                                      `((compile-file-to-target
+                                         ,intermediate-file
+                                         output: ,output-file
+                                         options: ',compiler-options))
+                                      flags-string: "-f"))
+                                  (error "error compiling generated C file")))))
+            ;; Portable syntax-case works by compiling a wrapper module that includes all necessary code
+            ((syntax-case) (let ((generated-code
+                                  `(,(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+                                    ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
+                                           (%module-dependencies-to-include module))
+                                    (include ,(string-append (%module-path-src module) (%module-filename-scm module)))))
+                                 (compilation-code
+                                  `((load "~~lib/syntax-case")
+                                    ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
+                                           (%module-dependencies-to-include module))
+                                    (compile-file-to-target
+                                     ,intermediate-file
+                                     output: ,output-file
+                                     options: ',compiler-options))))
+                             (error "Syntax-case currently unsopported")
+                             (if verbose
+                                 (begin (display "Expander: ")
+                                        (pp expander)
+                                        (println "Generated module wrapper code:")
+                                        (pp generated-code)
+                                        (println "Command-line compiler code")
+                                        (pp compilation-code)))
+                             (call-with-output-file
+                                 intermediate-file
+                               (lambda (f)
+                                 (for-each (lambda (c) (pp c f)) generated-code)))
+                             (or (= 0
+                                    (gambit-eval-here
+                                     compilation-code
+                                     verbose: #f))
+                                 (error "error generating C file"))))
+            ((gambit)
+             ;;************************* TODO! 3: Compile with Gambit default expander
+             ;; (map (lambda (f) `(define-cond-expand-feature ,f)) cond-expand-features)
+             (error "Gambit expander workflow not implemented"))
+            (else (error "Unknown expander"))))
         output-file)))
 
 ;;; Compile a C file

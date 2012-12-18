@@ -87,15 +87,15 @@
 ;;;   (lambda (x) (lambda (y) (lambda (z) (+ x y z))))
 ;;; (map map (map (lambda-curried (a b) (* a b)) '(1 2 3)) '((4 5 6) (7 8 9) (10 11 12)))
 
-(define-macro (lambda-curried bindings . body)
-  (define (fold-right kons knil lis1)
-    (let recur ((lis lis1))
-       (if (null? lis) knil
-	    (let ((head (car lis)))
-	      (kons head (recur (cdr lis)))))))
-  (if (null? bindings) `(lambda () ,@body)
-    (fold-right (lambda (arg curr-body) `(lambda (,arg) ,curr-body))
-	 (cons 'begin body) bindings)))
+;; (##define-macro (lambda-curried bindings . body)
+;;   (define (fold-right kons knil lis1)
+;;     (let recur ((lis lis1))
+;;       (if (null? lis) knil
+;;           (let ((head (car lis)))
+;;             (kons head (recur (cdr lis)))))))
+;;   (if (null? bindings) `(lambda () ,@body)
+;;       (fold-right (lambda (arg curr-body) `(lambda (,arg) ,curr-body))
+;;                   (cons 'begin body) bindings)))
 
 
 ;;; Macro for memoized function definition (with default key generator)
@@ -111,17 +111,16 @@
 
 ;;; Macro for memoized function definition (specifying a key generator)
 
-(define-syntax define-memoized/key-gen
-  (syntax-rules ()
-	((_ name
-       (lambda (args-for-key ...) body-for-key ...)
-       (lambda (args ...) body ...))
-	 (define name
-	   (letrec ((name (lambda (args ...) body ...)))
-         (memoize/key-gen
-		   (lambda (args-for-key ...) body-for-key ...)
-           name))))))
-
+;; (define-syntax define-memoized/key-gen
+;;   (syntax-rules ()
+;;     ((_ name
+;;         (lambda (args-for-key ...) body-for-key ...)
+;;         (lambda (args ...) body ...))
+;;      (define name
+;;        (letrec ((name (lambda (args ...) body ...)))
+;;          (memoize/key-gen
+;;           (lambda (args-for-key ...) body-for-key ...)
+;;           name))))))
 
 
 ;;TODO!!!

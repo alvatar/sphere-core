@@ -1,20 +1,26 @@
-;(include "src/base#.scm")
+(with-exception-catcher
+ (lambda (e)
+   (if (unbound-global-exception? e)
+       (begin (info/color 'brown "Bootstrapping Base")
+              (load "src/alexpander.scm"))))
+ (lambda () ##current-expander))
 (include "src/sphere#.scm")
 (include "src/sake-extensions.scm")
 
-(define modules '(debug/debuggee
-                  ffi
+(define modules '(;debug/debuggee
+                  ;ffi
                   functional
                   mailbox
                   profile
-                  repl-server))
+                  ;repl-server
+                  ))
 
 (define prelude-system-path "~~spheres/prelude#.scm")
 
 (define-task compile ()
   ;; Compile both with and without debugging options
   (for-each (lambda (m)
-              (sake:compile-c-to-o (sake:compile-to-c m))
+              (sake:compile-c-to-o (sake:compile-to-c m expander: 'alexpander))
               (sake:compile-c-to-o (sake:compile-to-c
                                     m
                                     version: '(debug)

@@ -22,11 +22,6 @@
     `(eval-in-macro-environment-no-result
       (##define ,pattern ,@body))))
 
-;;; Append strings, keywords or symbols into a symbol
-(define^ (macro-append . args)
-  (string->symbol
-   (apply string-append (map object->string args))))
-
 ;;; symbol->keyword
 (define^ (symbol->keyword s)
   (string->keyword (symbol->string s)))
@@ -465,8 +460,7 @@ fig.scm file"))
              (verbose (and (memq 'verbose options) #t))
              (include-single-module
               (lambda (module)
-                (let* ((module (or (%module-header module) module))
-                       (sphere (%module-sphere module))
+                (let* ((sphere (%module-sphere module))
                        (module-name (symbol->string (%module-id module))))
                   (if sphere
                       (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
@@ -480,7 +474,7 @@ fig.scm file"))
                         ;; Old solution for vanilla Gambit (no Alexpander)
                         ;; (eval `(include ,(%module-filename-scm module)))
                         (##alexpander-include (%module-filename-scm module))))))))
-        (let recur ((module root-module))
+        (let recur ((module (or (%module-header root-module) root-module)))
           (if (not (member (%module-normalize module) *included-modules*))
               (begin (for-each recur (%module-dependencies-to-include module))
                      (include-single-module module)))))))

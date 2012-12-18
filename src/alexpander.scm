@@ -2088,7 +2088,7 @@
                  (##make-source code #f)))))
        (if (pair? desourcified)
            (let* ((head (car desourcified))
-                  (head-str (symbol->string head)))
+                  (head-str (object->string head)))
              (cond
               ;; If the top-level form first element starts with ##, expand with gambit's default expander
               ((and
