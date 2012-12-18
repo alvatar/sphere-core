@@ -474,13 +474,13 @@ fig.scm file"))
                         ;; Old solution for vanilla Gambit (no Alexpander)
                         ;; (eval `(include ,(%module-filename-scm module)))
                         (##alexpander-include (%module-filename-scm module))))))))
-        (let recur ((module (or (%module-header root-module) root-module)))
+        (let recur ((module root-module))
           (if (not (member (%module-normalize module) *included-modules*))
               (begin (for-each recur (%module-dependencies-to-include module))
                      (include-single-module module)))))))
 
 ;;; Main include macro, doesn't load dependencies
-(##define-macro (##import-syntax . module)
+(##define-macro (##import-include . module)
   (let ((module (if (null? (cdr module))
                     (car module)
                     ;; If it defines the sphere, process the sphere name to make it a keyword

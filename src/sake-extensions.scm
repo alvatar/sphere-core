@@ -132,7 +132,7 @@
             ((alexpander) (let ((compilation-code
                                  `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
                                    ,@(if header-module
-                                         `(,@(map (lambda (m) `(##import-syntax ,m))
+                                         `(,@(map (lambda (m) `(##import-include ,m))
                                                   (append (%module-dependencies-to-include module)
                                                           (if header-module (list header-module) '()))))
                                          '()))))
