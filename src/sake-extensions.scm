@@ -4,7 +4,7 @@
 ;;; Parallel for-each, suitable mainly for parallel compilation, which spawns external
 ;;; processes
 
-(define (sake:parallel-for-each f l #!key (max-thread-number 2))
+(##define (sake:parallel-for-each f l #!key (max-thread-number 2))
   (let ((pending-elements l)
         (elements-mutex (make-mutex))
         (results '())
@@ -47,15 +47,15 @@
 ;;; Returns the path of the generated file
 ;;; version: generate module version with specific features (compiler options, cond-expand...)
 
-(define (sake:compile-to-c module-or-file
-                           #!key
-                           (library-name "")
-                           (version '())
-                           (cond-expand-features '())
-                           (compiler-options '())
-                           (expander 'alexpander)
-                           (output #f)
-                           (verbose #f))
+(##define (sake:compile-to-c module-or-file
+                             #!key
+                             (library-name "")
+                             (version '())
+                             (cond-expand-features '())
+                             (compiler-options '())
+                             (expander 'alexpander)
+                             (output #f)
+                             (verbose #f))
   (or (file-exists? (default-build-directory))
       (make-directory (default-build-directory)))
   (if (string? module-or-file)
@@ -118,8 +118,8 @@
                         ((cond-expand (feature-id body ...) more-clauses ...)
                          (cond-expand more-clauses ...))))))))
           (define map* (lambda (f l) (cond ((null? l) '())
-                                      ((not (pair? l)) (f l))
-                                      (else (cons (map* f (car l)) (map* f (cdr l)))))))
+                                           ((not (pair? l)) (f l))
+                                           (else (cons (map* f (car l)) (map* f (cdr l)))))))
           (define filter-map (lambda (f l)
                                (let recur ((l l))
                                  (if (null? l) '()
@@ -145,18 +145,19 @@
                             ;; Generate code: 1) alexpander 2) substitute alexpander's renamed symbols 3) namespaces and includes
                             (let* ((code-pass-1 (alexpand (with-input-from-file input-file read-all)))
                                    (code-pass-2 (map* (lambda (atom) (case atom
-                                                                  ((_eqv?_17) 'eqv?)
-                                                                  (else atom)))
+                                                                       ((_eqv?_17) 'eqv?)
+                                                                       (else atom)))
                                                       code-pass-1)) ; TODO!! Filter symbols!!""
                                    (intermediate-code
-                                    `(,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
+                                    `(,@(map (lambda (f) `(define-cond-expand-feature ,f)) (cons 'compile-to-c cond-expand-features))
+                                      ,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
                                       ,@(if header-module '((##include "~~lib/gambit#.scm")) '())
                                       ,@(filter-map
                                          (lambda (m) (let ((module-header (%module-header m)))
-                                                  (and module-header
-                                                       `(##include ,(string-append
-                                                                     (%module-path-src module-header)
-                                                                     (%module-filename-scm module-header))))))
+                                                       (and module-header
+                                                            `(##include ,(string-append
+                                                                          (%module-path-src module-header)
+                                                                          (%module-filename-scm module-header))))))
                                          (%module-dependencies-to-load module))
                                       ,@(if header-module
                                             `((##include ,(string-append
@@ -211,20 +212,19 @@
                                      verbose: #f))
                                  (error "error generating C file"))))
             ((gambit)
-             ;;************************* TODO! 3: Compile with Gambit default expander
-             ;; (map (lambda (f) `(define-cond-expand-feature ,f)) cond-expand-features)
              (error "Gambit expander workflow not implemented"))
             (else (error "Unknown expander"))))
         output-file)))
 
 ;;; Compile a C file
 
-(define (sake:compile-c-to-o c-file
-                             #!key
-                             (output (path-strip-extension c-file))
-                             (cc-options "")
-                             (ld-options "")
-                             (delete-c #f))
+(##define (sake:compile-c-to-o c-file
+                               #!key
+                               (output (path-strip-extension c-file))
+                               (cc-options "")
+                               (ld-options "")
+                               (delete-c #f))
+  ;; TODO: append compile-to-c to cond-expand-features: USE GSC PRELUDE
   (info "compiling C file to o -- "
         c-file)
   (or (= 0
@@ -236,16 +236,16 @@
 
 
 ;;; Compile to o, for dynamic loading, takes care of introducing 'compile-to-o cond-expand feature
-(define (sake:compile-to-o module
-                           #!key
-                           (library-name "")
-                           (version '())
-                           (cond-expand-features '())
-                           (compiler-options '())
-                           (cc-options "")
-                           (ld-options "")
-                           (output #f)
-                           (verbose #f))
+(##define (sake:compile-to-o module
+                             #!key
+                             (library-name "")
+                             (version '())
+                             (cond-expand-features '())
+                             (compiler-options '())
+                             (cc-options "")
+                             (ld-options "")
+                             (output #f)
+                             (verbose #f))
   (info "compiling module to o -- "
         (%module-sphere module)
         ": "
@@ -268,7 +268,7 @@
      ld-options: ld-options
      delete-c: (not file-already-existed?))))
 
-(define (sake:merge-modules modules #!key (output "merged-modules.scm"))
+(##define (sake:merge-modules modules #!key (output "merged-modules.scm"))
   (let ((output-path (string-append (current-build-directory) output)))
     (call-with-output-file
         output-path
@@ -286,11 +286,11 @@
 
 ;;; Install o and/or C file in the lib/ directory
 
-(define (sake:install-compiled-module m
-                                      #!key
-                                      (version '())
-                                      (omit-o #f)
-                                      (omit-c #f))
+(##define (sake:install-compiled-module m
+                                        #!key
+                                        (version '())
+                                        (omit-o #f)
+                                        (omit-c #f))
   (or (file-exists? (default-lib-directory))
       (make-directory (default-lib-directory)))
   (or omit-o
@@ -302,13 +302,13 @@
 
 ;;; Clean all default generated files and directories
 
-(define (sake:default-clean)
+(##define (sake:default-clean)
   (delete-file (current-build-directory) recursive: #t)
   (delete-file (default-lib-directory) recursive: #t))
 
 ;;; Install all the files in lib/ in the system directory for the library
 
-(define (sake:install-system-sphere #!optional (sphere (%current-sphere)))
+(##define (sake:install-system-sphere #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t)
   (make-directory (%sphere-system-path sphere))
   (make-directory (string-append (%sphere-system-path sphere) (default-src-directory)))
@@ -324,5 +324,5 @@
 
 ;;; Uninstall all the files from the system installation
 
-(define (sake:uninstall-system-sphere #!optional (sphere (%current-sphere)))
+(##define (sake:uninstall-system-sphere #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))

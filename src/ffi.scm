@@ -5,6 +5,8 @@
 ; Code needed by FFI-generation macros
 ;-------------------------------------------------------------------------------
 
+(##include "../src/ffi-header.scm")
+
 (c-declare "#include <malloc.h>")
 
 (define ffi:references

@@ -8,7 +8,7 @@
 (include "src/sake-extensions.scm")
 
 (define modules '(debug/debuggee
-                  ;ffi
+                  ffi
                   functional
                   mailbox
                   profile
@@ -19,7 +19,7 @@
 (define-task compile ()
   ;; Compile both with and without debugging options
   (for-each (lambda (m)
-              (sake:compile-c-to-o (sake:compile-to-c m expander: 'alexpander))
+              (sake:compile-c-to-o (sake:compile-to-c m))
               (sake:compile-c-to-o (sake:compile-to-c
                                     m
                                     version: '(debug)

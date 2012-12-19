@@ -645,7 +645,7 @@
 ;; (expand-syntax-bindings bindings id-n syntax-env ienv store loc-n k)
 ;;   => (k store loc-n)
 
-
+(define (dsssl-marker? sexp) (or (eq? sexp #!key) (eq? sexp #!optional) (eq? sexp #!rest)))
 (define (sid? sexp)          (or (symbol? sexp) (renamed-sid? sexp)))
 (define (renamed-sid? sexp)  (and (vector? sexp) (< 1 (vector-length sexp))))
 (define (svector? sexp)      (and (vector? sexp) (= 1 (vector-length sexp))))
@@ -809,16 +809,17 @@
 	  (error "Duplicate variable: " x " in lambda formals: " formals)))
     (begin
       (for-each check flattened)
+      ;; Álvaro Castro-Castilla: substitute  #!key, #!optional, #!rest
       (let loop ((formals flattened) (rvars '())
-		 (env env) (store store) (loc-n loc-n))
-	(if (not (null? formals))
-	    (let* ((var (intloc->var loc-n (car formals)))
-		   (env (extend-env env (sid-id (car formals)) loc-n))
-		   (store (extend-store store loc-n var)))
-	      (loop (cdr formals) (cons var rvars) env store (+ 1 loc-n)))
-	    (let* ((vars (reverse rvars))
-		   (vars (if dotted? (dot-flattened vars) vars)))
-	      (list vars (expand-expr expr id-n env store loc-n))))))))
+                 (env env) (store store) (loc-n loc-n))
+        (if (not (null? formals))
+            (let* ((var (intloc->var loc-n (car formals)))
+                   (env (extend-env env (sid-id (car formals)) loc-n))
+                   (store (extend-store store loc-n var)))
+              (loop (cdr formals) (cons var rvars) env store (+ 1 loc-n)))
+            (let* ((vars (reverse rvars))
+                   (vars (if dotted? (dot-flattened vars) vars)))
+              (list vars (expand-expr expr id-n env store loc-n))))))))
 
 (define (check-syntax-bindings bindings)
   (or (list? bindings) (error "Non-list syntax bindings list: " bindings))
@@ -969,11 +970,18 @@
 	     (and ek handle-combination) handle-syntax-use #f #f))
 	  ((or (number? sexp) (boolean? sexp) (string? sexp) (char? sexp))
 	   ((get-ek sexp) sexp))
+          ;; Álvaro Castro-Castilla: allow empty lists for Gambit special forms, keywords and DSSSL markers
+          ((null? sexp)
+           ((get-ek sexp) sexp))
+          ((keyword? sexp)
+           ((get-ek sexp) sexp))
+          ((dsssl-marker? sexp)
+           ((get-ek sexp) sexp))
 	  (else (error (string-append
                         (cond ((pair? sexp) "Improper list: ")
-                              ((null? sexp) "Empty list: ")
+                              ;((null? sexp) "Empty list: ")
+                              ;((keyword? sexp) "Keywords not supported: ")
                               ((vector? sexp) "Vector: ")
-                              ((keyword? sexp) "Keywords not supported: ")
                               (else "Non-S-Expression: "))
                         (object->string sexp)
                         " used as an expression, syntax, or definition."))))))
@@ -1728,15 +1736,15 @@
 		    (define var init) ... (let-syntax () . body))))))))
 	(define-protected-macros letrec-syntax
 	    (if lambda quote begin define letrec) (eqv?)
-	  (define-syntax let
-	    (syntax-rules ()
-	      ((_ ((var init) ...) . body)
-	       ((lambda (var ...) . body)
-		init ...))
-	      ((_ name ((var init) ...) . body)
-	       ((letrec ((name (lambda (var ...) . body)))
-		  name)
-		init ...))))
+          (define-syntax let
+            (syntax-rules ()
+              ((_ ((var init) ...) . body)
+               ((lambda (var ...) . body)
+                init ...))
+              ((_ name ((var init) ...) . body)
+               ((letrec ((name (lambda (var ...) . body)))
+                  name)
+                init ...))))
 	  (define-syntax let*
 	    (syntax-rules ()
 	      ((_ () . body) (let () . body))
@@ -1761,14 +1769,14 @@
 		    ((_ key (datum . data))
 		     (if (eqv? key 'datum) #t (compare key data)))))
 		 (case
-		  (syntax-rules (else)
-		    ((case key) (if #f #f))
-		    ((case key (else result1 . results))
-		     (begin result1 . results))
-		    ((case key ((datum ...) result1 . results) . clauses)
-		     (if (compare key (datum ...))
-			 (begin result1 . results)
-			 (case key . clauses))))))
+                     (syntax-rules (else)
+                       ((case key) (if #f #f))
+                       ((case key (else result1 . results))
+                        (begin result1 . results))
+                       ((case key ((datum ...) result1 . results) . clauses)
+                        (if (compare key (datum ...))
+                            (begin result1 . results)
+                            (case key . clauses))))))
 	      (syntax-rules ()
 		((_ expr clause1 clause ...)
 		 (let ((key expr))
@@ -1792,101 +1800,101 @@
 	      ((_) #f)
 	      ((_ test) (let () test))
 	      ((_ test . tests) (let ((x test)) (if x x (or . tests)))))))
-	;; Quasiquote uses let-syntax scope so that it can recognize
-	;; nested uses of itself using a syntax-rules literal (that
-	;; is, the quasiquote binding that is visible in the
-	;; environment of the quasiquote transformer must be the same
-	;; binding that is visible where quasiquote is used).
-	(define-protected-macros let-syntax
+          ;; Quasiquote uses let-syntax scope so that it can recognize
+          ;; nested uses of itself using a syntax-rules literal (that
+          ;; is, the quasiquote binding that is visible in the
+          ;; environment of the quasiquote transformer must be the same
+          ;; binding that is visible where quasiquote is used).
+          (define-protected-macros let-syntax
 	    (lambda quote let) (cons append list vector list->vector map)
-	  (define-syntax quasiquote
-	    (let-syntax
-		((tail-preserving-syntax-rules
-		  (syntax-rules ()
-		    ((tail-preserving-syntax-rules literals
-			((subpattern ...) (subtemplate ...))
-			...)
-		     (syntax-rules literals
-		       ((subpattern ... . tail) (subtemplate ... . tail))
-		       ...)))))
+            (define-syntax quasiquote
+              (let-syntax
+                  ((tail-preserving-syntax-rules
+                    (syntax-rules ()
+                      ((tail-preserving-syntax-rules literals
+                                                     ((subpattern ...) (subtemplate ...))
+                                                     ...)
+                       (syntax-rules literals
+                         ((subpattern ... . tail) (subtemplate ... . tail))
+                         ...)))))
 
-	      (define-syntax qq
-		(tail-preserving-syntax-rules
-		    (unquote unquote-splicing quasiquote)
-		  ((_ ,x        ())      (do-next x))
-		  ((_ (,@x . y) ())      (qq y () make-splice x))
-		  ((_ `x         depth)  (qq x (depth) make-list 'quasiquote))
-		  ((_ ,x        (depth)) (qq x  depth  make-list 'unquote))
-		  ((_ (,x  . y) (depth)) (qq-nested-unquote (,x  . y) (depth)))
-		  ((_ (,@x . y) (depth)) (qq-nested-unquote (,@x . y) (depth)))
-		  ((_ ,@x        depth)  (unquote-splicing-error ,@x))
-		  ((_ (x . y)    depth)  (qq x depth qq-cdr y depth make-pair))
-		  ((_ #(x y ...) depth)  (qq (x) depth qq-cdr #(y ...) depth
-					     make-vector-splice))
-		  ((_ x          depth)  (do-next 'x))))
+                (define-syntax qq
+                  (tail-preserving-syntax-rules
+                   (unquote unquote-splicing quasiquote)
+                   ((_ ,x        ())      (do-next x))
+                   ((_ (,@x . y) ())      (qq y () make-splice x))
+                   ((_ `x         depth)  (qq x (depth) make-list 'quasiquote))
+                   ((_ ,x        (depth)) (qq x  depth  make-list 'unquote))
+                   ((_ (,x  . y) (depth)) (qq-nested-unquote (,x  . y) (depth)))
+                   ((_ (,@x . y) (depth)) (qq-nested-unquote (,@x . y) (depth)))
+                   ((_ ,@x        depth)  (unquote-splicing-error ,@x))
+                   ((_ (x . y)    depth)  (qq x depth qq-cdr y depth make-pair))
+                   ((_ #(x y ...) depth)  (qq (x) depth qq-cdr #(y ...) depth
+                                              make-vector-splice))
+                   ((_ x          depth)  (do-next 'x))))
 
-	      (define-syntax do-next
-		(syntax-rules ()
-		  ((_ expr original-template) expr)
-		  ((_ expr next-macro . tail) (next-macro expr . tail))))
+                (define-syntax do-next
+                  (syntax-rules ()
+                    ((_ expr original-template) expr)
+                    ((_ expr next-macro . tail) (next-macro expr . tail))))
 
-	      (define-syntax unquote-splicing-error
-		(syntax-rules ()
-		  ((_ ,@x stack ... original-template)
-		   (unquote-splicing-error (,@x in original-template)))))
-	      
-	      (define-syntax qq-cdr
-		(tail-preserving-syntax-rules ()
-		  ((_ car cdr depth combiner) (qq cdr depth combiner car))))
-	      
-	      (define-syntax qq-nested-unquote
-		(tail-preserving-syntax-rules ()
-		  ((_ ((sym x) . y) (depth))
-		   (qq (x) depth make-map sym qq-cdr y (depth) make-splice))))
-	      
-	      (define-syntax make-map
-		(tail-preserving-syntax-rules (quote list map lambda)
-		  ((_ '(x) sym) (do-next '((sym x))))
-	          ((_ (list x) sym) (do-next (list (list 'sym x))))
-		  ((_ (map (lambda (x) y) z) sym)
-		   (do-next (map (lambda (x) (list 'sym y)) z)))
-		  ((_ expr sym)
-		   (do-next (map (lambda (x) (list 'sym x)) expr)))))
-								     
-	      (define-syntax make-pair
-		(tail-preserving-syntax-rules (quote list)
-		  ((_ 'y 'x) (do-next '(x . y)))
-		  ((_ '() x) (do-next (list x)))
-		  ((_ (list . elts) x) (do-next (list x . elts)))
-		  ((_ y x) (do-next (cons x y)))))
-						  
-	      (define-syntax make-list
-		(tail-preserving-syntax-rules (quote)
-		  ((_ y x) (make-pair '() y make-pair x))))
-							   
-	      (define-syntax make-splice
-		(tail-preserving-syntax-rules ()
-		  ((_ '() x) (do-next x))
-		  ((_ y x) (do-next (append x y)))))
-						    
-	      (define-syntax make-vector-splice
-		(tail-preserving-syntax-rules (quote list vector list->vector)
-		  ((_ '#(y ...) '(x))     (do-next '#(x y ...)))
-		  ((_ '#(y ...) (list x)) (do-next (vector x 'y ...)))
-		  ((_ '#()      x)        (do-next (list->vector x)))
-		  ((_ '#(y ...) x)        (do-next (list->vector
-						     (append x '(y ...)))))
-		  ((_ y '(x))             (make-vector-splice y (list 'x)))
-		  ((_ (vector y ...) (list x)) (do-next (vector x y ...)))
-		  ((_ (vector y ...) x)   (do-next (list->vector
-						     (append x (list y ...)))))
-		  ((_ (list->vector y) (list x)) (do-next (list->vector
-							    (cons x y))))
-		  ((_ (list->vector y) x) (do-next (list->vector
-						     (append x y))))))
-							   
-	      (syntax-rules ()
-		((_ template) (let () (qq template () template)))))))))))
+                (define-syntax unquote-splicing-error
+                  (syntax-rules ()
+                    ((_ ,@x stack ... original-template)
+                     (unquote-splicing-error (,@x in original-template)))))
+                
+                (define-syntax qq-cdr
+                  (tail-preserving-syntax-rules ()
+                                                ((_ car cdr depth combiner) (qq cdr depth combiner car))))
+                
+                (define-syntax qq-nested-unquote
+                  (tail-preserving-syntax-rules ()
+                                                ((_ ((sym x) . y) (depth))
+                                                 (qq (x) depth make-map sym qq-cdr y (depth) make-splice))))
+                
+                (define-syntax make-map
+                  (tail-preserving-syntax-rules (quote list map lambda)
+                                                ((_ '(x) sym) (do-next '((sym x))))
+                                                ((_ (list x) sym) (do-next (list (list 'sym x))))
+                                                ((_ (map (lambda (x) y) z) sym)
+                                                 (do-next (map (lambda (x) (list 'sym y)) z)))
+                                                ((_ expr sym)
+                                                 (do-next (map (lambda (x) (list 'sym x)) expr)))))
+                
+                (define-syntax make-pair
+                  (tail-preserving-syntax-rules (quote list)
+                                                ((_ 'y 'x) (do-next '(x . y)))
+                                                ((_ '() x) (do-next (list x)))
+                                                ((_ (list . elts) x) (do-next (list x . elts)))
+                                                ((_ y x) (do-next (cons x y)))))
+                
+                (define-syntax make-list
+                  (tail-preserving-syntax-rules (quote)
+                                                ((_ y x) (make-pair '() y make-pair x))))
+                
+                (define-syntax make-splice
+                  (tail-preserving-syntax-rules ()
+                                                ((_ '() x) (do-next x))
+                                                ((_ y x) (do-next (append x y)))))
+                
+                (define-syntax make-vector-splice
+                  (tail-preserving-syntax-rules (quote list vector list->vector)
+                                                ((_ '#(y ...) '(x))     (do-next '#(x y ...)))
+                                                ((_ '#(y ...) (list x)) (do-next (vector x 'y ...)))
+                                                ((_ '#()      x)        (do-next (list->vector x)))
+                                                ((_ '#(y ...) x)        (do-next (list->vector
+                                                                                  (append x '(y ...)))))
+                                                ((_ y '(x))             (make-vector-splice y (list 'x)))
+                                                ((_ (vector y ...) (list x)) (do-next (vector x y ...)))
+                                                ((_ (vector y ...) x)   (do-next (list->vector
+                                                                                  (append x (list y ...)))))
+                                                ((_ (list->vector y) (list x)) (do-next (list->vector
+                                                                                         (cons x y))))
+                                                ((_ (list->vector y) x) (do-next (list->vector
+                                                                                  (append x y))))))
+                
+                (syntax-rules ()
+                  ((_ template) (let () (qq template () template)))))))))))
 
 (define null-stuff (expand-top-level-forms null-prog builtins-store 0 list))
 (define null-output (car null-stuff))
@@ -1949,33 +1957,33 @@
 ;; If you want to target an even simpler output language, with no
 ;; LETREC, DELAY, or BEGIN, then one inefficient way to do so is to
 ;; use a second pass, like this:
-(define (expand-program-to-simple forms)
-  (define startup
-    '(begin
-       (define-syntax letrec
-	 (syntax-rules ()
-	   ((letrec ((var init) ...) expr)
-	    (let ((var #f) ...)
-	      (let ((var (let ((tmp init)) (lambda () (set! var tmp))))
-		    ...
-		    (thunk (lambda () expr)))
-		(begin (var) ... (thunk)))))))
-       (define-syntax delay
-	 (syntax-rules ()
-	   ((delay expr)
-	    (let ((result #f) (thunk (lambda () expr)))
-	      (lambda ()
-		(if thunk (let ((x (thunk)))
-			    (if thunk (begin (set! result x)
-					     (set! thunk #f)))))
-		result)))))
-       (define (force x) (x))
-       (define-syntax begin
-	 (syntax-rules ()
-	   ((begin x) x)
-	   ((begin x . y)
-	    ((lambda (ignore) (begin . y)) x))))))
-  (expand-program (cons startup (expand-program forms))))
+;; (define (expand-program-to-simple forms)
+;;   (define startup
+;;     '(begin
+;;        (define-syntax letrec
+;; 	 (syntax-rules ()
+;; 	   ((letrec ((var init) ...) expr)
+;; 	    (let ((var #f) ...)
+;; 	      (let ((var (let ((tmp init)) (lambda () (set! var tmp))))
+;; 		    ...
+;; 		    (thunk (lambda () expr)))
+;; 		(begin (var) ... (thunk)))))))
+;;        (define-syntax delay
+;; 	 (syntax-rules ()
+;; 	   ((delay expr)
+;; 	    (let ((result #f) (thunk (lambda () expr)))
+;; 	      (lambda ()
+;; 		(if thunk (let ((x (thunk)))
+;; 			    (if thunk (begin (set! result x)
+;; 					     (set! thunk #f)))))
+;; 		result)))))
+;;        (define (force x) (x))
+;;        (define-syntax begin
+;; 	 (syntax-rules ()
+;; 	   ((begin x) x)
+;; 	   ((begin x . y)
+;; 	    ((lambda (ignore) (begin . y)) x))))))
+;;   (expand-program (cons startup (expand-program forms))))
 
 ;; Notes:
 

@@ -2,15 +2,5 @@
 ;;; Prelude
 
 (define ##current-expander 'alexpander)
-(case ##current-expander
-  ((alexpander)
-   (println "*** INFO -- Macro expander: Alexpander")
-   (load "~~spheres/base/src/alexpander.scm"))
-  ((syntax-case)
-   (println "*** INFO -- Macro expander: Portable syntax-case")
-   (load "~~lib/syntax-case"))
-  ((gambit-default)
-   (println "*** INFO -- Macro expander: Gambit default"))
-  (else
-    (error "Unknown macro expander")))
+(load "~~spheres/base/src/alexpander.scm")
 (include "~~spheres/base/src/sphere#.scm")
