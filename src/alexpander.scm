@@ -1792,16 +1792,19 @@
 	       (let ((tmp x)) (cond (tmp (proc tmp)) . rest)))
 	      ((_ (x . exps) . rest)
 	       (if x (begin . exps) (cond . rest)))))
-	  (define-syntax and
-	    (syntax-rules ()
-	      ((_) #t)
-	      ((_ test) (let () test))
-	      ((_ test . tests) (if test (and . tests) #f))))
-	  (define-syntax or
-	    (syntax-rules ()
-	      ((_) #f)
-	      ((_ test) (let () test))
-	      ((_ test . tests) (let ((x test)) (if x x (or . tests)))))))
+          ;; Álvaro Castro-Castilla: passing these forms directly to Gambit as they
+          ;; contain no structure
+	  ;; (define-syntax and
+	  ;;   (syntax-rules ()
+	  ;;     ((_) #t)
+	  ;;     ((_ test) (let () test))
+	  ;;     ((_ test . tests) (if test (and . tests) #f))))
+	  ;; (define-syntax or
+	  ;;   (syntax-rules ()
+	  ;;     ((_) #f)
+	  ;;     ((_ test) (let () test))
+	  ;;     ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
+          )
           ;; Quasiquote uses let-syntax scope so that it can recognize
           ;; nested uses of itself using a syntax-rules literal (that
           ;; is, the quasiquote binding that is visible in the
