@@ -24,6 +24,37 @@
 	     ((test x t f) f))))
        (test abracadabra kt kf)))))
 
+;;! A macro-expand-time memv function for identifiers
+;; 	id-memv?? FORM (ID ...) KT KF
+;; FORM is an arbitrary form or datum, ID is an identifier.
+;; The macro expands into KT if FORM is an identifier, which occurs
+;; in the list of identifiers supplied by the second argument.
+;; All the identifiers in that list must be unique.
+;; Otherwise, id-memv?? expands to KF.
+;; Two identifiers match if both refer to the same binding occurrence, or
+;; (both are undefined and have the same spelling).
+;; (id-memv?? x (a b c) #t #f)
+;; (id-memv?? a (a b c) 'OK #f)
+;; (id-memv?? () (a b c) #t #f)
+;; (id-memv?? (x ...) (a b c) #t #f)
+;; (id-memv?? "abc" (a b c) #t #f)
+;; (id-memv?? x () #t #f)
+;; (let ((x 1))
+;;   (id-memv?? x (a b x) 'OK #f))
+;; (let ((x 1))
+;;   (id-memv?? x (a x b) 'OK #f))
+;; (let ((x 1))
+;;   (id-memv?? x (x a b) 'OK #f))
+(define-syntax id-memv??
+  (syntax-rules ()
+    ((id-memv?? form (id ...) kt kf)
+     (let-syntax
+         ((test
+	   (syntax-rules (id ...)
+	     ((test id _kt _kf) _kt) ...
+	     ((test otherwise _kt _kf) _kf))))
+       (test form kt kf)))))
+
 ;;! Check if two identifiers are two occurrences of the same identifier
 ;; For the macro id-eq??, two identifiers are equivalent if only if they
 ;; have the same color, or to put it differently, are two occurrences of
