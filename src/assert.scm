@@ -13,6 +13,7 @@
 ;; Typically, ?r-exp is either a variable or a string constant.
 ;; If the user specified no ?r-exp, the values of variables that are
 ;; referenced in ?expr will be printed upon the assertion failure.
+;; Based on code by Oleg Kiselyov
 
 (define-syntax assert
   (let-syntax ((cerr
@@ -27,8 +28,8 @@
        (letrec-syntax
            ((write-report
              (syntax-rules ()
-                                        ; given the list of expressions or vars,
-                                        ; create a cerr form
+               ;; given the list of expressions or vars,
+               ;; create a cerr form
                ((_ exprs prologue)
                 (k!reverse () (cerr . prologue)
                            (write-report* ! exprs #\newline)))))
@@ -41,10 +42,9 @@
                           (write-report* (x ": " 'x #\newline . rev-prologue) 
                                          rest #\newline)
                           (write-report* (x prefix . rev-prologue) rest "")))))
-	  
-                                        ; return the list of all unique "interesting"
-                                        ; variables in the expr. Variables that are certain
-                                        ; to be bound to procedures are not interesting.
+            ;; return the list of all unique "interesting"
+            ;; variables in the expr. Variables that are certain
+            ;; to be bound to procedures are not interesting.
             (vars-of 
              (syntax-rules (!)
                ((_ vars (op . args) (k-head ! . k-args))
@@ -52,11 +52,10 @@
                            (quote let let* letrec let*-values lambda cond quasiquote
                                   case define do assert)
                            (k-head vars . k-args) ; won't go inside
-                                        ; ignore the head of the application
+                           ;; ignore the head of the application
                            (vars-of* vars args (k-head ! . k-args))))
-                                        ; not an application -- ignore
-               ((_ vars non-app (k-head ! . k-args)) (k-head vars . k-args))
-               ))
+               ;; not an application -- ignore
+               ((_ vars non-app (k-head ! . k-args)) (k-head vars . k-args))))
             (vars-of*
              (syntax-rules (!)
                ((_ vars () (k-head ! . k-args)) (k-head vars . k-args))
@@ -66,7 +65,6 @@
                                      (vars-of* vars rest k)
                                      (vars-of* (x . vars) rest k))
                           (vars-of vars x (vars-of* ! rest k))))))
-
             (do-assert
              (syntax-rules (report:)
                ((_ () expr)             ; the most common case
@@ -81,7 +79,6 @@
                 (k!reverse () exprs (do-assert-c ! others)))
                ((_ exprs x . others)
                 (do-assert (x . exprs) . others))))
-
             (do-assert-c
              (syntax-rules ()
                ((_ exprs)
@@ -94,10 +91,8 @@
                 (or exprs
                     (begin (write-report others
                                          ("failed assertion: " 'exprs))
-                           (error "assertion failure"))))))
-            )
-         (do-assert () _expr . _others)
-         )))))
+                           (error "assertion failure")))))))
+         (do-assert () _expr . _others))))))
 
 (define-syntax assure
   (syntax-rules ()
