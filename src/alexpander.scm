@@ -645,6 +645,10 @@
 ;; (expand-syntax-bindings bindings id-n syntax-env ienv store loc-n k)
 ;;   => (k store loc-n)
 
+(define symbol?
+  (let ((old-symbol? symbol?))
+    (lambda (x)
+      (or (old-symbol? x) (keyword? x)))))
 (define (dsssl-marker? sexp) (or (eq? sexp #!key) (eq? sexp #!optional) (eq? sexp #!rest)))
 (define (sid? sexp)          (or (symbol? sexp) (renamed-sid? sexp)))
 (define (renamed-sid? sexp)  (and (vector? sexp) (< 1 (vector-length sexp))))
@@ -657,25 +661,10 @@
       (vector name renamed-id)
       (vector name renamed-id location)))
 
-;; Álvaro Castro-Castilla: treat keywords as symbols
-(define (sid-name sid)
-  ;(if (symbol? sid) sid (vector-ref sid 0))
-  (cond
-   ((symbol? sid) sid)
-   ((keyword? sid) sid)
-   (else (vector-ref sid 0))))
-(define (sid-id sid)
-  ;(if (symbol? sid) sid (vector-ref sid 1))
-  (cond
-   ((symbol? sid) sid)
-   ((keyword? sid) sid)
-   (else (vector-ref sid 1))))
+(define (sid-name sid) (if (symbol? sid) sid (vector-ref sid 0)))
+(define (sid-id sid)   (if (symbol? sid) sid (vector-ref sid 1)))
 (define (sid-location sid)
-  ;(if (symbol? sid) sid (vector-ref sid (if (= 2 (vector-length sid)) 0 2)))
-  (cond
-   ((symbol? sid) sid)
-   ((keyword? sid) sid)
-   (else (vector-ref sid (if (= 2 (vector-length sid)) 0 2)))))
+  (if (symbol? sid) sid (vector-ref sid (if (= 2 (vector-length sid)) 0 2))))
 
 (define (list1? x) (and (pair? x) (null?  (cdr x))))
 (define (list2? x) (and (pair? x) (list1? (cdr x))))
@@ -988,8 +977,6 @@
           ;; Álvaro Castro-Castilla: allow empty lists for Gambit special forms, keywords and DSSSL markers
           ((null? sexp)
            ((get-ek sexp) sexp))
-          ((keyword? sexp)
-           ((get-ek sexp) sexp))
           ((dsssl-marker? sexp)
            ((get-ek sexp) sexp))
 	  (else (error (string-append
@@ -1154,7 +1141,6 @@
 
   (define (check-lit lit)
     (or (sid? lit)
-        (keyword? lit) ;; Álvaro Castro-Castilla: allow keywords as literals
 	(error "Non-id: " lit " in literals list of: " synrules))
     (if (ellipsis? lit)
 	(error "Ellipsis " lit " in literals list of: " synrules)))
@@ -1660,7 +1646,7 @@
 
 (define (var->symbol var)
   (let* ((sym (var-name var))
-	 (str (symbol->string sym))
+	 (str (object->string sym))
 	 (loc (var-loc var)))
     (if (number? loc)
 	(let ((n (number->string loc)))
@@ -1806,18 +1792,16 @@
 	       (let ((tmp x)) (cond (tmp (proc tmp)) . rest)))
 	      ((_ (x . exps) . rest)
 	       (if x (begin . exps) (cond . rest)))))
-          ;; Álvaro Castro-Castilla: these can be passed directly to Gambit without expansion
-	  ;; (define-syntax and
-	  ;;   (syntax-rules ()
-	  ;;     ((_) #t)
-	  ;;     ((_ test) (let () test))
-	  ;;     ((_ test . tests) (if test (and . tests) #f))))
-	  ;; (define-syntax or
-	  ;;   (syntax-rules ()
-	  ;;     ((_) #f)
-	  ;;     ((_ test) (let () test))
-	  ;;     ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
-          )
+	  (define-syntax and
+	    (syntax-rules ()
+	      ((_) #t)
+	      ((_ test) (let () test))
+	      ((_ test . tests) (if test (and . tests) #f))))
+	  (define-syntax or
+	    (syntax-rules ()
+	      ((_) #f)
+	      ((_ test) (let () test))
+	      ((_ test . tests) (let ((x test)) (if x x (or . tests)))))))
           ;; Quasiquote uses let-syntax scope so that it can recognize
           ;; nested uses of itself using a syntax-rules literal (that
           ;; is, the quasiquote binding that is visible in the
