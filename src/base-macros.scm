@@ -223,6 +223,21 @@
          ((>= var limit))
        . body))))
 
+;;! Utility macro for checking arguments
+;; Original (as function)
+;; (define (check-arg pred val caller)
+;;   (let lp ((val val))
+;;     (if (pred val) val (lp (error "Bad argument" val pred caller)))))
+(define-syntax check-arg
+  (syntax-rules ()
+    ((_ ?pred ?val ?caller)
+     (if (?pred ?val)
+         #t
+         (error (string-append (object->string '?pred) " check failed with value "
+                               (object->string ?val)
+                               " in: "
+                               (object->string '?caller)))))))
+
 ;;; Define values allows sharing state between functions
 ;; UNTESTED
 ;; (define-values (inc dec reset)
