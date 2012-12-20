@@ -1109,10 +1109,37 @@
 
 ;; Returns (k expanded-forms store loc-n).
 (define (expand-top-level-forms forms store loc-n k)
+  (define (lambdas-to-lets form)
+    (if (or (not (list? form))
+            (null? form)
+            (eq? 'quote (car form)))
+        form
+        (let ((mapped (map lambdas-to-lets form)))
+          (if (not (and (pair? (car mapped))
+                        (eq? 'lambda (caar mapped))))
+              mapped
+              (let* ((lambda-form (car mapped))
+                     (inits (cdr mapped))
+                     (vars (cadr lambda-form))
+                     (body-expr (caddr lambda-form)))
+                (if (not (and (list? vars)
+                              (= (length vars) (length inits))))
+                    mapped
+                    (let ((bindings (map list vars inits)))
+                      (if (and (<= (length bindings) 1)
+                               (pair? body-expr)
+                               (or (eq? 'let* (car body-expr))
+                                   (and (eq? 'let (car body-expr))
+                                        (<= (length (cadr body-expr)) 1))))
+                          `(let* ,(append bindings (cadr body-expr))
+                             ,(caddr body-expr))
+                          `(let ,bindings
+                             ,body-expr)))))))))
   (define (finish outputs store loc-n)
     (define (finish1 output)
       ;; You can leave out the unrename-locals call if you want to.
-      (symbolize (unrename-locals output)))
+      ;; Álvaro Castro-Castilla: added LAMBDAS-TO-LETS step
+      (lambdas-to-lets (symbolize (unrename-locals output))))
     (k (map finish1 outputs) store loc-n))
   (expand-top-level-sexps (wrap-vecs forms) store loc-n finish))
 
@@ -1652,8 +1679,8 @@
 	(let ((n (number->string loc)))
 	  (string->symbol (string-append "_" str "_" n)))
 	(if (case sym
-              ;; Álvaro Castro-Castilla: added AND, OR as builtins
-	      ((begin define delay if lambda letrec quote set! and or) #t)
+              ;; Álvaro Castro-Castilla: added LET and LET* as builtins
+	      ((begin define delay if lambda letrec quote set! let let*) #t)
 	      (else (and (positive? (string-length str))
 			 (char=? #\_ (string-ref str 0)))))
 	    (string->symbol (string-append "_" str "_"))
@@ -1793,19 +1820,16 @@
 	       (let ((tmp x)) (cond (tmp (proc tmp)) . rest)))
 	      ((_ (x . exps) . rest)
 	       (if x (begin . exps) (cond . rest)))))
-          ;; Álvaro Castro-Castilla: passing these forms directly to Gambit as they
-          ;; contain no structure
-	  ;; (define-syntax and
-	  ;;   (syntax-rules ()
-	  ;;     ((_) #t)
-	  ;;     ((_ test) (let () test))
-	  ;;     ((_ test . tests) (if test (and . tests) #f))))
-	  ;; (define-syntax or
-	  ;;   (syntax-rules ()
-	  ;;     ((_) #f)
-	  ;;     ((_ test) (let () test))
-	  ;;     ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
-          )
+          (define-syntax and
+	    (syntax-rules ()
+	      ((_) #t)
+	      ((_ test) (let () test))
+	      ((_ test . tests) (if test (and . tests) #f))))
+	  (define-syntax or
+	    (syntax-rules ()
+	      ((_) #f)
+	      ((_ test) (let () test))
+	      ((_ test . tests) (let ((x test)) (if x x (or . tests)))))))
           ;; Quasiquote uses let-syntax scope so that it can recognize
           ;; nested uses of itself using a syntax-rules literal (that
           ;; is, the quasiquote binding that is visible in the
