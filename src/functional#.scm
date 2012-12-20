@@ -2,5 +2,14 @@
 ;;; Functional programming procedures
 
 (##namespace ("base:functional#"
-              Y))
+              U
+              Y
+              Y!
+              composer
+              negate
+              adjoin
+              curry
+              uncurry
+              memoize/key-gen
+              memoize))
 

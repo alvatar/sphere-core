@@ -1,3 +1,14 @@
+(##define-macro (check-arg pred val caller)
+  `(let ((pred ,pred)
+	 (val ,val)
+	 (caller ',caller))
+     (if (pred val)
+	 val
+         (error (string-append (object->string ',pred) " check failed with value "
+                               (object->string val)
+                               " in: "
+                               (object->string ',caller))))))
+
 ;; ;;! Macro expander for define*.
 ;; (##define-macro (define* pattern . body)
 ;;   (if (pair? pattern)
