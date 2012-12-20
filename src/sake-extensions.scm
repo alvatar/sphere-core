@@ -16,7 +16,7 @@
       (let recur ((n 0)
                   (thread-pool '()))
         (if (< n max-thread-number)
-            (recur (++ n)
+            (recur (+ n 1)
                    (cons (thread-start!
                           (make-thread
                            (lambda ()

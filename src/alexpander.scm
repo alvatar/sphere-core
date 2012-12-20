@@ -1652,7 +1652,8 @@
 	(let ((n (number->string loc)))
 	  (string->symbol (string-append "_" str "_" n)))
 	(if (case sym
-	      ((begin define delay if lambda letrec quote set!) #t)
+              ;; Álvaro Castro-Castilla: added AND, OR as builtins
+	      ((begin define delay if lambda letrec quote set! and or) #t)
 	      (else (and (positive? (string-length str))
 			 (char=? #\_ (string-ref str 0)))))
 	    (string->symbol (string-append "_" str "_"))
