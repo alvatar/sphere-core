@@ -146,6 +146,9 @@
                                                       code-pass-1)) ; TODO!! Filter symbols!!""
                                    (intermediate-code
                                     `(,@(map (lambda (f) `(define-cond-expand-feature ,f)) (cons 'compile-to-c cond-expand-features))
+                                      ,@(with-input-from-file (string-append (%module-path-src '(base: compilation-prelude))
+                                                                             (%module-filename-scm 'compilation-prelude))
+                                          read-all)
                                       ,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
                                       ,@(if header-module '((##include "~~lib/gambit#.scm")) '())
                                       ,@(filter-map
