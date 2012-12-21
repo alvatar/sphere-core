@@ -6,7 +6,7 @@
     ((_) (0))))
 
 ;;! A symbol? predicate at the macro-expand time
-;;	symbol?? FORM KT KF
+;; symbol?? FORM KT KF
 ;; FORM is an arbitrary form or datum
 ;; expands in KT if FORM is a symbol (identifier), Otherwise, expands in KF
 ;; (symbol?? x 'yes 'no) => yes
@@ -14,18 +14,18 @@
 ;; By Oleg Kiselyov
 (define-syntax symbol??
   (syntax-rules ()
-    ((symbol?? (x . y) kt kf) kf)	; It's a pair, not a symbol
-    ((symbol?? #(x ...) kt kf) kf)	; It's a vector, not a symbol
+    ((symbol?? (x . y) kt kf) kf) ; It's a pair, not a symbol
+    ((symbol?? #(x ...) kt kf) kf) ; It's a vector, not a symbol
     ((symbol?? maybe-symbol kt kf)
      (let-syntax
          ((test
-	   (syntax-rules ()
-	     ((test maybe-symbol t f) t)
-	     ((test x t f) f))))
+    (syntax-rules ()
+      ((test maybe-symbol t f) t)
+      ((test x t f) f))))
        (test abracadabra kt kf)))))
 
 ;;! A macro-expand-time memv function for identifiers
-;; 	id-memv?? FORM (ID ...) KT KF
+;;  id-memv?? FORM (ID ...) KT KF
 ;; FORM is an arbitrary form or datum, ID is an identifier.
 ;; The macro expands into KT if FORM is an identifier, which occurs
 ;; in the list of identifiers supplied by the second argument.
@@ -50,9 +50,9 @@
     ((id-memv?? form (id ...) kt kf)
      (let-syntax
          ((test
-	   (syntax-rules (id ...)
-	     ((test id _kt _kf) _kt) ...
-	     ((test otherwise _kt _kf) _kf))))
+    (syntax-rules (id ...)
+      ((test id _kt _kf) _kt) ...
+      ((test otherwise _kt _kf) _kf))))
        (test form kt kf)))))
 
 ;;! Check if two identifiers are two occurrences of the same identifier

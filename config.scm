@@ -1,5 +1,5 @@
-(sphere: "base")
+(sphere: "core")
 (dependencies:
  (assert
   (include
-   (base: syntax-macros))))
+   (core: syntax-macros))))

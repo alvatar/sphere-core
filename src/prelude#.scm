@@ -2,5 +2,5 @@
 ;;; Prelude
 
 (define ##current-expander 'alexpander)
-(load "~~spheres/base/src/alexpander.scm")
-(include "~~spheres/base/src/sphere#.scm")
+(load "~~spheres/core/src/alexpander.scm")
+(include "~~spheres/core/src/sphere#.scm")
