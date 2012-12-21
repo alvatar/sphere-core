@@ -140,13 +140,15 @@
                             (for-each eval compilation-code)
                             ;; Generate code: 1) alexpander 2) substitute alexpander's renamed symbols 3) namespaces and includes
                             (let* ((code-pass-1 (alexpand (with-input-from-file input-file read-all)))
-                                   (code-pass-2 (map* (lambda (atom) (case atom
-                                                                  ((_eqv?_17) 'eqv?)
-                                                                  (else atom)))
+                                   (code-pass-2 (map* (lambda (atom)
+                                                        (case atom
+                                                          ((_eqv?_17) 'eqv?)
+                                                          ((_cons_31) 'cons)
+                                                          (else atom)))
                                                       code-pass-1)) ; TODO!! Filter symbols!!""
                                    (intermediate-code
                                     `(,@(map (lambda (f) `(define-cond-expand-feature ,f)) (cons 'compile-to-c cond-expand-features))
-                                      ,@(with-input-from-file (string-append (%module-path-src '(base: compilation-prelude))
+                                      ,@(with-input-from-file (string-append (%module-path-src '(core: compilation-prelude))
                                                                              (%module-filename-scm 'compilation-prelude))
                                           read-all)
                                       ,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
