@@ -223,6 +223,32 @@
          ((>= var limit))
        . body))))
 
+;;! SRFI-2
+(define-syntax and-let*
+  (syntax-rules ()
+    ((_ ())
+     #t)
+    ((_ () body ...)
+     (begin body ...))
+    ((_ ((expr)))
+     expr)
+    ((_ ((var expr)))
+     expr)
+    ((_ (expr))
+     expr)
+    ((_ ((expr) clauses ...))
+     (if expr (and-let* (clauses ...)) expr))
+    ((_ ((var expr) clauses ...))
+     (let ((var expr))
+       (if var (and-let* (clauses ...)) var)))
+    ((_ ((var expr) clauses ...) body ...)
+     (let ((var expr))
+       (if var (and-let* (clauses ...) body ...) #f)))
+    ((_ ((expr) clauses ...) body ...)
+     (if expr (and-let* (clauses ...) body ...) #f))
+    ((_ (var clauses ...) body ...)
+     (if var (and-let* (clauses ...) body ...) #f))))
+
 ;; Utility macro for checking arguments
 ;; Macro in compilation-prelude to make it easy to define in debug/release modes
 ;; Original (as function)
