@@ -199,6 +199,13 @@ fig.scm file"))
                                   (cons head tail)))))))))
          (expand-wildcards
           (lambda (deps)
+            (map* (lambda (e)
+                    (if (eq? e '=)
+                        (string->keyword (symbol->string sphere))
+                        e))
+                  deps)))
+         (normalize-modules
+          (lambda (deps)
             (map (lambda (e)
                    (let ((module (car e))
                          (rest (cdr e)))
@@ -211,9 +218,10 @@ fig.scm file"))
                  deps))))
      (let ((deps-pair (assq (string->keyword "dependencies") (%sphere-config sphere))))
        (if deps-pair
-           (expand-wildcards
-            (expand-cond-features
-             (cdr deps-pair)))
+           (normalize-modules
+            (expand-wildcards
+             (expand-cond-features
+              (cdr deps-pair))))
            '())))))
 
 ;-------------------------------------------------------------------------------

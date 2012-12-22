@@ -2,4 +2,4 @@
 (dependencies:
  (assert
   (include
-   (core: syntax-macros))))
+   (= syntax-macros))))
