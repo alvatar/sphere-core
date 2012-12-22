@@ -60,6 +60,7 @@
       (error "unimplemented")
       (let* ((module module-or-file)
              (header-module (%module-header module))
+             (macros-module (%module-macros module))
              (version (if (null? version) (%module-version module) version))
              (input-file (string-append (default-src-directory) (%module-filename-scm module)))
              (intermediate-file (string-append (default-build-directory)
@@ -128,7 +129,8 @@
                                  `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
                                    ,@(map (lambda (m) `(##import-include ,m))
                                           (append (%module-dependencies-to-include module)
-                                                  (if header-module (list header-module) '()))))))
+                                                  (if header-module (list header-module) '())
+                                                  (if macros-module (list macros-module) '()))))))
                             (if verbose
                                 (begin
                                   (info/color 'light-green "compilation environment code:")
@@ -173,36 +175,36 @@
                                   (error "error compiling generated C file")))))
             ;; Portable syntax-case works by compiling a wrapper module that includes all necessary code
             ;; Currently deactivated
-            ((syntax-case) (let ((generated-code
-                                  `(,(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
-                                    ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
-                                           (%module-dependencies-to-include module))
-                                    (include ,(string-append (%module-path-src module) (%module-filename-scm module)))))
-                                 (compilation-code
-                                  `((load "~~lib/syntax-case")
-                                    ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
-                                           (%module-dependencies-to-include module))
-                                    (compile-file-to-target
-                                     ,intermediate-file
-                                     output: ,output-file
-                                     options: ',compiler-options))))
-                             (error "Syntax-case currently unsupported")
-                             (if verbose
-                                 (begin (display "Expander: ")
-                                        (pp expander)
-                                        (println "Generated module wrapper code:")
-                                        (pp generated-code)
-                                        (println "Command-line compiler code")
-                                        (pp compilation-code)))
-                             (call-with-output-file
-                                 intermediate-file
-                               (lambda (f)
-                                 (for-each (lambda (c) (pp c f)) generated-code)))
-                             (or (= 0
-                                    (gambit-eval-here
-                                     compilation-code
-                                     verbose: #f))
-                                 (error "error generating C file"))))
+            ;; ((syntax-case) (let ((generated-code
+            ;;                       `(,(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+            ;;                         ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
+            ;;                                (%module-dependencies-to-include module))
+            ;;                         (include ,(string-append (%module-path-src module) (%module-filename-scm module)))))
+            ;;                      (compilation-code
+            ;;                       `((load "~~lib/syntax-case")
+            ;;                         ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
+            ;;                                (%module-dependencies-to-include module))
+            ;;                         (compile-file-to-target
+            ;;                          ,intermediate-file
+            ;;                          output: ,output-file
+            ;;                          options: ',compiler-options))))
+            ;;                  (error "Syntax-case currently unsupported")
+            ;;                  (if verbose
+            ;;                      (begin (display "Expander: ")
+            ;;                             (pp expander)
+            ;;                             (println "Generated module wrapper code:")
+            ;;                             (pp generated-code)
+            ;;                             (println "Command-line compiler code")
+            ;;                             (pp compilation-code)))
+            ;;                  (call-with-output-file
+            ;;                      intermediate-file
+            ;;                    (lambda (f)
+            ;;                      (for-each (lambda (c) (pp c f)) generated-code)))
+            ;;                  (or (= 0
+            ;;                         (gambit-eval-here
+            ;;                          compilation-code
+            ;;                          verbose: #f))
+            ;;                      (error "error generating C file"))))
             ((gambit)
              (error "Gambit expander workflow not implemented"))
             (else (error "Unknown expander"))))
