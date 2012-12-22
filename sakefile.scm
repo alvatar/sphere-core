@@ -15,6 +15,9 @@
 (define-task compile ()
   (for-each (lambda (m) (sake:compile-c-to-o (sake:compile-to-c m))) modules))
 
+(define-task test ()
+  (sake:test-all))
+
 (define-task clean ()
   (sake:default-clean))
 
