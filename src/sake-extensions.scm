@@ -317,6 +317,7 @@
 
 ;;! Test all files in test/
 (##define (sake:test-all)
+  (or (%sphere-exists? 'energy) (error "You need to install Energy Sphere in order to use tests"))
   (for-each (lambda (f)
               (gambit-eval-here
                `((##import (energy: testing))

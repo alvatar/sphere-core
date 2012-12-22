@@ -102,10 +102,14 @@
           (if sphere-pair
               (string-append (path-strip-trailing-directory-separator (cadr sphere-pair)) "/")
               ;; Otherwise, try system-installed spheres
-              (if (file-exists? (%sphere-system-path sphere))
-                  (%sphere-system-path sphere)
-                  (error (string-append "Sphere not found: " (object->string sphere) " -- Please set a path in config file or install the sphere in the ~~spheres directory")))))
+              (and (file-exists? (%sphere-system-path sphere))
+                   (%sphere-system-path sphere)
+                   ;; (error (string-append "Sphere not found: " (object->string sphere) " -- Please set a path in config file or install the sphere in the ~~spheres directory"))
+                   )))
         #f)))
+
+(define^ (%sphere-exists? sphere)
+  (and (%sphere-path sphere) #t))
 
 (define^ (%paths)
   (let* ((paths-pair (assq (string->keyword "paths") (%current-config)))
@@ -120,13 +124,12 @@
 (define^ %sphere-config
   (let ((config-dict '()))
     (lambda (sphere)
-      (if sphere
-          (let ((sphere-pair (assq sphere config-dict)))
-            (if sphere-pair
-                (cadr sphere-pair)
-                (let ((new-pair (list
-                                 sphere
-                                 (with-exception-catcher
+      (and
+       (%sphere-exists? sphere)
+       (let ((sphere-pair (assq sphere config-dict)))
+         (if sphere-pair
+             (cadr sphere-pair)
+             (let* ((config-data (with-exception-catcher
                                   (lambda (e) (if (no-such-file-or-directory-exception? e)
                                              (error (string-append "Sphere \"" (symbol->string sphere) "\" doesn't have a con
 fig.scm file"))
@@ -134,75 +137,84 @@ fig.scm file"))
                                   (lambda () (call-with-input-file
                                             (string-append (or (%sphere-path sphere) "")
                                                            (config-file))
-                                          read-all))))))
-                  (set! config-dict
-                        (cons new-pair config-dict))
-                  (cadr new-pair))))
-          '()))))
+                                          read-all))))
+                    (new-pair (list sphere config-data)))
+               (if (eq? sphere (string->symbol (cadr (assq (string->keyword "sphere") config-data))))
+                   (begin (set! config-dict
+                                (cons new-pair config-dict))
+                          (cadr new-pair))
+                   #f))))))))
 
 ;;! Get dependencies of sphere's modules
 (define^ (%sphere-dependencies sphere)
-  (let ((expand-cond-features
-         (lambda (deps)
-           (let ((any-eq? (lambda (k l)
-                            (let recur ((l l))
-                              (cond ((null? l) #f)
-                                    ((eq? k (car l)) #t)
-                                    (else (recur (cdr l))))))))
-             (let expand-cond-features ((deps deps))
-               (cond ((null? deps) '())
-                     ((not (pair? deps)) deps)
-                     ((eq? 'cond-expand (car deps))
-                      ;; cond-expand found
-                      (let find-condition ((conditions (cdr deps)))
-                        (cond ((null? conditions)
-                               (error "cond-expand in dependencies not met"))
-                              ((not (pair? (car conditions)))
-                               (error "incorrect cond-expand syntax"))
-                              ((and (symbol? (caar conditions))
-                                    (any-eq? (caar conditions) ##cond-expand-features))
-                               (cons 'cond-expanded (cdar conditions)))
-                              ((and (symbol? (caar conditions))
-                                    (eq? (caar conditions) 'else))
-                               (cons 'cond-expanded (cdar conditions)))
-                              ((and (pair? (caar conditions))
-                                    (eq? (caaar conditions) 'or))
-                               (error "OR clauses in dependencies not implemented yet"))
-                              ((and (pair? (caar conditions))
-                                    (eq? (caaar conditions) 'and))
-                               (error "AND clauses in dependencies not implemented yet"))
-                              ((and (pair? (caar conditions))
-                                    (eq? (caaar conditions) 'not))
-                               (error "NOT clauses in dependencies not implemented yet"))
-                              ((and (pair? (caar conditions)))
-                               (error "incorrect cond-expand syntax: must use OR, AND, NOT lists or single symbols"))
-                              (else
-                               (find-condition (cdr conditions))))))
-                     (else (let ((head (expand-cond-features (car deps)))
-                                 (tail (expand-cond-features (cdr deps))))
-                             ;; Find a cleaner algorithm!
-                             ;; What does now is tag expanded expressions for appending them instead of cons'ing
-                             (if (and (pair? head) (eq? (car head) 'cond-expanded))
-                                 (append (cdr head) tail)
-                                 (cons head tail)))))))))
-        (expand-wildcards
-         (lambda (deps)
-           (map (lambda (e)
-                  (let ((module (car e))
-                        (rest (cdr e)))
-                    (cons
-                     (cond
-                      ((%module-reduced-form? module) (%module-normalize module (string->keyword "override-sphere") sphere))
-                      ((eq? '= (car module)) (cons (symbol->keyword sphere) (cdr module)))
-                      (else module))
-                     rest)))
-                deps))))
-    (let ((deps-pair (assq (string->keyword "dependencies") (%sphere-config sphere))))
-      (if deps-pair
-          (expand-wildcards
-           (expand-cond-features
-            (cdr deps-pair)))
-          '()))))
+  (define map*
+    (lambda (f l)
+      (cond ((null? l) '())
+            ((not (pair? l)) (f l))
+            (else (cons (map* f (car l)) (map* f (cdr l)))))))
+  (and
+   (%sphere-exists? sphere)
+   (let ((expand-cond-features
+          (lambda (deps)
+            (let ((any-eq? (lambda (k l)
+                             (let recur ((l l))
+                               (cond ((null? l) #f)
+                                     ((eq? k (car l)) #t)
+                                     (else (recur (cdr l))))))))
+              (let expand-cond-features ((deps deps))
+                (cond ((null? deps) '())
+                      ((not (pair? deps)) deps)
+                      ((eq? 'cond-expand (car deps))
+                       ;; cond-expand found
+                       (let find-condition ((conditions (cdr deps)))
+                         (cond ((null? conditions)
+                                (error "cond-expand in dependencies not met"))
+                               ((not (pair? (car conditions)))
+                                (error "incorrect cond-expand syntax"))
+                               ((and (symbol? (caar conditions))
+                                     (any-eq? (caar conditions) ##cond-expand-features))
+                                (cons 'cond-expanded (cdar conditions)))
+                               ((and (symbol? (caar conditions))
+                                     (eq? (caar conditions) 'else))
+                                (cons 'cond-expanded (cdar conditions)))
+                               ((and (pair? (caar conditions))
+                                     (eq? (caaar conditions) 'or))
+                                (error "OR clauses in dependencies not implemented yet"))
+                               ((and (pair? (caar conditions))
+                                     (eq? (caaar conditions) 'and))
+                                (error "AND clauses in dependencies not implemented yet"))
+                               ((and (pair? (caar conditions))
+                                     (eq? (caaar conditions) 'not))
+                                (error "NOT clauses in dependencies not implemented yet"))
+                               ((and (pair? (caar conditions)))
+                                (error "incorrect cond-expand syntax: must use OR, AND, NOT lists or single symbols"))
+                               (else
+                                (find-condition (cdr conditions))))))
+                      (else (let ((head (expand-cond-features (car deps)))
+                                  (tail (expand-cond-features (cdr deps))))
+                              ;; Find a cleaner algorithm!
+                              ;; What does now is tag expanded expressions for appending them instead of cons'ing
+                              (if (and (pair? head) (eq? (car head) 'cond-expanded))
+                                  (append (cdr head) tail)
+                                  (cons head tail)))))))))
+         (expand-wildcards
+          (lambda (deps)
+            (map (lambda (e)
+                   (let ((module (car e))
+                         (rest (cdr e)))
+                     (cons
+                      (cond
+                       ((%module-reduced-form? module) (%module-normalize module (string->keyword "override-sphere") sphere))
+                       ((eq? '= (car module)) (cons (symbol->keyword sphere) (cdr module)))
+                       (else module))
+                      rest)))
+                 deps))))
+     (let ((deps-pair (assq (string->keyword "dependencies") (%sphere-config sphere))))
+       (if deps-pair
+           (expand-wildcards
+            (expand-cond-features
+             (cdr deps-pair)))
+           '())))))
 
 ;-------------------------------------------------------------------------------
 ; Module
@@ -214,10 +226,6 @@ fig.scm file"))
                     (->symbol id)
                     (string->keyword "version") version))
       (->symbol id)))
-
-;;! Signal error when module has a wrong format
-(define^ (module-error module)
-  (error "Error parsing module directive (wrong module format): " module))
 
 ;;! Module structure: (sphere: module-id [version: '(list-of-version-features)])
 (define^ %module-reduced-form? symbol?)
@@ -244,21 +252,32 @@ fig.scm file"))
   (or (%module-reduced-form? module)
       (%module-normal-form? module)))
 
+;;! Check if module exists
+(define^ (%check-module module)
+  (or (%module? module)
+      (error "Ill-defined module: " module))
+  (let ((sphere (%module-sphere module)))
+    (or (%sphere-exists? sphere)
+        (error "Sphere doesn't exist: " (symbol->string sphere))))
+  (or (string-append (%module-path-src module) (%module-filename-scm module))
+      (string-append (%module-path-lib module) (%module-filename-o module))
+      (error "Module doesn't exist: " (object->string module))))
+
 (define^ (%module-sphere module)
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (if (%module-normal-form? module)
       (let ((first (car module)))
         (if (keyword? first) (keyword->symbol first) first))
       (%current-sphere)))
 
 (define^ (%module-id module)
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (if (%module-normal-form? module)
       (cadr module)
       module))
 
 (define^ (%module-version module)
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (if (%module-normal-form? module)
       ;; Search for version: from the third element on
       (let ((version (memq 'version: (cddr module))))
@@ -319,7 +338,7 @@ fig.scm file"))
 
 ;;! Transforms / into _
 (define^ (%module-flat-name module)
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (let ((name (string-copy (symbol->string (%module-id module)))))
     (let recur ((i (- (string-length name) 1)))
       (if (= i 0)
@@ -329,12 +348,12 @@ fig.scm file"))
                  (recur (- i 1)))))))
 
 (define^ (%module-filename-scm module)
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (string-append (symbol->string (%module-id module))
                  (default-scm-extension)))
 
 (define^ (%module-filename-c module #!key (version '()))
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -344,7 +363,7 @@ fig.scm file"))
                  (default-c-extension)))
 
 (define^ (%module-filename-o module #!key (version '()))
-  (or (%module? module) (module-error module))
+  (or (%module? module) (%module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -355,7 +374,7 @@ fig.scm file"))
 
 ;;; Module dependecies, as directly read from the %config
 (define^ (%module-dependencies module)
-  (or (%module? module) (module-error module))
+  (%check-module module)
   (assq (%module-id module) (%sphere-dependencies (%module-sphere module))))
 
 (define^ (%module-dependencies-select type)
@@ -384,7 +403,7 @@ fig.scm file"))
                      (car sphere-deps))
                     (else (find-unversioned module sphere (cdr sphere-deps)))))))
     (lambda (module)
-      (or (%module? module) (module-error module))
+      (%check-module module)
       (let ((module-sphere (%module-sphere module))
             (get-dependency-list (lambda (l) (let ((type-pair (assq type (cdr l))))
                                           (if type-pair (cdr type-pair) '())))))
@@ -511,6 +530,7 @@ fig.scm file"))
    ##load-module-and-dependencies
    (let ((load-single-module
           (lambda (module options)
+            (%check-module module)
             (let ((verbose (and (memq 'verbose options) #t))
                   (sphere (%module-sphere module)))
               (let ((header-module (%module-header module))
@@ -520,6 +540,7 @@ fig.scm file"))
                                                                  (%module-filename-scm header-module)))))
                 (if macros-module
                     (##include-module-and-dependencies macros-module '()))
+                (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                 (if sphere
                     (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                           (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
@@ -594,7 +615,7 @@ fig.scm file"))
                                   (string-shrink! str (- (string-length str) 1))
                                   (string->keyword str))))
                           (cdr module)))))
-    (or (%module? module) (module-error module))
+    (%check-module module)
     (##include-module-and-dependencies module '(verbose))))
 
 ;;; Load only module dependencies, do not load the module
@@ -602,7 +623,7 @@ fig.scm file"))
   (let ((module (if (null? (cdr module))
                     (car module)
                     module)))
-    (or (%module? module) (module-error module))
+    (%check-module module)
     (##load-module-and-dependencies module '(omit-root verbose))))
 
 ;;; Main load macro, loads dependencies
@@ -619,5 +640,5 @@ fig.scm file"))
                                    (string-shrink! str (- (string-length str) 1))
                                    (string->keyword str))))
                            (cdr module)))))
-    (or (%module? module) (module-error module))
+    (%check-module module)
     `(##load-module-and-dependencies ',module '(verbose))))
