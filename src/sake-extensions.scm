@@ -115,9 +115,6 @@
                            features)
                         ((cond-expand (feature-id body ...) more-clauses ...)
                          (cond-expand more-clauses ...))))))))
-          (define map* (lambda (f l) (cond ((null? l) '())
-                                      ((not (pair? l)) (f l))
-                                      (else (cons (map* f (car l)) (map* f (cdr l)))))))
           (define filter-map (lambda (f l)
                                (let recur ((l l))
                                  (if (null? l) '()
@@ -139,13 +136,7 @@
                             ;; Eval compilation code in current environment
                             (for-each eval compilation-code)
                             ;; Generate code: 1) alexpander 2) substitute alexpander's renamed symbols 3) namespaces and includes
-                            (let* ((code-pass-1 (alexpand (with-input-from-file input-file read-all)))
-                                   (code-pass-2 (map* (lambda (atom)
-                                                        (case atom
-                                                          ((_eqv?_17) 'eqv?)
-                                                          ((_cons_31) 'cons)
-                                                          (else atom)))
-                                                      code-pass-1)) ; TODO!! Filter symbols!!""
+                            (let* ((code (alexpand (with-input-from-file input-file read-all)))
                                    (intermediate-code
                                     `(,@(map (lambda (f) `(define-cond-expand-feature ,f)) (cons 'compile-to-c cond-expand-features))
                                       ,@(with-input-from-file (string-append (%module-path-src '(core: compilation-prelude))
@@ -165,7 +156,7 @@
                                                            (%module-path-src header-module)
                                                            (%module-filename-scm header-module))))
                                             '())
-                                      ,@code-pass-2)))
+                                      ,@code)))
                               (if verbose
                                   (begin (info/color 'light-green "macro-expanded code:")
                                          (for-each pp intermediate-code)))
@@ -321,3 +312,14 @@
 ;;! Uninstall all the files from the system installation
 (##define (sake:uninstall-system-sphere #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))
+
+;;! Test all files in test/
+(##define (sake:test-all)
+  (for-each (lambda (f)
+              (gambit-eval-here
+               `((##import (energy: testing))
+                 (##import-include (energy: testing-macros))
+                 (eval '(include ,f)))))
+            (fileset dir: "test/"
+                     test: (f-and (extension=? ".scm")
+                                  (f-not (ends-with? "#.scm"))))))

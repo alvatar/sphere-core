@@ -2105,10 +2105,24 @@
 (define ##default-expand-source ##expand-source)
 
 (let ((store (null-mstore)))
+  (define map*
+    (lambda (f l)
+      (cond ((null? l) '())
+            ((not (pair? l)) (f l))
+            (else (cons (map* f (car l)) (map* f (cdr l)))))))
+  (define (preprocess code) code)
+  (define (postprocess code)
+    (map* (lambda (atom)
+            (case atom
+              ((_eqv?_17) 'eqv?)
+              ((_cons_31) 'cons)
+              (else atom)))
+          code))
   (set!
    alexpand
    (lambda (forms)
-     (expand-top-level-forms! forms store)))
+     (postprocess
+      (expand-top-level-forms! forms store))))
   (set!
    alexpand-source
    (lambda (expr)
@@ -2123,7 +2137,10 @@
                                 (cons '##begin expanded-code))))
                  ;; original solution by Mario Benelli's solution, breaks some macros
                  ;; (##sourcify-deep code ##source1-marker))
-                 (##make-source code #f)))))
+                 (##make-source (postprocess code) #f))))
+              (full-expand (lambda ()
+                             (postprocess
+                              (expand-with-alexpander desourcified)))))
        (if (pair? desourcified)
            (let* ((head (car desourcified))
                   (head-str (object->string head)))
@@ -2138,8 +2155,8 @@
                (println "*** WARNING -- define-macro not supported, please use ##define-macro form instead")
                (##default-expand-source (##make-source (void) #f)))
               (else
-               (expand-with-alexpander desourcified))))
-           (expand-with-alexpander desourcified))))))
+               (full-expand))))
+           (full-expand))))))
 
 ;;; Include using the expander
 (define (##alexpander-include f)
