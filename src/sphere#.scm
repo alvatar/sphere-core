@@ -22,19 +22,19 @@
     `(eval-in-macro-environment-no-result
       (##define ,pattern ,@body))))
 
-;;; symbol->keyword
+;;! symbol->keyword
 (define^ (symbol->keyword s)
   (string->keyword (symbol->string s)))
 
-;;; keyword->symbol
+;;! keyword->symbol
 (define^ (keyword->symbol k)
   (string->symbol (keyword->string k)))
 
-;;; Anything to symbol
+;;! Anything to symbol
 (define^ (->symbol o)
   (string->symbol (object->string o)))
 
-;;; Anything to keyword
+;;! Anything to keyword
 (define^ (->keyword o)
   (string->keyword (object->string o)))
 
@@ -63,8 +63,8 @@
 (define^ config-file
   (make-parameter "config.scm"))
 
-;;; Read current sphere config data
-;;; Returns null list if no config data found
+;;! Read current sphere config data
+;; Returns null list if no config data found
 (define^ %current-config
   (let ((cached #f))
     (lambda ()
@@ -116,7 +116,7 @@
           paths)
          paths)))
 
-;;; Used for getting a specific sphere config data
+;;! Used for getting a specific sphere config data
 (define^ %sphere-config
   (let ((config-dict '()))
     (lambda (sphere)
@@ -140,7 +140,7 @@ fig.scm file"))
                   (cadr new-pair))))
           '()))))
 
-;;; Get dependencies of sphere's modules
+;;! Get dependencies of sphere's modules
 (define^ (%sphere-dependencies sphere)
   (let ((expand-cond-features
          (lambda (deps)
@@ -215,11 +215,11 @@ fig.scm file"))
                     (string->keyword "version") version))
       (->symbol id)))
 
-;;; Signal error when module has a wrong format
+;;! Signal error when module has a wrong format
 (define^ (module-error module)
   (error "Error parsing module directive (wrong module format): " module))
 
-;;; Module structure: (sphere: module-id [version: '(list-of-version-features)])
+;;! Module structure: (sphere: module-id [version: '(list-of-version-features)])
 (define^ %module-reduced-form? symbol?)
 
 (define^ (%module-normal-form? module)
@@ -227,7 +227,7 @@ fig.scm file"))
        (or (keyword? (car module))
            (and (symbol? (car module)) ; In case we don't have keywords (syntax-case)
                 (equal? #\: (let ((str (symbol->string (car module))))
-                                (string-ref str (- (string-length str) 1)))))
+                              (string-ref str (- (string-length str) 1)))))
            (eq? '= (car module))) ; Wildcard = represents the "this" sphere
        (not (null? (cdr module)))
        (symbol? (cadr module))
@@ -279,8 +279,15 @@ fig.scm file"))
 (define^ (%module-path-lib module)
   (string-append (%module-path module) (default-lib-directory)))
 
-;;; Module versions identify debug, architecture or any compiled-in features
-;;; Normalizes removing duplicates and sorting alphabetically
+(define^ (%module-namespace module)
+  (string-append
+   (symbol->string (%module-sphere module))
+   ":"
+   (symbol->string (%module-id module))
+   "#"))
+
+;;! Module versions identify debug, architecture or any compiled-in features
+;; Normalizes removing duplicates and sorting alphabetically
 (define^ (%version->string version-symbol-list)
   (letrec ((delete-duplicates
             (lambda (l)
@@ -310,7 +317,7 @@ fig.scm file"))
                                (map symbol->string
                                     (delete-duplicates version-symbol-list)))))))
 
-;;; Transforms / into _
+;;! Transforms / into _
 (define^ (%module-flat-name module)
   (or (%module? module) (module-error module))
   (let ((name (string-copy (symbol->string (%module-id module)))))
@@ -443,7 +450,7 @@ fig.scm file"))
 ; Including and loading
 ;-------------------------------------------------------------------------------
 
-;;; Is there a header for this module? If so, return the header module
+;;! Is there a header for this module? If so, return the header module
 (define^ (%module-header module)
   (let ((header-module (%make-module
                         (string->keyword "sphere") (%module-sphere module)
@@ -454,30 +461,124 @@ fig.scm file"))
                          (%module-filename-scm header-module)))
          header-module)))
 
-(define^ %include-module-and-dependencies
-    (lambda (root-module options)
-      (let* ((*included-modules* '())
-             (verbose (and (memq 'verbose options) #t))
-             (include-single-module
-              (lambda (module)
-                (let* ((sphere (%module-sphere module))
-                       (module-name (symbol->string (%module-id module))))
-                  (if sphere
-                      (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
-                        (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
-                        (set! *included-modules* (cons (%module-normalize module) *included-modules*))
-                        ;; Old solution for vanilla Gambit (no Alexpander)
-                        ;;`(include ,include-file)
-                        (##alexpander-include include-file))
-                      (begin
-                        (if verbose (display (string-append "-- including -- " module-name ")\n")))
-                        ;; Old solution for vanilla Gambit (no Alexpander)
-                        ;; (eval `(include ,(%module-filename-scm module)))
-                        (##alexpander-include (%module-filename-scm module))))))))
-        (let recur ((module root-module))
-          (if (not (member (%module-normalize module) *included-modules*))
-              (begin (for-each recur (%module-dependencies-to-include module))
-                     (include-single-module module)))))))
+;;! Is there a macros module for this module? If so, return the macros module
+(define^ (%module-macros module)
+  (let ((macros-module (%make-module
+                        (string->keyword "sphere") (%module-sphere module)
+                        (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
+                        (string->keyword "version") (%module-version module))))
+    (and (file-exists?
+          (string-append (%module-path-src macros-module)
+                         (%module-filename-scm macros-module)))
+         macros-module)))
+
+;;! Include module and dependencies
+(define ##include-module-and-dependencies #f)
+
+;;! Load module and dependencies
+(define ##load-module-and-dependencies #f)
+
+(let* ((*loaded-modules* '())
+       (*included-modules* '())
+       (include-single-module
+        (lambda (module options)
+          (let* ((verbose (and (memq 'verbose options) #t))
+                 (sphere (%module-sphere module))
+                 (module-name (symbol->string (%module-id module))))
+            (if sphere
+                (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
+                  (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
+                  (set! *included-modules* (cons (%module-normalize module) *included-modules*))
+                  ;; Old solution for vanilla Gambit (no Alexpander)
+                  ;;`(include ,include-file)
+                  (##alexpander-include include-file))
+                (begin
+                  (if verbose (display (string-append "-- including -- " module-name ")\n")))
+                  ;; Old solution for vanilla Gambit (no Alexpander)
+                  ;; (eval `(include ,(%module-filename-scm module)))
+                  (##alexpander-include (%module-filename-scm module))))))))
+  (set!
+   ##include-module-and-dependencies
+   (lambda (root-module options)
+     (let* ((*included-modules* '())
+            (force (and (memq 'force options) #f)))
+       (let recur ((module root-module))
+         (if (or force
+                 (not (member (%module-normalize module) *included-modules*)))
+             (begin (for-each recur (%module-dependencies-to-include module))
+                    (include-single-module module '(verbose #t))))))))
+  (set!
+   ##load-module-and-dependencies
+   (let ((load-single-module
+          (lambda (module options)
+            (let ((verbose (and (memq 'verbose options) #t))
+                  (sphere (%module-sphere module)))
+              (let ((header-module (%module-header module))
+                    (macros-module (%module-macros module)))
+                (if header-module
+                    (eval `(##alexpander-include ,(string-append (%module-path-src header-module)
+                                                                 (%module-filename-scm header-module)))))
+                (if macros-module
+                    (##include-module-and-dependencies macros-module '()))
+                (if sphere
+                    (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                          (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                      (cond ((file-exists? file-o)
+                             (if verbose
+                                 (display (string-append "-- loading -- " (object->string module) "\n")))
+                             (load file-o)
+                                        ;(pp file-o)
+                             file-o)
+                            ((file-exists? file-scm)
+                             ;; Include dependencies
+                             ;; (for-each (lambda (m)
+                             ;;             (display (string-append "-- including  -- " (object->string m) "\n"))
+                             ;;             (eval `(##include ,(string-append (%module-path-src m)
+                             ;;                                               (%module-filename-scm m)))))
+                             ;;           (%module-dependencies-to-include module))
+                             ;; Include available header dependencies
+                             ;; (for-each (lambda (m)
+                             ;;             (let ((m (%module-header m)))
+                             ;;               (and
+                             ;;                 m
+                             ;;                 (begin (display (string-append "-- including header -- " (object->string m) "\n"))
+                             ;;                        (eval `(##include ,(string-append (%module-path-src m)
+                             ;;                                                          (%module-filename-scm m))))))))
+                             ;;           (%module-dependencies-to-load module))
+                             ;; Load the header
+                             ;; (and header-module
+                             ;;      (eval `(##include ,(string-append (%module-path-src header-module)
+                             ;;                                        (%module-filename-scm header-module)))))
+                             (error "loading of scm code TODO")
+                             (let recur ((include-module module))
+                               (if (not (member (%module-normalize include-module) *included-modules*))
+                                   (begin (for-each recur (%module-dependencies-to-include include-module))
+                                          (or (equal? include-module module)
+                                              (include-single-module include-module options)))))
+                             (if verbose
+                                 (display (string-append "-- loading -- " (object->string module) "\n")))
+                             (load file-scm)
+                             (pp file-scm)
+                             file-scm)
+                            (else
+                             (error (string-append "Module: "
+                                                   (object->string module)
+                                                   " cannot be found in current sphere's path"))))
+                      (set! *loaded-modules* (cons (%module-normalize module) *loaded-modules*)))
+                    (begin (if verbose
+                               (display (string-append "-- loading -- " (object->string module) "\n")))
+                           (load (%module-filename-scm module)))))))))
+     (lambda (root-module options)
+       ;; Get options, as #t or #f
+       (let ((omit-root (and (memq 'omit-root options) #t)))
+         (let recur ((module root-module))
+           (if (not (member (%module-normalize module) *loaded-modules*))
+               (begin (for-each recur (%module-dependencies-to-load module))
+                      (or (and omit-root (equal? root-module module))
+                          (load-single-module module options))))))))))
+
+
+
 
 ;;; Main include macro, doesn't load dependencies
 (##define-macro (##import-include . module)
@@ -494,95 +595,7 @@ fig.scm file"))
                                   (string->keyword str))))
                           (cdr module)))))
     (or (%module? module) (module-error module))
-    (%include-module-and-dependencies module '(verbose))))
-
-;;; Load module and dependencies. Remembers what's been loaded and included by this procedure.
-;;; A new include can be forced with (%include ...)
-(cond-expand
- ((not compiling)                       ; TODO!
-  (define ##load-module-and-dependencies
-    (let ((*loaded-modules* '())
-          (*included-modules* '()))
-      (letrec
-          ((include-single-module
-            (lambda (module options)
-              (let ((verbose (and (memq 'verbose options) #t))
-                    (sphere (%module-sphere module))
-                    (module-name (symbol->string (%module-id module))))
-                (if sphere
-                    (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
-                      (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
-                      (set! *included-modules* (cons (%module-normalize module) *included-modules*))
-                      `(include ,include-file))
-                    (begin
-                      (if verbose (display (string-append "-- including -- " module-name ")\n")))
-                      (eval `(include ,(%module-filename-scm module))))))))
-           (load-single-module
-            (lambda (module options)
-              (let ((verbose (and (memq 'verbose options) #t))
-                    (sphere (%module-sphere module)))
-                (let () ;; ((header-module (%module-header module)))
-                  ;; Create new namespace if there is a header file
-                  ;; (and header-module
-                  ;;      (eval `(##namespace (,(symbol->string (%module-id header-module))))))
-                  ;; Load basic scheme names
-                  ;; (eval '(##include "~~lib/gambit#.scm"))
-                  (if sphere
-                      (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
-                            (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
-                        (cond ((file-exists? file-o)
-                               (if verbose
-                                   (display (string-append "-- loading -- " (object->string module) "\n")))
-                               (load file-o)
-                               (pp file-o)
-                               file-o)
-                              ((file-exists? file-scm)
-                               ;; Include dependencies
-                               ;; (for-each (lambda (m)
-                               ;;             (display (string-append "-- including  -- " (object->string m) "\n"))
-                               ;;             (eval `(##include ,(string-append (%module-path-src m)
-                               ;;                                               (%module-filename-scm m)))))
-                               ;;           (%module-dependencies-to-include module))
-                               ;; Include available header dependencies
-                               ;; (for-each (lambda (m)
-                               ;;             (let ((m (%module-header m)))
-                               ;;               (and m
-                               ;;                    (begin (display (string-append "-- including header -- " (object->string m) "\n"))
-                               ;;                           (eval `(##include ,(string-append (%module-path-src m)
-                               ;;                                                             (%module-filename-scm m))))))))
-                               ;;           (%module-dependencies-to-load module))
-                               ;; Load the header
-                               ;; (and header-module
-                               ;;      (eval `(##include ,(string-append (%module-path-src header-module)
-                               ;;                                        (%module-filename-scm header-module)))))
-                               (let recur ((include-module module))
-                                 (if (not (member (%module-normalize include-module) *included-modules*))
-                                     (begin (for-each recur (%module-dependencies-to-include include-module))
-                                            (or (equal? include-module module)
-                                                (include-single-module include-module options)))))
-                               (if verbose
-                                   (display (string-append "-- loading -- " (object->string module) "\n")))
-                               (load file-scm)
-                               (pp file-scm)
-                               file-scm)
-                              (else
-                               (error (string-append "Module: "
-                                                     (object->string module)
-                                                     " cannot be found in current sphere's path"))))
-                        (set! *loaded-modules* (cons (%module-normalize module) *loaded-modules*)))
-                      (begin (if verbose
-                                 (display (string-append "-- loading -- " (object->string module) "\n")))
-                             (load (%module-filename-scm module))))
-                  ;; (eval '(##namespace ("")))
-                  )))))
-        (lambda (root-module options)
-          ;; Get options, as #t or #f
-          (let ((omit-root (and (memq 'omit-root options) #t)))
-            (let recur ((module root-module))
-              (if (not (member (%module-normalize module) *loaded-modules*))
-                  (begin (for-each recur (%module-dependencies-to-load module))
-                         (or (and omit-root (equal? root-module module))
-                             (load-single-module module options))))))))))))
+    (##include-module-and-dependencies module '(verbose))))
 
 ;;; Load only module dependencies, do not load the module
 (##define-macro (##load-module-dependencies . module)

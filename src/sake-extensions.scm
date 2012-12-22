@@ -142,7 +142,7 @@
                                       ,@(with-input-from-file (string-append (%module-path-src '(core: compilation-prelude))
                                                                              (%module-filename-scm 'compilation-prelude))
                                           read-all)
-                                      ,@(if header-module `((##namespace (,(symbol->string (%module-id header-module))))) '())
+                                      ,@(if header-module `((##namespace (,(%module-namespace header-module)))) '())
                                       ,@(if header-module '((##include "~~lib/gambit#.scm")) '())
                                       ,@(filter-map
                                          (lambda (m) (let ((module-header (%module-header m)))
