@@ -256,8 +256,6 @@
 
 
 ;;!! SRFI-5 A compatible let form with signatures and rest arguments
-
-;; SRFI-5 Reference implementation
 ;; Copyright (C) Andy Gaynor (1999). All Rights Reserved.
 ;; Modifications
 ;; - Rewritten let-loop as a local syntax definition
@@ -348,7 +346,6 @@
 
 
 ;;!! SRFI-16 Syntax for procedures of variable arity
-
 ;; Copyright (C) Lars T Hansen (1999). All Rights Reserved.
 ;; This code is in the public domain.
 
@@ -394,7 +391,6 @@
                       ?clause1 ...)))))
 
 ;;!! SRFI-26 Notation for Specializing Parameters without Currying
-
 ;; Sebastian.Egner@philips.com, 5-Jun-2002.
 ;; adapted from the posting by Al Petrofsky <al@petrofsky.org>
 ;; placed in the public domain.
@@ -460,6 +456,18 @@
     (syntax-rules ()
       ((cute . slots-or-exprs)
        (srfi-26-internal-cute () () () . slots-or-exprs)))))
+
+
+;;!! SRFI-31 A special form rec for recursive evaluation
+;; Copyright (C) Dr. Mirko Luedde (2002). All Rights Reserved.
+
+;;! rec
+(define-syntax rec
+  (syntax-rules ()
+    ((rec (NAME . VARIABLES) . BODY)
+     (letrec ( (NAME (lambda VARIABLES . BODY)) ) NAME))
+    ((rec NAME EXPRESSION)
+     (letrec ( (NAME EXPRESSION) ) NAME))))
 
 
 ;; Utility macro for checking arguments

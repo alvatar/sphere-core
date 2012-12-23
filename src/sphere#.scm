@@ -260,6 +260,10 @@ fig.scm file"))
   (or (%module-reduced-form? module)
       (%module-normal-form? module)))
 
+;;! Throw a module format error
+(define^ (%module-error module)
+  (error "Error parsing module directive (wrong module format): " module))
+
 ;;! Check if module exists
 (define^ (%check-module module)
   (or (%module? module)
