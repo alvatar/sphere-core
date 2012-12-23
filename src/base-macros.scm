@@ -223,33 +223,97 @@
          ((>= var limit))
        . body))))
 
-;;! and-let* (SRFI-2)
+
+;;!! SRFI-2 AND-LET*: an AND with local bindings, a guarded LET* special form
+
+;;! and-let*
+;; Implemented in syntax-rules by Álvaro Castro-Castilla
 (define-syntax and-let*
   (syntax-rules ()
     ((_ ())
      #t)
-    ((_ () body ...)
-     (begin body ...))
-    ((_ ((expr)))
-     expr)
-    ((_ ((var expr)))
-     expr)
-    ((_ (expr))
-     expr)
-    ((_ ((expr) clauses ...))
-     (if expr (and-let* (clauses ...)) expr))
-    ((_ ((var expr) clauses ...))
-     (let ((var expr))
-       (if var (and-let* (clauses ...)) var)))
-    ((_ ((var expr) clauses ...) body ...)
-     (let ((var expr))
-       (if var (and-let* (clauses ...) body ...) #f)))
-    ((_ ((expr) clauses ...) body ...)
-     (if expr (and-let* (clauses ...) body ...) #f))
-    ((_ (var clauses ...) body ...)
-     (if var (and-let* (clauses ...) body ...) #f))))
+    ((_ () ?body ...)
+     (begin ?body ...))
+    ((_ ((?expr)))
+     ?expr)
+    ((_ ((?var ?expr)))
+     ?expr)
+    ((_ (?expr))
+     ?expr)
+    ((_ ((?expr) ?clauses ...))
+     (let ((var ?expr))
+       (if var (and-let* (?clauses ...)) var)))
+    ((_ ((?var ?expr) ?clauses ...))
+     (let ((?var ?expr))
+       (if ?var (and-let* (?clauses ...)) ?var)))
+    ((_ ((?var ?expr) ?clauses ...) ?body ...)
+     (let ((?var ?expr))
+       (if ?var (and-let* (?clauses ...) ?body ...) #f)))
+    ((_ ((?expr) ?clauses ...) ?body ...)
+     (if ?expr (and-let* (?clauses ...) ?body ...) #f))
+    ((_ (?var ?clauses ...) ?body ...)
+     (if ?var (and-let* (?clauses ...) ?body ...) #f))))
 
-;;! let-values (SRFI-11)
+
+;;!! SRFI-5 A compatible let form with signatures and rest arguments
+
+;; SRFI-5 Reference implementation
+;; Copyright (C) Andy Gaynor (1999). All Rights Reserved.
+;; Modifications
+;; - Rewritten let-loop as a local syntax definition
+;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
+
+(define-syntax let-rest
+  (let-syntax
+      ((let-loop
+        (syntax-rules ()
+          ;; Standard binding: destructure and loop.
+          ((_ name ((var0 val0) binding ...) (var ...     ) (val ...     ) body)
+           (let-loop name (            binding ...) (var ... var0) (val ... val0) body))
+          ;; Rest binding, no name: use standard-let, listing the rest values.
+          ;; Because of let's first clause, there is no "no bindings, no name" clause.
+          ((_ #f (rest-var rest-val ...) (var ...) (val ...) body)
+           (let ((var val) ... (rest-var (list rest-val ...))) . body))
+          ;; Or call a lambda with a rest parameter on all values.
+          ;; ((lambda (var ... . rest-var) . body) val ... rest-val ...))
+          ;; Or use one of several other reasonable alternatives.
+          ;; No bindings, name: call a letrec'ed lambda.
+          ((_ name () (var ...) (val ...) body)
+           ((letrec ((name (lambda (var ...) . body)))
+              name)
+            val ...))
+          ;; Rest binding, name: call a letrec'ed lambda.
+          ((_ name (rest-var rest-val ...) (var ...) (val ...) body)
+           ((letrec ((name (lambda (var ... . rest-var) . body)))
+              name)
+            val ... rest-val ...)))))
+    (syntax-rules ()
+      ;; No bindings: use standard-let.
+      ((_ () body ...)
+       (let () body ...))
+      ;; Or call a lambda.
+      ;; ((lambda () body ...))
+      ;; All standard bindings: use standard-let.
+      ((_ ((var val) ...) body ...)
+       (let ((var val) ...) body ...))
+      ;; Or call a lambda.
+      ;; ((lambda (var ...) body ...) val ...)
+      ;; One standard binding: loop.
+      ;; The all-standard-bindings clause didn't match,
+      ;; so there must be a rest binding.
+      ((_ ((var val) . bindings) body ...)
+       (let-loop #f bindings (var) (val) (body ...)))
+      ;; Signature-style name: loop.
+      ((_ (name binding ...) body ...)
+       (let-loop name (binding ...) () () (body ...)))
+      ;; defun-style name: loop.
+      ((_ name bindings body ...)
+       (let-loop name bindings () () (body ...))))))
+
+
+;;!! SRFI-11 Syntax for receiving multiple values
+
+;;! let-values
 ;; Code by Lars T Hansen
 (define-syntax let-values
   (syntax-rules ()
@@ -281,6 +345,122 @@
     ((let*-values (?binding0 ?binding1 ...) ?body0 ?body1 ...)
      (let-values (?binding0)
        (let*-values (?binding1 ...) ?body0 ?body1 ...)))))
+
+
+;;!! SRFI-16 Syntax for procedures of variable arity
+
+;; Copyright (C) Lars T Hansen (1999). All Rights Reserved.
+;; This code is in the public domain.
+
+;;! case-lambda
+(define-syntax case-lambda
+  (syntax-rules ()
+    ((case-lambda 
+      (?a1 ?e1 ...) 
+      ?clause1 ...)
+     (lambda args
+       (let ((l (length args)))
+         (case-lambda "CLAUSE" args l 
+                      (?a1 ?e1 ...)
+                      ?clause1 ...))))
+    ((case-lambda "CLAUSE" ?args ?l 
+                  ((?a1 ...) ?e1 ...) 
+                  ?clause1 ...)
+     (if (= ?l (length '(?a1 ...)))
+         (apply (lambda (?a1 ...) ?e1 ...) ?args)
+         (case-lambda "CLAUSE" ?args ?l 
+                      ?clause1 ...)))
+    ((case-lambda "CLAUSE" ?args ?l
+                  ((?a1 . ?ar) ?e1 ...) 
+                  ?clause1 ...)
+     (case-lambda "IMPROPER" ?args ?l 1 (?a1 . ?ar) (?ar ?e1 ...) 
+                  ?clause1 ...))
+    ((case-lambda "CLAUSE" ?args ?l 
+                  (?a1 ?e1 ...)
+                  ?clause1 ...)
+     (let ((?a1 ?args))
+       ?e1 ...))
+    ((case-lambda "CLAUSE" ?args ?l)
+     (error "Wrong number of arguments to CASE-LAMBDA."))
+    ((case-lambda "IMPROPER" ?args ?l ?k ?al ((?a1 . ?ar) ?e1 ...)
+                  ?clause1 ...)
+     (case-lambda "IMPROPER" ?args ?l (+ ?k 1) ?al (?ar ?e1 ...) 
+                  ?clause1 ...))
+    ((case-lambda "IMPROPER" ?args ?l ?k ?al (?ar ?e1 ...) 
+                  ?clause1 ...)
+     (if (>= ?l ?k)
+         (apply (lambda ?al ?e1 ...) ?args)
+         (case-lambda "CLAUSE" ?args ?l 
+                      ?clause1 ...)))))
+
+;;!! SRFI-26 Notation for Specializing Parameters without Currying
+
+;; Sebastian.Egner@philips.com, 5-Jun-2002.
+;; adapted from the posting by Al Petrofsky <al@petrofsky.org>
+;; placed in the public domain.
+;; Modifications
+;; - Made internal syntaxes private with letrec
+;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
+
+;;! cut
+(define-syntax cut
+  ;; (srfi-26-internal-cut slot-names combination . se)
+  ;;   transformer used internally
+  ;;     slot-names  : the internal names of the slots
+  ;;     combination : procedure being specialized, followed by its arguments
+  ;;     se          : slots-or-exprs, the qualifiers of the macro
+  (letrec-syntax
+      ((srfi-26-internal-cut
+        (syntax-rules (<> <...>)
+          ;; construct fixed- or variable-arity procedure:
+          ;;   (begin proc) throws an error if proc is not an <expression>
+          ((srfi-26-internal-cut (slot-name ...) (proc arg ...))
+           (lambda (slot-name ...) ((begin proc) arg ...)))
+          ((srfi-26-internal-cut (slot-name ...) (proc arg ...) <...>)
+           (lambda (slot-name ... . rest-slot) (apply proc arg ... rest-slot)))
+          ;; process one slot-or-expr
+          ((srfi-26-internal-cut (slot-name ...)   (position ...)      <>  . se)
+           (srfi-26-internal-cut (slot-name ... x) (position ... x)        . se))
+          ((srfi-26-internal-cut (slot-name ...)   (position ...)      nse . se)
+           (srfi-26-internal-cut (slot-name ...)   (position ... nse)      . se)))))
+    (syntax-rules ()
+      ((cut . slots-or-exprs)
+       (srfi-26-internal-cut () () . slots-or-exprs)))))
+
+;;! cute
+(define-syntax cute
+  ;; (srfi-26-internal-cute slot-names nse-bindings combination . se)
+  ;;   transformer used internally
+  ;;     slot-names     : the internal names of the slots
+  ;;     nse-bindings   : let-style bindings for the non-slot expressions.
+  ;;     combination    : procedure being specialized, followed by its arguments
+  ;;     se             : slots-or-exprs, the qualifiers of the macro
+  (letrec-syntax
+      ((srfi-26-internal-cute
+        (syntax-rules (<> <...>)
+          ;; If there are no slot-or-exprs to process, then:
+          ;; construct a fixed-arity procedure,
+          ((srfi-26-internal-cute
+            (slot-name ...) nse-bindings (proc arg ...))
+           (let nse-bindings (lambda (slot-name ...) (proc arg ...))))
+          ;; or a variable-arity procedure
+          ((srfi-26-internal-cute
+            (slot-name ...) nse-bindings (proc arg ...) <...>)
+           (let nse-bindings (lambda (slot-name ... . x) (apply proc arg ... x))))
+          ;; otherwise, process one slot:
+          ((srfi-26-internal-cute
+            (slot-name ...)         nse-bindings  (position ...)   <>  . se)
+           (srfi-26-internal-cute
+            (slot-name ... x)       nse-bindings  (position ... x)     . se))
+          ;; or one non-slot expression
+          ((srfi-26-internal-cute
+            slot-names              nse-bindings  (position ...)   nse . se)
+           (srfi-26-internal-cute
+            slot-names ((x nse) . nse-bindings) (position ... x)       . se)))))
+    (syntax-rules ()
+      ((cute . slots-or-exprs)
+       (srfi-26-internal-cute () () () . slots-or-exprs)))))
+
 
 ;; Utility macro for checking arguments
 ;; Macro in compilation-prelude to make it easy to define in debug/release modes
