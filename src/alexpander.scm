@@ -2116,6 +2116,7 @@
             (case atom
               ((_eqv?_17) 'eqv?)
               ((_cons_31) 'cons)
+              ((_list_33) 'list)
               (else atom)))
           code))
   (set!
