@@ -1829,7 +1829,13 @@
 	    (syntax-rules ()
 	      ((_) #f)
 	      ((_ test) (let () test))
-	      ((_ test . tests) (let ((x test)) (if x x (or . tests)))))))
+	      ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
+          ;; Álvaro Castro-Castilla: added so lambda formals can be used (ie. dotted rest args)
+          (define-syntax receive
+            (syntax-rules ()
+              ((receive ?formals ?producer ?body1 ?body2 ...)
+               (call-with-values (lambda () ?producer)
+                 (lambda ?formals ?body1 ?body2 ...))))))
           ;; Quasiquote uses let-syntax scope so that it can recognize
           ;; nested uses of itself using a syntax-rules literal (that
           ;; is, the quasiquote binding that is visible in the
@@ -2116,7 +2122,9 @@
             (case atom
               ((_eqv?_17) 'eqv?)
               ((_cons_31) 'cons)
+              ((_cons_32) 'cons)
               ((_list_33) 'list)
+              ((_list_34) 'list)
               (else atom)))
           code))
   (set!
