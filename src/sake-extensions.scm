@@ -325,4 +325,5 @@
                  (eval '(include ,f)))))
             (fileset dir: "test/"
                      test: (f-and (extension=? ".scm")
-                                  (f-not (ends-with? "#.scm"))))))
+                                  (f-not (ends-with? "#.scm")))
+                     recursive: #t)))
