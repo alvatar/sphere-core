@@ -321,7 +321,6 @@
   (for-each (lambda (f)
               (gambit-eval-here
                `((##import (energy: testing))
-                 (##import-include (energy: testing-macros))
                  (eval '(include ,f)))))
             (fileset dir: "test/"
                      test: (f-and (extension=? ".scm")

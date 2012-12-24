@@ -517,17 +517,25 @@ fig.scm file"))
                  (sphere (%module-sphere module))
                  (module-name (symbol->string (%module-id module))))
             (if sphere
-                (let ((include-file (string-append (%module-path-src module) (%module-filename-scm module))))
-                  (if verbose (display (string-append "-- including -- " module-name " -- (" (symbol->string sphere) ")" "\n")))
-                  (set! *included-modules* (cons (%module-normalize module) *included-modules*))
-                  ;; Old solution for vanilla Gambit (no Alexpander)
-                  ;;`(include ,include-file)
-                  (##alexpander-include include-file))
+                (let ((include-file (string-append (%module-path-src module)
+                                                   (%module-filename-scm module))))                  
+                  (if (not (member (%module-normalize module) *included-modules*))
+                      (begin
+                        (if verbose
+                            (display (string-append "-- including -- " (object->string module) "\n")))
+                        (set! *included-modules* (cons (%module-normalize module) *included-modules*))
+                        ;; Old solution for vanilla Gambit (no Alexpander)
+                        ;;`(include ,include-file)
+                        (##alexpander-include include-file))))
                 (begin
-                  (if verbose (display (string-append "-- including -- " module-name ")\n")))
-                  ;; Old solution for vanilla Gambit (no Alexpander)
-                  ;; (eval `(include ,(%module-filename-scm module)))
-                  (##alexpander-include (%module-filename-scm module))))))))
+                  (if (not (member (%module-normalize module) *included-modules*))
+                      (begin
+                        (if verbose
+                            (display (string-append "-- including -- " (object->string module) "\n")))
+                        (set! *included-modules* (cons (%module-normalize module) *included-modules*))
+                        ;; Old solution for vanilla Gambit (no Alexpander)
+                        ;; (eval `(include ,(%module-filename-scm module)))
+                        (##alexpander-include (%module-filename-scm module))))))))))
   (set!
    ##include-module-and-dependencies
    (lambda (root-module options)
@@ -552,7 +560,7 @@ fig.scm file"))
                                                                  (%module-filename-scm header-module)))))
                 (if macros-module
                     (##include-module-and-dependencies macros-module '()))
-                (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                ;; (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                 (if sphere
                     (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                           (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
