@@ -535,11 +535,50 @@
 ;;! rec
 (define-syntax rec
   (syntax-rules ()
-    ((rec (NAME . VARIABLES) . BODY)
-     (letrec ( (NAME (lambda VARIABLES . BODY)) ) NAME))
-    ((rec NAME EXPRESSION)
-     (letrec ( (NAME EXPRESSION) ) NAME))))
+    ((rec (?name . ?variables) . ?body)
+     (letrec ((?name (lambda ?variables . ?body))) ?name))
+    ((rec ?name ?expression)
+     (letrec ((?name ?expression)) ?name))))
 
+;;!! SRFI-61 A more general cond clause
+;; Included in Alexpander for full availability
+;; (define-syntax cond
+;;   (letrec-syntax
+;;       ((cond/maybe-more
+;;         (syntax-rules ()
+;;           ((cond/maybe-more test consequent)
+;;            (if test
+;;                consequent))
+;;           ((cond/maybe-more test consequent clause ...)
+;;            (if test
+;;                consequent
+;;                (cond clause ...))))))
+;;     (syntax-rules (=> else)
+;;       ((_ (else else1 else2 ...))
+;;        ;; the (if #t (begin ...)) wrapper ensures that there may be no
+;;        ;; internal definitions in the body of the clause.  R5RS mandates
+;;        ;; this in text (by referring to each subform of the clauses as
+;;        ;; <expression>) but not in its reference implementation of cond,
+;;        ;; which just expands to (begin ...) with no (if #t ...) wrapper.
+;;        (if #t (begin else1 else2 ...)))
+;;       ((_ (test => receiver) more-clause ...)
+;;        (let ((t test))
+;;          (cond/maybe-more t
+;;                           (receiver t)
+;;                           more-clause ...)))
+;;       ((_ (generator guard => receiver) more-clause ...)
+;;        (call-with-values (lambda () generator)
+;;          (lambda t
+;;            (cond/maybe-more (apply guard    t)
+;;                             (apply receiver t)
+;;                             more-clause ...))))
+;;       ((_ (test) more-clause ...)
+;;        (let ((t test))
+;;          (cond/maybe-more t t more-clause ...)))
+;;       ((_ (test body1 body2 ...) more-clause ...)
+;;        (cond/maybe-more test
+;;                         (begin body1 body2 ...)
+;;                         more-clause ...)))))
 
 ;; Utility macro for checking arguments
 ;; Macro in compilation-prelude to make it easy to define in debug/release modes

@@ -1854,7 +1854,6 @@
                 ((_ (test) more-clause ...)
                  (let ((t test))
                    (cond/maybe-more t t more-clause ...)))
-
                 ((_ (test body1 body2 ...) more-clause ...)
                  (cond/maybe-more test
                                   (begin body1 body2 ...)
