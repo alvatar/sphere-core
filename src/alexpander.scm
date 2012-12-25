@@ -1792,7 +1792,7 @@
 		       (begin (if #f #f) expr ...)
 		       (begin command ...
 			      (loop (do-step var step ...) ...))))))))
-          ;; Álvaro Castro-Castilla: made CASE more general with SRFI-61
+          ;; Álvaro Castro-Castilla: made CASE more general with SRFI-87
 	  ;; (define-syntax case
 	  ;;   (letrec-syntax
 	  ;;       ((compare
