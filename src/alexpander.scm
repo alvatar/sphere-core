@@ -645,6 +645,7 @@
 ;; (expand-syntax-bindings bindings id-n syntax-env ienv store loc-n k)
 ;;   => (k store loc-n)
 
+(define strict-symbol? symbol?)
 (define symbol?
   (let ((old-symbol? symbol?))
     (lambda (x)
@@ -2190,13 +2191,40 @@
   (define (preprocess code) code)
   (define (postprocess code)
     (map* (lambda (atom)
-            (case atom
-              ((_eqv?_17) 'eqv?)
-              ((_cons_31) 'cons)
-              ((_cons_32) 'cons)
-              ((_list_33) 'list)
-              ((_list_34) 'list)
-              (else atom)))
+            (if (not (strict-symbol? atom))
+                atom
+                (let* ((str (symbol->string atom))
+                       (str-len (string-length str)))
+                  (if (not (char=? #\_ (string-ref str 0)))
+                      atom
+                      (cond
+                       ;; eqv? cons list
+                       ((> str-len 4)
+                        (let ((form-substr (substring str 1 5)))
+                          (cond
+                           ((string=? form-substr "eqv?")
+                            (if (string->number (substring str 6 str-len))
+                                'eqv?
+                                atom))
+                           ((string=? form-substr "cons")
+                            (if (string->number (substring str 6 str-len))
+                                'cons
+                                atom))
+                           ((string=? form-substr "list")
+                            (if (string->number (substring str 6 str-len))
+                                'list
+                                atom))
+                           (else atom))))
+                       ;; eq?
+                       ((> str-len 3)
+                        (let ((form-substr (substring str 1 4)))
+                          (cond
+                           ((string=? form-substr "eq?")
+                            (if (string->number (substring str 5 str-len))
+                                'eq?
+                                atom))
+                           (else atom))))
+                       (else atom))))))
           code))
   (set!
    alexpand
