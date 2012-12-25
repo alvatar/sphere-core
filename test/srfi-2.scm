@@ -1,5 +1,5 @@
 (##import core: testing)
-(include "src/base-macros.scm")
+(##import-include core: base-macros)
 
 (check-set-mode! 'summary)
 

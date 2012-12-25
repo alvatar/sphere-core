@@ -1,5 +1,5 @@
 (##import core: testing)
-(include "src/base-macros.scm")
+(##import-include core: base-macros)
 
 ;; Based on code by Sebastian.Egner@philips.com, 1-Aug-2005, R5RS + SRFI-71.
 
