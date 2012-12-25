@@ -1791,26 +1791,59 @@
 		       (begin (if #f #f) expr ...)
 		       (begin command ...
 			      (loop (do-step var step ...) ...))))))))
-	  (define-syntax case
-	    (letrec-syntax
-		((compare
-		  (syntax-rules ()
-		    ((_ key ()) #f)
-		    ((_ key (datum . data))
-		     (if (eqv? key 'datum) #t (compare key data)))))
-		 (case
-                     (syntax-rules (else)
-                       ((case key) (if #f #f))
-                       ((case key (else result1 . results))
-                        (begin result1 . results))
-                       ((case key ((datum ...) result1 . results) . clauses)
-                        (if (compare key (datum ...))
-                            (begin result1 . results)
-                            (case key . clauses))))))
-	      (syntax-rules ()
-		((_ expr clause1 clause ...)
-		 (let ((key expr))
-		   (case key clause1 clause ...))))))
+          ;; Álvaro Castro-Castilla: made CASE more general with SRFI-61
+	  ;; (define-syntax case
+	  ;;   (letrec-syntax
+	  ;;       ((compare
+	  ;;         (syntax-rules ()
+	  ;;           ((_ key ()) #f)
+	  ;;           ((_ key (datum . data))
+	  ;;            (if (eqv? key 'datum) #t (compare key data)))))
+	  ;;        (case
+          ;;            (syntax-rules (else)
+          ;;              ((case key) (if #f #f))
+          ;;              ((case key (else result1 . results))
+          ;;               (begin result1 . results))
+          ;;              ((case key ((datum ...) result1 . results) . clauses)
+          ;;               (if (compare key (datum ...))
+          ;;                   (begin result1 . results)
+          ;;                   (case key . clauses))))))
+	  ;;     (syntax-rules ()
+	  ;;       ((_ expr clause1 clause ...)
+	  ;;        (let ((key expr))
+	  ;;          (case key clause1 clause ...))))))
+          (define-syntax case
+            (syntax-rules (else =>)
+              ((case (key ...)
+                 clauses ...)
+               (let ((atom-key (key ...)))
+                 (case atom-key clauses ...)))
+              ((case key
+                 (else => result))
+               (result key))
+              ((case key
+                 ((atoms ...) => result))
+               (if (memv key '(atoms ...))
+                   (result key)))
+              ((case key
+                 ((atoms ...) => result)
+                 clause clauses ...)
+               (if (memv key '(atoms ...))
+                   (result key)
+                   (case key clause clauses ...)))
+              ((case key
+                 (else result1 result2 ...))
+               (begin result1 result2 ...))
+              ((case key
+                 ((atoms ...) result1 result2 ...))
+               (if (memv key '(atoms ...))
+                   (begin result1 result2 ...)))
+              ((case key
+                 ((atoms ...) result1 result2 ...)
+                 clause clauses ...)
+               (if (memv key '(atoms ...))
+                   (begin result1 result2 ...)
+                   (case key clause clauses ...)))))
           ;; Álvaro Castro-Castilla: made COND more general with SRFI-61
 	  ;; (define-syntax cond
 	  ;;   (syntax-rules (else =>)
