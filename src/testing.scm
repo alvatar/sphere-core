@@ -98,7 +98,7 @@
   (newline))
 
 (define (check:report-failed expected-result)
-  (display "*** failed ***")
+  (display "\033[00;31m*** failed ***\033[00m")
   (newline)
   (display " ; expected result: ")
   (check:write expected-result)
@@ -106,13 +106,16 @@
 
 (define (check-report)
   (if (>= check:mode 1)
-      (begin
-        (newline)
+      (let ((clean? (zero? (length check:failed))))
         (display "; *** checks *** : ")
         (display check:correct)
         (display " correct, ")
+        (if (not clean?)
+            (display "\033[00;31m"))
         (display (length check:failed))
         (display " failed.")
+        (if (not clean?)
+            (display "\033[00m"))
         (if (or (null? check:failed) (<= check:mode 1))
             (newline)
             (let* ((w (car (reverse check:failed)))
