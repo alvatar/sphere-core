@@ -1,3 +1,4 @@
+(##import energy: testing)
 (include "src/base-macros.scm")
 
 ;; Based on code by Sebastian.Egner@philips.com, 1-Aug-2005, R5RS + SRFI-71.

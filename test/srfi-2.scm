@@ -1,3 +1,4 @@
+(##import energy: testing)
 (include "src/base-macros.scm")
 
 (test-begin "srfi-2" 28)

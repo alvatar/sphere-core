@@ -8,7 +8,8 @@
 (include "src/sake-extensions.scm")
 
 (define modules
-  '(ffi))
+  '(ffi
+    testing))
 
 (define prelude-system-path "~~spheres/prelude#.scm")
 

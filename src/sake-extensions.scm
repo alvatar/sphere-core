@@ -296,8 +296,7 @@
   (or (%sphere-exists? 'energy) (error "You need to install Sphere Energy in order to use tests"))
   (for-each (lambda (f)
               (gambit-eval-here
-               `((##import (energy: testing))
-                 (eval '(include ,f)))))
+               `((eval '(include ,f)))))
             (fileset dir: "test/"
                      test: (f-and (extension=? ".scm")
                                   (f-not (ends-with? "#.scm")))
@@ -310,14 +309,12 @@
    ((string? module)
     (if (file-exists? module)
         (gambit-eval-here
-         `((##import (energy: testing))
-           (eval '(include ,module))))
+         `((eval '(include ,module))))
         (error "Testing file doesn't exist")))
    ((%module? module)
     (%check-module module)
     (gambit-eval-here
-     `((##import (energy: testing))
-       (eval '(include ,(string-append "test/"
+     `((eval '(include ,(string-append "test/"
                                        (%module-filename-scm module)))))))
    (else
     (error "Bad testing module description: file path or module"))))
