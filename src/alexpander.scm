@@ -401,7 +401,7 @@
 ;;         (null-environment 5)))
 ;; => (foo 1 2 3 4)
 
-
+
 ;; BASIC USAGE:
 
 ;; There are four supported ways to use this:
@@ -453,7 +453,7 @@
 ;; changed, any r5rs-conformant program will still be translated to an
 ;; equivalent macro-free r5rs program.
 
-
+
 ;; INTERNALS
 
 ;; [NOTE: this documentation is certainly not complete, and it kind of

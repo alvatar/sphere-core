@@ -1,4 +1,4 @@
-(##alexpander-include "src/base-macros.scm")
+(include "src/base-macros.scm")
 
 (test-begin "srfi-2" 28)
 
