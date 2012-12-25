@@ -291,6 +291,37 @@
       (copy-file (string-append (default-build-directory) (%module-filename-c m version: version))
                  (string-append (default-lib-directory) (%module-filename-c m version: version)))))
 
+;;! Test all files in test/
+(##define (sake:test-all)
+  (or (%sphere-exists? 'energy) (error "You need to install Sphere Energy in order to use tests"))
+  (for-each (lambda (f)
+              (gambit-eval-here
+               `((##import (energy: testing))
+                 (eval '(include ,f)))))
+            (fileset dir: "test/"
+                     test: (f-and (extension=? ".scm")
+                                  (f-not (ends-with? "#.scm")))
+                     recursive: #t)))
+
+;;! Test a file
+(##define (sake:test module)
+  (or (%sphere-exists? 'energy) (error "You need to install Sphere Energy in order to use tests"))
+  (cond
+   ((string? module)
+    (if (file-exists? module)
+        (gambit-eval-here
+         `((##import (energy: testing))
+           (eval '(include ,module))))
+        (error "Testing file doesn't exist")))
+   ((%module? module)
+    (%check-module module)
+    (gambit-eval-here
+     `((##import (energy: testing))
+       (eval '(include ,(string-append "test/"
+                                       (%module-filename-scm module)))))))
+   (else
+    (error "Bad testing module description: file path or module"))))
+
 ;;! Clean all default generated files and directories
 (##define (sake:default-clean)
   (delete-file (current-build-directory) recursive: #t)
@@ -314,15 +345,3 @@
 ;;! Uninstall all the files from the system installation
 (##define (sake:uninstall-system-sphere #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))
-
-;;! Test all files in test/
-(##define (sake:test-all)
-  (or (%sphere-exists? 'energy) (error "You need to install Energy Sphere in order to use tests"))
-  (for-each (lambda (f)
-              (gambit-eval-here
-               `((##import (energy: testing))
-                 (eval '(include ,f)))))
-            (fileset dir: "test/"
-                     test: (f-and (extension=? ".scm")
-                                  (f-not (ends-with? "#.scm")))
-                     recursive: #t)))
