@@ -293,7 +293,6 @@
 
 ;;! Test all files in test/
 (##define (sake:test-all)
-  (or (%sphere-exists? 'energy) (error "You need to install Sphere Energy in order to use tests"))
   (for-each (lambda (f)
               (gambit-eval-here
                `((eval '(include ,f)))))
@@ -304,7 +303,6 @@
 
 ;;! Test a file
 (##define (sake:test module)
-  (or (%sphere-exists? 'energy) (error "You need to install Sphere Energy in order to use tests"))
   (cond
    ((string? module)
     (if (file-exists? module)
