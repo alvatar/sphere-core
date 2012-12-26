@@ -2190,42 +2190,11 @@
             (else (cons (map* f (car l)) (map* f (cdr l)))))))
   (define (preprocess code) code)
   (define (postprocess code)
-    (map* (lambda (atom)
-            (if (not (strict-symbol? atom))
-                atom
-                (let* ((str (symbol->string atom))
-                       (str-len (string-length str)))
-                  (if (not (char=? #\_ (string-ref str 0)))
-                      atom
-                      (cond
-                       ;; eqv? cons list
-                       ((> str-len 4)
-                        (let ((form-substr (substring str 1 5)))
-                          (cond
-                           ((string=? form-substr "eqv?")
-                            (if (string->number (substring str 6 str-len))
-                                'eqv?
-                                atom))
-                           ((string=? form-substr "cons")
-                            (if (string->number (substring str 6 str-len))
-                                'cons
-                                atom))
-                           ((string=? form-substr "list")
-                            (if (string->number (substring str 6 str-len))
-                                'list
-                                atom))
-                           (else atom))))
-                       ;; eq?
-                       ((> str-len 3)
-                        (let ((form-substr (substring str 1 4)))
-                          (cond
-                           ((string=? form-substr "eq?")
-                            (if (string->number (substring str 5 str-len))
-                                'eq?
-                                atom))
-                           (else atom))))
-                       (else atom))))))
-          code))
+    (let ((substt (list->table (map (lambda (x) (cons (cadr x)
+                                                 (caddr x)))
+                                    null-output))))
+      (map* (lambda (atom) (or (table-ref substt atom #f) atom))
+            code)))
   (set!
    alexpand
    (lambda (forms)
@@ -2246,9 +2215,9 @@
                  ;; original solution by Mario Benelli's solution, breaks some macros
                  ;; (##sourcify-deep code ##source1-marker))
                  (##make-source (postprocess code) #f))))
-              (full-expand (lambda ()
-                             (postprocess
-                              (expand-with-alexpander desourcified)))))
+            (full-expand (lambda ()
+                           (postprocess
+                            (expand-with-alexpander desourcified)))))
        (if (pair? desourcified)
            (let* ((head (car desourcified))
                   (head-str (object->string head)))
