@@ -2188,7 +2188,6 @@
       (cond ((null? l) '())
             ((not (pair? l)) (f l))
             (else (cons (map* f (car l)) (map* f (cdr l)))))))
-  (define (preprocess code) code)
   (define (postprocess code)
     (let ((substt (list->table (map (lambda (x) (cons (cadr x)
                                                  (caddr x)))
