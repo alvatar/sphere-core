@@ -2,5 +2,9 @@
 ;;; Prelude
 
 (define ##current-expander 'alexpander)
-(load "~~spheres/core/src/alexpander.scm")
+(let ((ofile "~~spheres/core/lib/alexpander.o1")
+      (scmfile "~~spheres/core/src/alexpander.scm"))
+  (if (file-exists? ofile)
+      (load ofile)
+      (load scmfile)))
 (include "~~spheres/core/src/sphere#.scm")
