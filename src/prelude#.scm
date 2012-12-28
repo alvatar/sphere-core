@@ -6,5 +6,5 @@
       (scmfile "~~spheres/core/src/alexpander.scm"))
   (if (file-exists? ofile)
       (load ofile)
-      (load scmfile)))
+      (begin (println "--- Loading source version of Alexpander") (load scmfile))))
 (include "~~spheres/core/src/sphere#.scm")
