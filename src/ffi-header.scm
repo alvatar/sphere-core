@@ -241,9 +241,9 @@
 
 (c-define-type size-t unsigned-int)
 
-(cond-expand
- (compile-to-o
-  (c-declare #<<c-declare-end
+ 
+  
+(c-declare #<<c-declare-end
 
 #ifndef FFIMACRO
 #define FFIMACRO
@@ -265,16 +265,13 @@ ___SCMOBJ ffimacro__free_foreign(void *p)
 #endif
 
 c-declare-end
-             ))
- (compile-to-c
-  (c-declare #<<c-declare-end
+)
 
-             ___SCMOBJ ffimacro__leave_alone(void *p);
-             ___SCMOBJ ffimacro__free_foreign(void *p);
-
-c-declare-end
-             ))
- (else))
+;; (c-declare #<<c-declare-end
+;;            ___SCMOBJ ffimacro__leave_alone(void *p)  ;
+;;            ___SCMOBJ ffimacro__free_foreign(void *p) ;
+;; c-declare-end
+;; )
 
 ;-------------------------------------------------------------------------------
 ; Objective-C utilities
