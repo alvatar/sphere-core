@@ -271,7 +271,6 @@
 (c-define-type unsigned-int64* (pointer unsigned-int64))
 
 (c-define-type size-t unsigned-int)
-(else)
 
 (cond-expand
  (compile-to-o

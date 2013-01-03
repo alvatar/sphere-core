@@ -140,12 +140,30 @@
                             ;; Generate code: 1) alexpander 2) substitute alexpander's renamed symbols 3) namespaces and includes
                             (let* ((code (alexpand (with-input-from-file input-file read-all)))
                                    (intermediate-code
-                                    `(,@(map (lambda (f) `(define-cond-expand-feature ,f)) (cons 'compile-to-c cond-expand-features))
-                                      ,@(with-input-from-file (string-append (%module-path-src '(core: compilation-prelude))
-                                                                             (%module-filename-scm 'compilation-prelude))
+                                    `(;; Compile-time cond-expand-features
+                                      ,@(map (lambda (f)
+                                               `(define-cond-expand-feature ,f))
+                                             (cons 'compile-to-c cond-expand-features))
+                                      ;; Append general compilation prelude
+                                      ,@(with-input-from-file
+                                            (string-append
+                                             (%module-path-src '(core: compilation-prelude))
+                                             (%module-filename-scm 'compilation-prelude))
                                           read-all)
-                                      ,@(if header-module `((##namespace (,(%module-namespace header-module)))) '())
-                                      ,@(if header-module '((##include "~~lib/gambit#.scm")) '())
+                                      ;; Include custom compilation preludes defined in config.scm
+                                      ,@(map (lambda (p)
+                                               `(##include ,(string-append
+                                                             (%module-path-src p)
+                                                             (%module-filename-scm p))))
+                                             (%module-dependencies-to-compilation-prelude module))
+                                      ;; If there is a header module set up proper namespace
+                                      ,@(if header-module
+                                            `((##namespace (,(%module-namespace header-module))))
+                                            '())
+                                      ,@(if header-module
+                                            '((##include "~~lib/gambit#.scm"))
+                                            '())
+                                      ;; Include load dependencies' headers if they have
                                       ,@(filter-map
                                          (lambda (m) (let ((module-header (%module-header m)))
                                                   (and module-header
@@ -153,6 +171,7 @@
                                                                      (%module-path-src module-header)
                                                                      (%module-filename-scm module-header))))))
                                          (%module-dependencies-to-load module))
+                                      ;; Include header module if we have one
                                       ,@(if header-module
                                             `((##include ,(string-append
                                                            (%module-path-src header-module)

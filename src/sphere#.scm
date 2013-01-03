@@ -427,6 +427,9 @@ fig.scm file"))
                     (get-dependency-list that)
                     '()))))))))
 
+(define^ (%module-dependencies-to-compilation-prelude module)
+  ((%module-dependencies-select 'compilation-prelude) module))
+
 (define^ (%module-dependencies-to-include module)
   ((%module-dependencies-select 'include) module))
 
