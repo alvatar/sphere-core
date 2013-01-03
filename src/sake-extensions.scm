@@ -147,15 +147,15 @@
                                       ;; Append general compilation prelude
                                       ,@(with-input-from-file
                                             (string-append
-                                             (%module-path-src '(core: compilation-prelude))
-                                             (%module-filename-scm 'compilation-prelude))
+                                             (%module-path-src '(core: prelude))
+                                             (%module-filename-scm 'prelude))
                                           read-all)
                                       ;; Include custom compilation preludes defined in config.scm
                                       ,@(map (lambda (p)
                                                `(##include ,(string-append
                                                              (%module-path-src p)
                                                              (%module-filename-scm p))))
-                                             (%module-dependencies-to-compilation-prelude module))
+                                             (%module-dependencies-to-prelude module))
                                       ;; If there is a header module set up proper namespace
                                       ,@(if header-module
                                             `((##namespace (,(%module-namespace header-module))))

@@ -9,6 +9,44 @@
                                " in: "
                                (object->string ',caller))))))
 
+
+;;!! Define functions for usage in low-level macros (first method)
+;; (define^ (f ... ) ... )
+
+(##define-macro (eval-in-macro-environment . exprs)
+  (if (pair? exprs)
+      (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
+            (interaction-environment))
+      #f))
+(##define-macro (eval-in-macro-environment-no-result . exprs)
+  `(eval-in-macro-environment
+    ,@exprs
+    '(begin)))
+
+(##define-macro (define^ . args)
+  (let ((pattern (car args))
+        (body (cdr args)))
+    `(eval-in-macro-environment-no-result
+      (##define ,pattern ,@body))))
+
+;;!! Define functions for usage in low-level macros (second method)
+;; Insert your defines inside the following macros:
+;; (at-expand-time-and-runtime
+;;   (define ... )
+;;   ... )
+;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
+
+;;! Define for both expand time and runtime
+(##define-macro (at-expand-time-and-runtime . exprs)
+  (let ((l `(begin ,@exprs)))
+    (eval l)
+    l))
+
+;;! Define for expand time
+(##define-macro (at-expand-time . expr)
+  (eval (cons 'begin expr)))
+
+
 ;; ;;! Macro expander for define*.
 ;; (##define-macro (define* pattern . body)
 ;;   (if (pair? pattern)

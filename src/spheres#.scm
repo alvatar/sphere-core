@@ -1,26 +1,23 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Sphere (module system)
 
+(let ((ofile "~~spheres/core/lib/alexpander.o1")
+      (scmfile "~~spheres/core/src/alexpander.scm"))
+  (with-exception-catcher
+   (lambda (e)
+     (if (unbound-global-exception? e)
+         (if (file-exists? ofile)
+             (load scmfile)
+             (begin (println "--- Loading source version of Alexpander") (load scmfile)))))
+   (lambda () ##current-expander)))
+(define ##current-expander 'alexpander)
+
+
 ;-------------------------------------------------------------------------------
 ; Macro utils
 ;-------------------------------------------------------------------------------
 
-(##define-macro (eval-in-macro-environment . exprs)
-  (if (pair? exprs)
-      (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
-            (interaction-environment))
-      #f))
-
-(##define-macro (eval-in-macro-environment-no-result . exprs)
-  `(eval-in-macro-environment
-    ,@exprs
-    '(begin)))
-
-(##define-macro (define^ . args)
-  (let ((pattern (car args))
-        (body (cdr args)))
-    `(eval-in-macro-environment-no-result
-      (##define ,pattern ,@body))))
+(include "prelude.scm")
 
 ;;! symbol->keyword
 (define^ (symbol->keyword s)
@@ -427,8 +424,8 @@ fig.scm file"))
                     (get-dependency-list that)
                     '()))))))))
 
-(define^ (%module-dependencies-to-compilation-prelude module)
-  ((%module-dependencies-select 'compilation-prelude) module))
+(define^ (%module-dependencies-to-prelude module)
+  ((%module-dependencies-select 'prelude) module))
 
 (define^ (%module-dependencies-to-include module)
   ((%module-dependencies-select 'include) module))
