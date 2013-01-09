@@ -99,10 +99,11 @@
           (if sphere-pair
               (string-append (path-strip-trailing-directory-separator (cadr sphere-pair)) "/")
               ;; Otherwise, try system-installed spheres
-              (and (file-exists? (%sphere-system-path sphere))
-                   (%sphere-system-path sphere)
-                   ;; (error (string-append "Sphere not found: " (object->string sphere) " -- Please set a path in config file or install the sphere in the ~~spheres directory"))
-                   )))
+              (let ((system-path (%sphere-system-path sphere)))
+                (and (file-exists? system-path)
+                     (path-expand system-path)
+                     ;; (error (string-append "Sphere not found: " (object->string sphere) " -- Please set a path in config file or install the sphere in the ~~spheres directory"))
+                     ))))
         #f)))
 
 (define^ (%sphere-exists? sphere)
