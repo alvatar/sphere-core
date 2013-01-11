@@ -814,7 +814,6 @@
 	  (error "Duplicate variable: " x " in lambda formals: " formals)))
     (begin
       (for-each check flattened)
-      ;; Álvaro Castro-Castilla: substitute  #!key, #!optional, #!rest
       (let loop ((formals flattened) (rvars '())
                  (env env) (store store) (loc-n loc-n))
         (if (not (null? formals))
@@ -980,10 +979,10 @@
            ((get-ek sexp) sexp))
           ((dsssl-marker? sexp)
            ((get-ek sexp) sexp))
+          ;; end
 	  (else (error (string-append
                         (cond ((pair? sexp) "Improper list: ")
                               ;((null? sexp) "Empty list: ")
-                              ;((keyword? sexp) "Keywords not supported: ")
                               ((vector? sexp) "Vector: ")
                               (else "Non-S-Expression: "))
                         (object->string sexp)
@@ -1110,37 +1109,10 @@
 
 ;; Returns (k expanded-forms store loc-n).
 (define (expand-top-level-forms forms store loc-n k)
-  (define (lambdas-to-lets form)
-    (if (or (not (list? form))
-            (null? form)
-            (eq? 'quote (car form)))
-        form
-        (let ((mapped (map lambdas-to-lets form)))
-          (if (not (and (pair? (car mapped))
-                        (eq? 'lambda (caar mapped))))
-              mapped
-              (let* ((lambda-form (car mapped))
-                     (inits (cdr mapped))
-                     (vars (cadr lambda-form))
-                     (body-expr (caddr lambda-form)))
-                (if (not (and (list? vars)
-                              (= (length vars) (length inits))))
-                    mapped
-                    (let ((bindings (map list vars inits)))
-                      (if (and (<= (length bindings) 1)
-                               (pair? body-expr)
-                               (or (eq? 'let* (car body-expr))
-                                   (and (eq? 'let (car body-expr))
-                                        (<= (length (cadr body-expr)) 1))))
-                          `(let* ,(append bindings (cadr body-expr))
-                             ,(caddr body-expr))
-                          `(let ,bindings
-                             ,body-expr)))))))))
   (define (finish outputs store loc-n)
     (define (finish1 output)
       ;; You can leave out the unrename-locals call if you want to.
-      ;; Álvaro Castro-Castilla: added LAMBDAS-TO-LETS step
-      (lambdas-to-lets (symbolize (unrename-locals output))))
+      (symbolize (unrename-locals output)))
     (k (map finish1 outputs) store loc-n))
   (expand-top-level-sexps (wrap-vecs forms) store loc-n finish))
 
@@ -1680,8 +1652,7 @@
 	(let ((n (number->string loc)))
 	  (string->symbol (string-append "_" str "_" n)))
 	(if (case sym
-              ;; Álvaro Castro-Castilla: added LET and LET* as builtins
-	      ((begin define delay if lambda letrec quote set! let let*) #t)
+              ((begin define delay if lambda letrec quote set!) #t)
 	      (else (and (positive? (string-length str))
 			 (char=? #\_ (string-ref str 0)))))
 	    (string->symbol (string-append "_" str "_"))
@@ -1892,16 +1863,17 @@
                  (cond/maybe-more test
                                   (begin body1 body2 ...)
                                   more-clause ...)))))
-          (define-syntax and
-	    (syntax-rules ()
-	      ((_) #t)
-	      ((_ test) (let () test))
-	      ((_ test . tests) (if test (and . tests) #f))))
-	  (define-syntax or
-	    (syntax-rules ()
-	      ((_) #f)
-	      ((_ test) (let () test))
-	      ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
+          ;; Álvaro Castro-Castilla: removed AND/OR macros, they are keywords for Gambit
+          ;; (define-syntax and
+	  ;;   (syntax-rules ()
+	  ;;     ((_) #t)
+	  ;;     ((_ test) (let () test))
+	  ;;     ((_ test . tests) (if test (and . tests) #f))))
+	  ;; (define-syntax or
+	  ;;   (syntax-rules ()
+	  ;;     ((_) #f)
+	  ;;     ((_ test) (let () test))
+	  ;;     ((_ test . tests) (let ((x test)) (if x x (or . tests))))))
           ;; Álvaro Castro-Castilla: added so lambda formals can be used (ie. dotted rest args)
           (define-syntax receive
             (syntax-rules ()
