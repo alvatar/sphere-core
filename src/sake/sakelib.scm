@@ -1,0 +1,6 @@
+(##namespace ("sake#"))
+(##include "~~lib/gambit#.scm")
+(include "common.scm")
+(include "tasks.scm")
+(include "filesets.scm")
+(include "compile.scm")

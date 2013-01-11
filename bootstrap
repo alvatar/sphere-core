@@ -1,0 +1,12 @@
+#!/bin/sh
+
+gsi -f -e '(begin (load "src/sake/sakelib")
+                  (include "src/sake/sakelib#.scm")
+                  (include "sakefile.scm")
+                  (task-run clean)
+                  (task-run stage-1)
+                  (exit))'
+
+sake stage-2
+sake stage-3
+

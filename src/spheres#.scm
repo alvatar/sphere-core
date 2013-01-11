@@ -7,8 +7,11 @@
    (lambda (e)
      (if (unbound-global-exception? e)
          (if (file-exists? ofile)
-             (load scmfile)
-             (begin (println "--- Loading source version of Alexpander") (load scmfile)))))
+             (load ofile)
+             (if (file-exists? scmfile)
+                 (begin (println "--- Loading source version of Alexpander")
+                        (load scmfile))
+                 (load "src/alexpander")))))
    (lambda () ##current-expander)))
 (define ##current-expander 'alexpander)
 
