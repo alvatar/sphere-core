@@ -47,7 +47,6 @@
 ;; version: generate module version with specific features (compiler options, cond-expand...)
 (##define (sake:compile-to-c module-or-file
                              #!key
-                             (library-name "")
                              (version '())
                              (cond-expand-features '())
                              (compiler-options '())
@@ -248,7 +247,6 @@
 ;;! Compile to o, for dynamic loading, takes care of introducing 'compile-to-o cond-expand feature
 (##define (sake:compile-to-o module
                              #!key
-                             (library-name "")
                              (version '())
                              (cond-expand-features '())
                              (compiler-options '())
@@ -266,7 +264,6 @@
                                       (%module-filename-c module version: version))))
         (c-file (sake:compile-to-c
                  module
-                 library-name: library-name
                  version: version
                  cond-expand-features: (cons 'compile-to-o cond-expand-features)
                  compiler-options: compiler-options
@@ -277,6 +274,43 @@
      cc-options: cc-options
      ld-options: ld-options
      delete-c: (not file-already-existed?))))
+
+;;! Compile to exe
+(##define (sake:compile-to-exe exe-name
+                               modules
+                               #!key
+                               (version '())
+                               (cond-expand-features '())
+                               (compiler-options '())
+                               (cc-options "")
+                               (ld-options "")
+                               (output (string-append (current-build-directory) exe-name))
+                               (strip #t)
+                               (verbose #f))
+  (info "compiling modules to exe: ")
+  (for-each (lambda (m) (info (string-append "    * " (object->string m)))) modules)
+  (let ((c-files
+         (map
+          (lambda (m) (sake:compile-to-c
+                  m
+                  version: version
+                  cond-expand-features: (cons 'compile-to-o cond-expand-features)
+                  compiler-options: compiler-options
+                  verbose: verbose))
+          modules)))
+    (gambit-eval-here
+     `((let* ((link-file (link-incremental ',c-files))
+              (gcc-cli (string-append ,(c-compiler)
+                                      " " ,@(map (lambda (f) (string-append f " ")) c-files)
+                                      " " link-file
+                                      " -o" ,output
+                                      " -I" (path-expand "~~include")
+                                      " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil")))
+         ;; (pp link-file) (pp gcc-cli)
+         (shell-command gcc-cli)
+         (if ,strip (shell-command ,(string-append "strip " output)))
+         (delete-file link-file)))
+     flags-string: "-f")))
 
 ;;! Make a module that includes a set of modules
 (##define (sake:merge-modules modules #!key (output "merged-modules.scm"))
