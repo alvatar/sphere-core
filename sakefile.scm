@@ -77,7 +77,7 @@
 
 (define-task install-stage-3 ()
   (for-each sake:install-compiled-module modules)
-  (sake:install-sphere-in-system))
+  (sake:install-sphere-to-system))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
   'stage-3)

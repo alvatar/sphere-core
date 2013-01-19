@@ -382,7 +382,7 @@
   (delete-file (default-lib-directory) recursive: #t))
 
 ;;! Install all the files in lib/ in the system directory for the library
-(##define (sake:install-sphere-in-system #!optional (sphere (%current-sphere)))
+(##define (sake:install-sphere-to-system #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t)
   (make-directory (%sphere-system-path sphere))
   (make-directory (string-append (%sphere-system-path sphere) (default-src-directory)))
