@@ -289,15 +289,20 @@
                                (verbose #f))
   (info "compiling modules to exe: ")
   (for-each (lambda (m) (info (string-append "    * " (object->string m)))) modules)
-  (let ((c-files
-         (map
-          (lambda (m) (sake:compile-to-c
-                  m
-                  version: version
-                  cond-expand-features: (cons 'compile-to-o cond-expand-features)
-                  compiler-options: compiler-options
-                  verbose: verbose))
-          modules)))
+  (let* ((new-c-files
+          (map
+           (lambda (m) (sake:compile-to-c
+                   m
+                   version: version
+                   cond-expand-features: (cons 'compile-to-o cond-expand-features)
+                   compiler-options: compiler-options
+                   verbose: verbose))
+           modules))
+         (c-files (append (map (lambda (m) (string-append
+                                       (%module-path-lib m)
+                                       (%module-filename-c m)))
+                               (apply append (map %module-dependencies-to-load modules)))
+                          new-c-files)))
     (gambit-eval-here
      `((let* ((link-file (link-incremental ',c-files))
               (gcc-cli (string-append ,(c-compiler)
@@ -306,7 +311,8 @@
                                       " -o" ,output
                                       " -I" (path-expand "~~include")
                                       " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil")))
-         ;; (pp link-file) (pp gcc-cli)
+         (if (not link-file) (error "error generating link file"))
+         (if ,verbose (begin (pp link-file) (pp gcc-cli)))
          (shell-command gcc-cli)
          (if ,strip (shell-command ,(string-append "strip " output)))
          (delete-file link-file)))
