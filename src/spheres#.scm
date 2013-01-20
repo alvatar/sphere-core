@@ -575,35 +575,9 @@ fig.scm file"))
                                         ;(pp file-o)
                              file-o)
                             ((file-exists? file-scm)
-                             ;; Include dependencies
-                             ;; (for-each (lambda (m)
-                             ;;             (display (string-append "-- including  -- " (object->string m) "\n"))
-                             ;;             (eval `(##include ,(string-append (%module-path-src m)
-                             ;;                                               (%module-filename-scm m)))))
-                             ;;           (%module-dependencies-to-include module))
-                             ;; Include available header dependencies
-                             ;; (for-each (lambda (m)
-                             ;;             (let ((m (%module-header m)))
-                             ;;               (and
-                             ;;                 m
-                             ;;                 (begin (display (string-append "-- including header -- " (object->string m) "\n"))
-                             ;;                        (eval `(##include ,(string-append (%module-path-src m)
-                             ;;                                                          (%module-filename-scm m))))))))
-                             ;;           (%module-dependencies-to-load module))
-                             ;; Load the header
-                             ;; (and header-module
-                             ;;      (eval `(##include ,(string-append (%module-path-src header-module)
-                             ;;                                        (%module-filename-scm header-module)))))
-                             (error "loading of scm code TODO")
-                             (let recur ((include-module module))
-                               (if (not (member (%module-normalize include-module) *included-modules*))
-                                   (begin (for-each recur (%module-dependencies-to-include include-module))
-                                          (or (equal? include-module module)
-                                              (include-single-module include-module options)))))
+                             (##alexpander-include file-scm)
                              (if verbose
-                                 (display (string-append "-- loading -- " (object->string module) "\n")))
-                             (load file-scm)
-                             (pp file-scm)
+                                 (display (string-append "-- loading source -- " (object->string module) "\n")))
                              file-scm)
                             (else
                              (error (string-append "Module: "
@@ -640,7 +614,7 @@ fig.scm file"))
                                   (string->keyword str))))
                           (cdr module)))))
     (%check-module module)
-    (##include-module-and-dependencies module '(verbose))))
+    `(##include-module-and-dependencies ',module '(verbose))))
 
 ;;; Load only module dependencies, do not load the module
 (##define-macro (##load-module-dependencies . module)

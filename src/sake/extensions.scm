@@ -382,19 +382,18 @@
   (delete-file (default-lib-directory) recursive: #t))
 
 ;;! Install all the files in lib/ in the system directory for the library
-(##define (sake:install-sphere-to-system #!optional (sphere (%current-sphere)))
+(##define (sake:install-sphere-to-system #!key
+                                         (extra-directories '())
+                                         (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t)
   (make-directory (%sphere-system-path sphere))
-  (make-directory (string-append (%sphere-system-path sphere) (default-src-directory)))
-  (make-directory (string-append (%sphere-system-path sphere) (default-lib-directory)))
-  (copy-files (fileset dir: (default-src-directory) recursive: #f)
-              (string-append (%sphere-system-path sphere)
-                             (default-src-directory)))
-  (copy-files (fileset dir: (default-lib-directory) recursive: #f)
-              (string-append (%sphere-system-path sphere)
-                             (default-lib-directory)))
   (copy-files '("config.scm")
-              (%sphere-system-path sphere)))
+              (%sphere-system-path sphere))
+  (for-each (lambda (dir)
+              (make-directory (string-append (%sphere-system-path sphere) dir))
+              (copy-files (fileset dir: dir recursive: #f)
+                          (string-append (%sphere-system-path sphere) dir)))
+            `(,(default-src-directory) ,(default-lib-directory) ,@extra-directories)))
 
 ;;! Uninstall all the files from the system installation
 (##define (sake:uninstall-sphere-from-system #!optional (sphere (%current-sphere)))
