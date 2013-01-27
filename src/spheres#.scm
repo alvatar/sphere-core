@@ -528,8 +528,6 @@ fig.scm file"))
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module) *included-modules*))
-                        ;; Old solution for vanilla Gambit (no Alexpander)
-                        ;;`(include ,include-file)
                         (##alexpander-include include-file))))
                 (begin
                   (if (not (member (%module-normalize module) *included-modules*))
@@ -537,16 +535,13 @@ fig.scm file"))
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module) *included-modules*))
-                        ;; Old solution for vanilla Gambit (no Alexpander)
-                        ;; (eval `(include ,(%module-filename-scm module)))
                         (##alexpander-include (%module-filename-scm module))))))))))
   (set!
    ##include-module-and-dependencies
    (lambda (root-module options)
-     (let* ((*included-modules* '())
-            (force (and (memq 'force options) #f)))
+     (let ((force-include (and (memq 'force options) #f)))
        (let recur ((module root-module))
-         (if (or force
+         (if (or force-include
                  (not (member (%module-normalize module) *included-modules*)))
              (begin (for-each recur (%module-dependencies-to-include module))
                     (include-single-module module '(verbose #t))))))))
@@ -556,12 +551,16 @@ fig.scm file"))
           (lambda (module options)
             (%check-module module)
             (let ((verbose (and (memq 'verbose options) #t))
+                  (includes (and (memq 'includes options) #t))
                   (sphere (%module-sphere module)))
               (let ((header-module (%module-header module))
                     (macros-module (%module-macros module)))
                 (if header-module
                     (eval `(##alexpander-include ,(string-append (%module-path-src header-module)
                                                                  (%module-filename-scm header-module)))))
+                (if includes
+                    (for-each (lambda (m) (include-single-module m '(verbose)))
+                              (%module-dependencies-to-include module)))
                 (if macros-module
                     (##include-module-and-dependencies macros-module '()))
                 ;; (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
@@ -596,10 +595,7 @@ fig.scm file"))
                       (or (and omit-root (equal? root-module module))
                           (load-single-module module options))))))))))
 
-
-
-
-;;; Main include macro, doesn't load dependencies
+;;! import-include macro
 (##define-macro (##import-include . module)
   (let ((module (if (null? (cdr module))
                     (car module)
@@ -617,14 +613,14 @@ fig.scm file"))
     `(##include-module-and-dependencies ',module '(verbose))))
 
 ;;; Load only module dependencies, do not load the module
-(##define-macro (##load-module-dependencies . module)
-  (let ((module (if (null? (cdr module))
-                    (car module)
-                    module)))
-    (%check-module module)
-    (##load-module-and-dependencies module '(omit-root verbose))))
+;; (##define-macro (##load-module-dependencies . module)
+;;   (let ((module (if (null? (cdr module))
+;;                     (car module)
+;;                     module)))
+;;     (%check-module module)
+;;     (##load-module-and-dependencies module '(omit-root verbose includes))))
 
-;;; Main load macro, loads dependencies
+;;! import macro, loads dependencies
 (##define-macro (##import . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
@@ -639,4 +635,4 @@ fig.scm file"))
                                    (string->keyword str))))
                            (cdr module)))))
     (%check-module module)
-    `(##load-module-and-dependencies ',module '(verbose))))
+    `(##load-module-and-dependencies ',module '(verbose includes))))
