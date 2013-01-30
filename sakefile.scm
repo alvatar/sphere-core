@@ -77,7 +77,7 @@
   (for-each (lambda (m) (sake:compile-c-to-o (sake:compile-to-c m))) modules))
 
 (define-task install-stage-3 ()
-  (for-each sake:install-compiled-module modules)
+  (for-each (lambda (m) (sake:install-compiled-module m versions: '(() (debug)))) modules)
   (sake:install-sphere-to-system))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)

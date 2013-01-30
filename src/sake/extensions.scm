@@ -339,17 +339,20 @@
 ;;! Install o and/or C file in the lib/ directory
 (##define (sake:install-compiled-module m
                                         #!key
-                                        (version '())
+                                        (versions '(()))
                                         (omit-o #f)
                                         (omit-c #f))
   (or (file-exists? (default-lib-directory))
       (make-directory (default-lib-directory)))
-  (or omit-o
-      (copy-file (string-append (default-build-directory) (%module-filename-o m version: version))
-                 (string-append (default-lib-directory) (%module-filename-o m version: version))))
-  (or omit-c
-      (copy-file (string-append (default-build-directory) (%module-filename-c m version: version))
-                 (string-append (default-lib-directory) (%module-filename-c m version: version)))))
+  (for-each
+   (lambda (version)
+     (or omit-o
+         (copy-file (string-append (default-build-directory) (%module-filename-o m version: version))
+                    (string-append (default-lib-directory) (%module-filename-o m version: version))))
+     (or omit-c
+         (copy-file (string-append (default-build-directory) (%module-filename-c m version: version))
+                    (string-append (default-lib-directory) (%module-filename-c m version: version)))))
+   versions))
 
 ;;! Test all files in test/
 (##define (sake:test-all)
