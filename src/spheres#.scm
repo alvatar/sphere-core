@@ -418,11 +418,11 @@ fig.scm file"))
                           (equal? (cadr (%module-normalize module))
                                   (cadr (%module-normalize (caar sphere-deps)
                                                            override-sphere: sphere))))
-                     (display (string-append "*** INFO -- Propagating "
-                                             (object->string (%module-version module))
-                                             " version to "
-                                             (object->string module)
-                                             " dependencies:\n"))
+                     ;; (display (string-append "*** INFO -- Propagating "
+                     ;;                         (object->string (%module-version module))
+                     ;;                         " version to "
+                     ;;                         (object->string module)
+                     ;;                         " dependencies:\n"))
                      (car sphere-deps))
                     (else (find-dependencies-list module sphere (cdr sphere-deps) omit-version?))))))
     (lambda (module)
@@ -543,18 +543,18 @@ fig.scm file"))
             (if sphere
                 (let ((include-file (string-append (%module-path-src module)
                                                    (%module-filename-scm module))))                  
-                  (if (not (member (%module-normalize module) *included-modules*))
+                  (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
-                        (set! *included-modules* (cons (%module-normalize module) *included-modules*))
+                        (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
                         (##alexpander-include include-file))))
                 (begin
-                  (if (not (member (%module-normalize module) *included-modules*))
+                  (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
-                        (set! *included-modules* (cons (%module-normalize module) *included-modules*))
+                        (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
                         (##alexpander-include (%module-filename-scm module))))))))))
   (set!
    ##include-module-and-dependencies
@@ -562,7 +562,7 @@ fig.scm file"))
      (let ((force-include (and (memq 'force options) #f)))
        (let recur ((module root-module))
          (if (or force-include
-                 (not (member (%module-normalize module) *included-modules*)))
+                 (not (member (%module-normalize module override-version: '()) *included-modules*)))
              (begin (for-each recur (%module-dependencies-to-include module))
                     (include-single-module module '(verbose #t))))))))
   (set!
@@ -602,7 +602,7 @@ fig.scm file"))
                              (error (string-append "Module: "
                                                    (object->string module)
                                                    " cannot be found in current sphere's path"))))
-                      (set! *loaded-modules* (cons (%module-normalize module) *loaded-modules*)))
+                      (set! *loaded-modules* (cons (%module-normalize module override-version: '()) *loaded-modules*)))
                     (begin (if verbose
                                (display (string-append "-- loading -- " (object->string module) "\n")))
                            (load (%module-filename-scm module)))))))))
@@ -610,7 +610,7 @@ fig.scm file"))
        ;; Get options, as #t or #f
        (let ((omit-root (and (memq 'omit-root options) #t)))
          (let recur ((module root-module))
-           (if (not (member (%module-normalize module) *loaded-modules*))
+           (if (not (member (%module-normalize module override-version: '()) *loaded-modules*))
                (begin (for-each recur (%module-dependencies-to-load module))
                       (or (and omit-root (equal? root-module module))
                           (load-single-module module options))))))))))
