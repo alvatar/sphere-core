@@ -113,7 +113,7 @@
   (and (%sphere-path sphere) #t))
 
 (define^ (%paths)
-  (let* ((paths-pair (assq (string->keyword "paths") (%current-config)))
+  (let* ((paths-pair (assq paths: (%current-config)))
          (paths (if paths-pair (cdr paths-pair) '())))
     (if (%current-sphere)
          (cons
@@ -140,7 +140,7 @@ fig.scm file"))
                                                            (config-file))
                                           read-all))))
                     (new-pair (list sphere config-data)))
-               (if (eq? sphere (string->symbol (cadr (assq (string->keyword "sphere") config-data))))
+               (if (eq? sphere (string->symbol (cadr (assq sphere: config-data))))
                    (begin (set! config-dict
                                 (cons new-pair config-dict))
                           (cadr new-pair))
@@ -212,12 +212,12 @@ fig.scm file"))
                          (rest (cdr e)))
                      (cons
                       (cond
-                       ((%module-reduced-form? module) (%module-normalize module (string->keyword "override-sphere") sphere))
+                       ((%module-reduced-form? module) (%module-normalize module override-sphere: sphere))
                        ((eq? '= (car module)) (cons (symbol->keyword sphere) (cdr module)))
                        (else module))
                       rest)))
                  deps))))
-     (let ((deps-pair (assq (string->keyword "dependencies") (%sphere-config sphere))))
+     (let ((deps-pair (assq dependencies: (%sphere-config sphere))))
        (if deps-pair
            (normalize-modules
             (expand-wildcards
@@ -233,7 +233,7 @@ fig.scm file"))
   (if sphere
       (append (list (->keyword sphere)
                     (->symbol id)
-                    (string->keyword "version") version))
+                    version: version))
       (->symbol id)))
 
 ;;! Module structure: (sphere: module-id [version: '(list-of-version-features)])
@@ -249,13 +249,16 @@ fig.scm file"))
        (not (null? (cdr module)))
        (symbol? (cadr module))
        (or (null? (cddr module))
-           (and (eq? (string->keyword "version") (caddr module))
+           (and (eq? version: (caddr module))
                 (list? (cadddr module))))))
 
-(define^ (%module-normalize module #!key (override-sphere #f))
-  (%make-module (string->keyword "sphere") (if override-sphere override-sphere (%module-sphere module))
-                (string->keyword "id") (%module-id module)
-                (string->keyword "version") (%module-version module)))
+(define^ (%module-normalize module
+                            #!key
+                            (override-sphere #f)
+                            (override-version #f))
+  (%make-module sphere: (if override-sphere override-sphere (%module-sphere module))
+                id: (%module-id module)
+                version: (if override-version override-version (%module-version module))))
 
 (define^ (%module? module)
   (or (%module-reduced-form? module)
@@ -385,47 +388,64 @@ fig.scm file"))
                  (%module-flat-name module)
                  (default-o-extension)))
 
-;;; Module dependecies, as directly read from the %config
+;;! Module dependecies, as directly read from the %config
 (define^ (%module-dependencies module)
   (%check-module module)
   (assq (%module-id module) (%sphere-dependencies (%module-sphere module))))
 
+;;! Builds a procedure to get a list of dependencies of one type
+;; It works by first trying the versioned module, if not found it falls back to the unversioned module
+;; If the root module doesn't have a dependencies for the exact version, the unversioned dependencies will
+;; be used instead. In this case, the same version requested for the root module will be tried for every
+;; dependency first before falling back.
 (define^ (%module-dependencies-select type)
-  (letrec ((find-normalized
-            (lambda (module sphere sphere-deps)
+  (letrec ((find-dependencies-list
+            (lambda (module sphere sphere-deps omit-version?)
               (cond ((null? sphere-deps) #f)
                     ;; Check if module is from this sphere
                     ((not (eq? (%module-sphere (caar sphere-deps)) sphere))
-                     (error (string-append "Dependency lists can't be done for non-local modules -> change " (config-file) " (tip: you can use = to identify local spheres)")))
-                    ;; First check for the right version of the module
+                     (error (string-append
+                             "Dependency lists can't be done for non-local modules -> change "
+                             (config-file)
+                             " (tip: you can use = to identify local spheres)")))
+                    ;; Try versioned
                     ((equal? (%module-normalize module)
                              (%module-normalize (caar sphere-deps)
-                                                (string->keyword "override-sphere") sphere))
+                                                override-sphere: sphere))
                      (car sphere-deps))
-                    (else (find-normalized module sphere (cdr sphere-deps))))))
-           (find-unversioned
-            (lambda (module sphere sphere-deps)
-              (cond ((null? sphere-deps) #f)
-                    ;; If not found, assume that unversioned dependencies can be used (only module is checked)
-                    ((equal? (cadr (%module-normalize module))
-                             (cadr (%module-normalize (caar sphere-deps)
-                                                      (string->keyword "override-sphere") sphere)))
-                     (display (string-append "*** WARNING -- No versioned dependencies found, using unversioned modules for "
+                    ;; Try unversioned
+                    ((and omit-version?
+                          (equal? (cadr (%module-normalize module))
+                                  (cadr (%module-normalize (caar sphere-deps)
+                                                           override-sphere: sphere))))
+                     (display (string-append "*** INFO -- Propagating "
+                                             (object->string (%module-version module))
+                                             " version to "
                                              (object->string module)
-                                             "\n"))
+                                             " dependencies:\n"))
                      (car sphere-deps))
-                    (else (find-unversioned module sphere (cdr sphere-deps)))))))
+                    (else (find-dependencies-list module sphere (cdr sphere-deps) omit-version?))))))
     (lambda (module)
       (%check-module module)
       (let ((module-sphere (%module-sphere module))
             (get-dependency-list (lambda (l) (let ((type-pair (assq type (cdr l))))
                                           (if type-pair (cdr type-pair) '())))))
-        (let ((this (find-normalized module module-sphere (%sphere-dependencies module-sphere))))
-          (if this
-              (get-dependency-list this)
-              (let ((that (find-unversioned module module-sphere (%sphere-dependencies module-sphere))))
-                (if that
-                    (get-dependency-list that)
+        ;; Try first with versioned module
+        (let ((versioned (find-dependencies-list module
+                                                 module-sphere
+                                                 (%sphere-dependencies module-sphere)
+                                                 #f)))
+          (if versioned
+              (get-dependency-list versioned)
+              ;; ...otherwise try to find unversioned module in dependency list
+              (let ((unversioned (find-dependencies-list module
+                                                         module-sphere
+                                                         (%sphere-dependencies module-sphere)
+                                                         #t)))
+                (if unversioned
+                    ;; ...but we will make them versioned, propagating the version
+                    (map (lambda (m) (%module-normalize m override-version: (%module-version module)))
+                         (get-dependency-list unversioned))
                     '()))))))))
 
 (define^ (%module-dependencies-to-prelude module)
@@ -437,7 +457,7 @@ fig.scm file"))
 (define^ (%module-dependencies-to-load module)
   ((%module-dependencies-select 'load) module))
 
-;;; Gets the full tree of dependencies, building a list in the right order
+;;! Gets the full tree of dependencies, building a list in the right order
 (define^ (%module-deep-dependencies-select type)
   (lambda (module)
     (let ((deps '()))
@@ -457,8 +477,8 @@ fig.scm file"))
 ; Utils
 ;-------------------------------------------------------------------------------
 
-;;; Builds a new list of modules merging two lists
-;;; Not optimized
+;;! Builds a new list of modules merging two lists
+;; Not optimized
 (define^ (%merge-module-lists dep1 dep2)
   (letrec ((delete-duplicates
             (lambda (l) (cond ((null? l) '())
@@ -467,7 +487,7 @@ fig.scm file"))
     ;; We work on reversed list to keep the first occurence
     (reverse (delete-duplicates (reverse (append dep1 dep2))))))
 
-;;; Select modules from a list belonging to a sphere
+;;! Select modules from a list belonging to a sphere
 (define^ (%select-modules modules spheres)
   (let* ((select (if (pair? spheres) spheres (list spheres)))
          (any-eq? (lambda (k l)
@@ -488,9 +508,9 @@ fig.scm file"))
 ;;! Is there a header for this module? If so, return the header module
 (define^ (%module-header module)
   (let ((header-module (%make-module
-                        (string->keyword "sphere") (%module-sphere module)
-                        (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "#"))
-                        (string->keyword "version") (%module-version module))))
+                        sphere: (%module-sphere module)
+                        id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
+                        version: (%module-version module))))
     (and (file-exists?
           (string-append (%module-path-src header-module)
                          (%module-filename-scm header-module)))
@@ -499,9 +519,9 @@ fig.scm file"))
 ;;! Is there a macros module for this module? If so, return the macros module
 (define^ (%module-macros module)
   (let ((macros-module (%make-module
-                        (string->keyword "sphere") (%module-sphere module)
-                        (string->keyword "id") (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
-                        (string->keyword "version") (%module-version module))))
+                        sphere: (%module-sphere module)
+                        id: (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
+                        version: (%module-version module))))
     (and (file-exists?
           (string-append (%module-path-src macros-module)
                          (%module-filename-scm macros-module)))
