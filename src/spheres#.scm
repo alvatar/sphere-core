@@ -617,20 +617,24 @@ fig.scm file"))
 
 ;;! import-include macro
 (##define-macro (##import-include . module)
-  (let ((module (if (null? (cdr module))
-                    (car module)
-                    ;; If it defines the sphere, process the sphere name to make it a keyword
-                    (cons (let ((first (car module)))
-                            (if (keyword? first)
-                                first
-                                (let ((str (apply string
-                                                  (string->list
-                                                   (symbol->string first)))))
-                                  (string-shrink! str (- (string-length str) 1))
-                                  (string->keyword str))))
-                          (cdr module)))))
-    (%check-module module)
-    `(##include-module-and-dependencies ',module '(verbose))))
+  (if (string? (car module))
+      ;; If filename given, just include it (doesn't register as loaded module)
+      (eval `(##alexpander-include ,(car module)))
+      ;; oterwise act normally
+      (let ((module (if (null? (cdr module))
+                        (car module)
+                        ;; If it defines the sphere, process the sphere name to make it a keyword
+                        (cons (let ((first (car module)))
+                                (if (keyword? first)
+                                    first
+                                    (let ((str (apply string
+                                                      (string->list
+                                                       (symbol->string first)))))
+                                      (string-shrink! str (- (string-length str) 1))
+                                      (string->keyword str))))
+                              (cdr module)))))
+        (%check-module module)
+        `(##include-module-and-dependencies ',module '(verbose)))))
 
 ;;; Load only module dependencies, do not load the module
 ;; (##define-macro (##load-module-dependencies . module)
