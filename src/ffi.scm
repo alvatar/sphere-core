@@ -44,6 +44,10 @@
   (c-lambda ((pointer void #f)) (pointer void #f)
             "___result_voidstar = (void*)___arg1;"))
 
+(define integer->void*
+  (c-lambda (int) (pointer void #f)
+            "___result_voidstar = (void*)___arg1;"))
+
 (define void*->unsigned-char*
   (c-lambda (void*) unsigned-char*
             "___result_voidstar = ___arg1;"))
