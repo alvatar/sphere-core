@@ -34,23 +34,31 @@
 
 (define void*-offset
   (c-lambda ((pointer void #f) int) (pointer void #f)
-            "___result_voidstar = ((void*)___arg1) + ___arg2;"))
+            "___result_voidstar = ((void*)___arg1_voidstar) + ___arg2;"))
 
 ;-------------------------------------------------------------------------------
 ; Conversion/casting
 ;-------------------------------------------------------------------------------
 
-(define ->void*
+(define *->void*
   (c-lambda ((pointer void #f)) (pointer void #f)
-            "___result_voidstar = (void*)___arg1;"))
+            "___result_voidstar = (void*)___arg1_voidstar;"))
 
 (define integer->void*
-  (c-lambda (int) (pointer void #f)
+  (c-lambda (unsigned-long-long) (pointer void #f)
             "___result_voidstar = (void*)___arg1;"))
 
 (define void*->unsigned-char*
   (c-lambda (void*) unsigned-char*
-            "___result_voidstar = ___arg1;"))
+            "___result_voidstar = ___arg1_voidstar;"))
+
+(define char*->string
+  (c-lambda (char*) char-string
+            "___result = ___arg1_voidstar;"))
+
+(define unsigned-char*->string
+  (c-lambda (unsigned-char*) char-string
+            "___result = ___arg1_voidstar;"))
 
 ;-------------------------------------------------------------------------------
 ; Standard C functions
@@ -66,54 +74,51 @@
   (c-lambda ((pointer void) unsigned-int) (pointer void) "realloc"))
 
 (define free
-  (c-lambda ((pointer void)) void "free"))
+  (c-lambda ((pointer void #f)) void "free"))
 
 ;-------------------------------------------------------------------------------
 ; Arrays
 ;-------------------------------------------------------------------------------
 
-;;; unsigned-int array
+;;! int
 
-(c-declare #<<end-of-c-declare
-#include <stdint.h>
-end-of-c-declare
-)
+(c-declare "#include <stdint.h>")
 
 (define make-int*
   (c-lambda (int) int*
-            "___result_voidstar = malloc( ___arg1*sizeof(int) );"))
+            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(int) );"))
 
 (define int*-set!
   (c-lambda (int* int) void
-            "*___arg1 = ___arg2;"))
+            "*(int*)___arg1_voidstar = ___arg2;"))
 
-(define pointer->int
+(define *->int
   (c-lambda (int*) int
-            "___result = *___arg1;"))
+            "___result = *(int*)___arg1_voidstar;"))
+
+;;! unisgned-int32
 
 (define make-unsigned-int32*
   (c-lambda (int) unsigned-int32*
-            "___result_voidstar = malloc( ___arg1*sizeof(uint32_t) );"))
+            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(uint32_t) );"))
 
-(define pointer->unsigned-int32
+(define *->unsigned-int32
   (c-lambda (unsigned-int32*) unsigned-int32
             "___result = *___arg1;"))
 
-
-
-;;; TODO: make from macro and apply to all types
+;;! unsigned-int
 
 (define make-unsigned-int*
   (c-lambda (int) unsigned-int*
-            "___result_voidstar = malloc( ___arg1*sizeof(unsigned int) );"))
+            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(unsigned int) );"))
 
-(define unsigned-int*-ref
-  (c-lambda (unsigned-int* int) unsigned-int
-            "___result = ((unsigned int*)___arg1)[___arg2];"))
+;; (define unsigned-int*-ref
+;;   (c-lambda (unsigned-int* int) unsigned-int
+;;             "___result = ((unsigned int*)___arg1_voidstar)[___arg2];"))
 
 (define unsigned-int*-set!
   (c-lambda (unsigned-int* int unsigned-int) void
-            "((unsigned int*)___arg1)[___arg2] = ___arg3;"))
+            "((unsigned int*)___arg1_voidstar)[___arg2] = ___arg3;"))
 
 (define (vector->unsigned-int* vec)
   (let* ((length (vector-length vec))
