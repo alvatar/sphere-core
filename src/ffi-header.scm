@@ -1,11 +1,55 @@
+;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
+;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro. All Rights Reserved.
+;;; Foreign Function Interface functionality
 
-;;; C constants generation macro
+(define^ (make-symbol #!rest elems)
+  (string->symbol (apply string-append
+                         (map (lambda (e)
+                                (cond ((symbol? e) (symbol->string e))
+                                      ((string? e) e)
+                                      (else (error "make-symbol: unsupported type"))))
+                              elems))))
 
+;-------------------------------------------------------------------------------
+; Types
+;-------------------------------------------------------------------------------
+
+(c-define-type void* (pointer void))
+(c-define-type bool* (pointer bool))
+(c-define-type short* (pointer short))
+(c-define-type unsigned-short* (pointer unsigned-short))
+(c-define-type int* (pointer int))
+(c-define-type unsigned-int* (pointer unsigned-int))
+(c-define-type long* (pointer long))
+(c-define-type unsigned-long* (pointer unsigned-long))
+(c-define-type long-long* (pointer long-long))
+(c-define-type unsigned-long-long* (pointer unsigned-long-long))
+(c-define-type float* (pointer float))
+(c-define-type double* (pointer double))
+(c-define-type char* (pointer char))
+(c-define-type char** (pointer char*))
+(c-define-type unsigned-char* (pointer unsigned-char))
+(c-define-type unsigned-char** (pointer unsigned-char*))
+(c-define-type int8* (pointer int8))
+(c-define-type unsigned-int8* (pointer unsigned-int8))
+(c-define-type int16* (pointer int16))
+(c-define-type unsigned-int16* (pointer unsigned-int16))
+(c-define-type int32* (pointer int32))
+(c-define-type unsigned-int32* (pointer unsigned-int32))
+(c-define-type int64* (pointer int64))
+(c-define-type unsigned-int64* (pointer unsigned-int64))
+
+(c-define-type size-t unsigned-long-long)
+
+;-------------------------------------------------------------------------------
+; Macros
+;-------------------------------------------------------------------------------
+
+;;! C constants generation macro
 ;; Creating the bindings in a simple C function makes for more compact
 ;; binaries, as per Marc Feeley's advice.
 ;;
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
-;; (Via 'Alvaro Castro-Castilla).
 (##define-macro
   (c-constants . names)
   (let ((nb-names (length names))
@@ -84,7 +128,7 @@
            (lambda (scheme-attr-name c-attr-name scheme-attr-type c-attr-type
                                 voidstar pointer)
              (let ((_voidstar (if (or voidstar pointer) "_voidstar" ""))
-                   (amperstand (if voidstar "&" ""))
+                   (ampersand (if voidstar "&" ""))
                    (scheme-attr-type (if voidstar
                                          (symbol-append unmanaged-prefix
                                                         scheme-attr-type)
@@ -101,7 +145,7 @@
                                         ; XXX: correctly cast to type, should help with enums in C++.
                                         ;" = (" (symbol->string c-attr-type) ")"
                              " = "
-                             amperstand "(((" c-type-name
+                             ampersand "(((" c-type-name
                              "*)___arg1_voidstar)->"
                              c-attr-name ");"))
                           parent)))
@@ -201,12 +245,10 @@
 ;;; Build a size-of value equivalent to the C operator
 ;;; c-build-sizeof float -> sizeof-float
 
-(##define-macro c-build-sizeof
-  (lambda (type)
-    (let ((type-str (symbol->string type)))
-      `(##define ,(string->symbol (string-append "sizeof-" type-str))
-         ((c-lambda () unsigned-int
-                    ,(string-append "___result = sizeof(" type-str ");")))))))
+(##define-macro (c-sizeof scheme-type c-type)
+  `(define ,(make-symbol scheme-type '-size)
+     ((c-lambda () size-t
+                ,(string-append "___result = sizeof(" c-type ");")))))
 
 ;;; Automatic memory freeing macro
 
@@ -216,32 +258,6 @@
 ;;        (free ,(car expr))
 ;;        ret)))
 
-(c-define-type void* (pointer void))
-(c-define-type bool* (pointer bool))
-(c-define-type short* (pointer short))
-(c-define-type unsigned-short* (pointer unsigned-short))
-(c-define-type int* (pointer int))
-(c-define-type unsigned-int* (pointer unsigned-int))
-(c-define-type long* (pointer long))
-(c-define-type unsigned-long* (pointer unsigned-long))
-(c-define-type long-long* (pointer long-long))
-(c-define-type unsigned-long-long* (pointer unsigned-long-long))
-(c-define-type float* (pointer float))
-(c-define-type double* (pointer double))
-(c-define-type char* (pointer char))
-(c-define-type char** (pointer char*))
-(c-define-type unsigned-char* (pointer unsigned-char))
-(c-define-type unsigned-char** (pointer unsigned-char*))
-(c-define-type int8* (pointer int8))
-(c-define-type unsigned-int8* (pointer unsigned-int8))
-(c-define-type int16* (pointer int16))
-(c-define-type unsigned-int16* (pointer unsigned-int16))
-(c-define-type int32* (pointer int32))
-(c-define-type unsigned-int32* (pointer unsigned-int32))
-(c-define-type int64* (pointer int64))
-(c-define-type unsigned-int64* (pointer unsigned-int64))
-
-(c-define-type size-t unsigned-long-long)
 
  
   
