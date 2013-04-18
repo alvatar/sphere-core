@@ -10,6 +10,26 @@
                                       (else (error "make-symbol: unsupported type"))))
                               elems))))
 
+(define^ (->string o)
+  (cond ((string? o) o)
+        ((symbol? o) (symbol->string o))
+        ((keyword? o) (keyword->string o))
+        (else (error (string-append "->string: unrecognized type " o)))))
+
+(define^ (generic-string-append #!rest ol)
+  (apply string-append (map ->string ol)))
+
+(define^ (symbol-append #!rest ol)
+  (string->symbol (apply generic-string-append ol)))
+
+(define^ (build-defines #!rest define-blocks)
+  (cons 'begin
+        (let recur ((ds define-blocks))
+          (cond ((null? ds) '())
+                ((null? (car ds)) (recur (cdr ds)))
+                (else (cons (car ds)
+                            (recur (cdr ds))))))))
+
 ;-------------------------------------------------------------------------------
 ; Types
 ;-------------------------------------------------------------------------------
@@ -38,11 +58,10 @@
 (c-define-type unsigned-int32* (pointer unsigned-int32))
 (c-define-type int64* (pointer int64))
 (c-define-type unsigned-int64* (pointer unsigned-int64))
-
 (c-define-type size-t unsigned-long-long)
 
 ;-------------------------------------------------------------------------------
-; Macros
+; FFI generation
 ;-------------------------------------------------------------------------------
 
 ;;! C constants generation macro
@@ -242,13 +261,46 @@
   (c-union . type.fields)
   (c-native 'union (car type.fields) (cdr type.fields)))
 
-;;; Build a size-of value equivalent to the C operator
-;;; c-build-sizeof float -> sizeof-float
+;;! Build a size-of value equivalent to the C operator
+;; c-build-sizeof float -> sizeof-float
 
-(##define-macro (c-sizeof scheme-type c-type)
-  `(define ,(make-symbol scheme-type '-size)
+(##define-macro (build-c-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
+  `(define ,(symbol-append scheme-type '-size)
      ((c-lambda () size-t
                 ,(string-append "___result = sizeof(" c-type ");")))))
+
+;;! Build FFI procedures for C type arrays
+;; (build-c-array-ffi float f32) ->
+;; alloc-float*
+;; float*-ref
+;; float*-set!
+;; *->float*
+;; f32vector->float*
+(##define-macro (build-c-array-ffi scheme-type #!key (c-type scheme-type) scheme-vector)
+  (build-defines
+   `(define ,(symbol-append 'alloc- scheme-type '*)
+      (c-lambda (size-t) (pointer ,scheme-type)
+                ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+   `(define ,(symbol-append scheme-type '*-ref)
+      (c-lambda ((pointer ,scheme-type) size-t) ,scheme-type
+                ,(generic-string-append "___result = ___arg1[___arg2];")))
+   `(define ,(symbol-append scheme-type '*-set!)
+      (c-lambda ((pointer ,scheme-type) size-t ,scheme-type) void
+                ,(generic-string-append "___arg1[___arg2] = ___arg3;")))
+   `(define ,(symbol-append '*-> scheme-type)
+      (c-lambda ((pointer ,scheme-type #f)) ,scheme-type
+                ,(generic-string-append "___result = *___arg1;")))
+   (if scheme-vector
+       `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
+         (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
+                (buf (,(symbol-append 'alloc- scheme-type '*) length)))
+           (let loop ((i 0))
+             (if (fx< i length)
+                 (begin
+                   (,(symbol-append scheme-type '*-set!) buf i (,(symbol-append scheme-vector 'vector-ref) vec i))
+                   (loop (fx+ i 1)))
+                 buf))))
+       '())))
 
 ;;; Automatic memory freeing macro
 

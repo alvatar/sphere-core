@@ -105,28 +105,26 @@
             "___result_voidstar = (void*)___arg1;"))
 
 ;-------------------------------------------------------------------------------
-; Type sizes
-;-------------------------------------------------------------------------------
-
-(c-sizeof unsigned-char "unsigned char")
-(c-sizeof char "char")
-(c-sizeof unsigned-short "unsigned short")
-(c-sizeof short "short")
-(c-sizeof unsigned-int "unsigned int")
-(c-sizeof int "int")
-(c-sizeof unsigned-long "unsigned long")
-(c-sizeof long "long")
-(c-sizeof float "float")
-(c-sizeof double "double")
-(c-sizeof size-t "size_t")
-
-;-------------------------------------------------------------------------------
-; Gambit-managed arrays
+; C arrays
 ;-------------------------------------------------------------------------------
 
 (c-declare "#include <stdint.h>")
 
+(build-c-sizeof unsigned-char c-type: "unsigned char")
+
+(build-c-sizeof unsigned-short c-type: "unsigned short")
+(build-c-sizeof short)
+(build-c-sizeof unsigned-long c-type: "unsigned long")
+(build-c-sizeof long)
+(build-c-sizeof float)
+(build-c-sizeof double)
+(build-c-sizeof size-t c-type: "size_t")
+
 ;;!! char
+
+(build-c-sizeof char)
+(build-c-array-ffi char
+                   scheme-vector: s8)
 
 (define char*->string
   (c-lambda (char*) char-string
@@ -134,9 +132,10 @@
 
 ;;!! unsigned char
 
-(define void*->unsigned-char*
-  (c-lambda (void*) unsigned-char*
-            "___result_voidstar = ___arg1_voidstar;"))
+(build-c-sizeof unsigned-char c-type: "unsigned char")
+(build-c-array-ffi unsigned-char
+                   c-type: "unsigned char"
+                   scheme-vector: u8)
 
 (define unsigned-char*->string
   (c-lambda (unsigned-char*) char-string
@@ -144,104 +143,13 @@
 
 ;;!! int
 
-(define make-int*
-  (c-lambda (int) int*
-            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(int) );"))
-
-(define int*-set!
-  (c-lambda (int* int) void
-            "*(int*)___arg1_voidstar = ___arg2;"))
-
-(define *->int
-  (c-lambda (int*) int
-            "___result = *(int*)___arg1_voidstar;"))
-
-;;!! unisgned-int32
-(define make-unsigned-int32*
-  (c-lambda (int) unsigned-int32*
-            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(uint32_t) );"))
-
-(define *->unsigned-int32
-  (c-lambda (unsigned-int32*) unsigned-int32
-            "___result = *___arg1;"))
+(build-c-sizeof int)
+(build-c-array-ffi int
+                   scheme-vector: s32)
 
 ;;!! unsigned-int
 
-(define make-unsigned-int*
-  (c-lambda (int) unsigned-int*
-            "___result_voidstar = ___EXT(___alloc_rc)( ___arg1*sizeof(unsigned int) );"))
-
-;; (define unsigned-int*-ref
-;;   (c-lambda (unsigned-int* int) unsigned-int
-;;             "___result = ((unsigned int*)___arg1_voidstar)[___arg2];"))
-
-(define unsigned-int*-set!
-  (c-lambda (unsigned-int* int unsigned-int) void
-            "((unsigned int*)___arg1_voidstar)[___arg2] = ___arg3;"))
-
-(define (vector->unsigned-int* vec)
-  (let* ((length (vector-length vec))
-         (buf (make-unsigned-int* length)))
-    (let loop ((i 0))
-      (if (< i length)
-          (begin
-            (unsigned-int*-set! buf i (vector-ref vec i))
-            (loop (+ i 1)))
-          buf))))
-
-;-------------------------------------------------------------------------------
-; C-managed arrays
-;-------------------------------------------------------------------------------
-
-;;;;;;; MALLOC GENERICO
-;;;;;;; CONVERSION *void->int/otros tipos ESPECIFICO
-;;;;;;; FREE GENÉRICO
-;;;;;;; ARRAY-REF ESPECIFICO
-;;;;;;; ARRAY-SET ESPECIFICO
-
-;; (define-macro (define-array-allocator-and-accessors type)
-
-;;    (define (sym . syms)
-;;      (string->symbol (apply string-append
-;;                             (map symbol->string syms))))
-
-;;    (let ((type-str (symbol->string type)))
-;;      `(begin
-
-;;         (define ,(sym 'alloc- type '-array)
-;;           (c-lambda (int) (pointer ,type)
-;;                     ,(string-append
-;;                       "___result_voidstar = malloc( ___arg1 * sizeof("
-;;                       type-str
-;;                       ") );")))
-
-;;         (define ,(sym 'free- type '-array)
-;;           (c-lambda ((pointer ,type)) void
-;;                     "free( ___arg1 );"))
-
-;;         (define ,(sym type '-array-ref)
-;;           (c-lambda ((pointer ,type) int) ,type
-;;                     "___result = ___arg1[___arg2];"))
-
-;;         (define ,(sym type '-array-set!)
-;;           (c-lambda ((pointer ,type) int ,type) void
-;;                     "___arg1[___arg2] = ___arg3;")))))
-
-;; ;; test it:
-
-;; (define-array-allocator-and-accessors int)
-;; (define-array-allocator-and-accessors double)
-
-;; (define a (alloc-int-array 5))
-;; (define b (alloc-double-array 10))
-
-;; (int-array-set! a 1 111)
-;; (int-array-set! a 2 222)
-;; (pp (+ (int-array-ref a 1) (int-array-ref a 2))) ;; 333
-
-;; (double-array-set! b 1 1.5)
-;; (double-array-set! b 2 2.0)
-;; (pp (+ (double-array-ref b 1) (double-array-ref b 2))) ;; 3.5
-
-;; (free-int-array a)
-;; (free-double-array b)
+(build-c-sizeof unsigned-int c-type: "unsigned int")
+(build-c-array-ffi unsigned-int
+                   c-type: "unsigned int"
+                   scheme-vector: u32)
