@@ -126,7 +126,6 @@
                    ,(generic-string-append
                      "___result" _voidstar " = "
                      ampersand "(((" c-type  "*)___arg1_voidstar)->" c-attribute ");")))))))
-         #;
          (mutator
           (attribute-builder
            (lambda (scheme-attribute
@@ -134,18 +133,16 @@
                c-attribute
                c-attribute-type
                pointer?)
-             (let ((_voidstar (if pointer? "_voidstar" ""))
-                   (cast (if pointer?
+             (let ((cast (if pointer?
                              (generic-string-append "(" c-attribute-type "*)")
                              ""))
                    (dereference (if pointer? "*" "")))
                `(define ,(symbol-append
                           scheme-type "-" scheme-attribute "-set!")
                   (c-lambda
-                   (,scheme-type ,scheme-attribute-type) void
+                   (,scheme-pointer-type ,scheme-attribute-type) void
                    ,(string-append
-                     "(*(" c-type "*)___arg1_voidstar)." c-attribute
-                     " = " dereference cast "___arg2" _voidstar ";"))))))))
+                     "(*(" c-type "*)___arg1_voidstar)." c-attribute " = ___arg2;"))))))))
     `(begin
        ;; Type definitions
        (c-define-type ,scheme-type (,struct-or-union ,c-type ,scheme-type))
@@ -175,8 +172,7 @@
        ;; Attribute accessors
        ,@(map accessor fields)
        ;; Attribute mutators
-       #;,@(map mutator fields)
-       )))
+       ,@(map mutator fields))))
 
 (##define-macro (build-c-struct type #!rest fields)
   (c-native 'struct type fields))
