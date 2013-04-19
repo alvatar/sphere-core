@@ -7,17 +7,17 @@
 
 (##include "../src/ffi-header.scm")
 
-(define ffi:references
-  (if (table? ffi:references)
-    ffi:references
-    (make-table weak-keys: #t weak-values: #f test: eq?)))
+;; (define ffi:references
+;;   (if (table? ffi:references)
+;;     ffi:references
+;;     (make-table weak-keys: #t weak-values: #f test: eq?)))
 
-(define ffi:link
-  (if (procedure? ffi:link)
-    ffi:link
-    (lambda (parent child)
-      (table-set! ffi:references child parent)
-      (make-will child (lambda (x) (table-set! ffi:references x))))))
+;; (define ffi:link
+;;   (if (procedure? ffi:link)
+;;     ffi:link
+;;     (lambda (parent child)
+;;       (table-set! ffi:references child parent)
+;;       (make-will child (lambda (x) (table-set! ffi:references x))))))
 
 ;-------------------------------------------------------------------------------
 ; Gambit memory

@@ -2,19 +2,11 @@
 ;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
-(define^ (make-symbol #!rest elems)
-  (string->symbol (apply string-append
-                         (map (lambda (e)
-                                (cond ((symbol? e) (symbol->string e))
-                                      ((string? e) e)
-                                      (else (error "make-symbol: unsupported type"))))
-                              elems))))
-
 (define^ (->string o)
   (cond ((string? o) o)
         ((symbol? o) (symbol->string o))
         ((keyword? o) (keyword->string o))
-        (else (error (string-append "->string: unrecognized type " o)))))
+        (else (error (string-append "->string: unrecognized type -- " (object->string o))))))
 
 (define^ (generic-string-append #!rest ol)
   (apply string-append (map ->string ol)))
@@ -66,11 +58,8 @@
 
 ;;! C constants generation macro
 ;; Creating the bindings in a simple C function makes for more compact
-;; binaries, as per Marc Feeley's advice.
-;;
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
-(##define-macro
-  (c-constants . names)
+(##define-macro (build-c-constants . names)
   (let ((nb-names (length names))
         (wrapper (gensym)))
     (letrec ((interval (lambda (lo hi)
@@ -97,173 +86,107 @@
                 names)))))
 
 ;;! Struct and union generation macro
-;; (code by Estevo Castro)
-(define^ (c-native struct-or-union type fields)
-  (letrec ((to-string (lambda (x)
-                        (cond ((string? x) x)
-                              ((symbol? x) (symbol->string x))
-                              (else (error "Unsupported type: " x)))))
-           (mixed-append (lambda args
-                           (apply string-append (map to-string args))))
-           (symbol-append (lambda args
-                            (string->symbol (apply mixed-append args)))))
-    (let*
-        ((managed-prefix "managed-")
-         (unmanaged-prefix "unmanaged-")
-         (scheme-type (if (pair? type) (car type) type))
-         (pointer-type (symbol-append scheme-type "*"))
-         (c-type (if (pair? type) (cadr type) type))
-         (c-type-name (symbol->string c-type))
-         (attr-worker
+(define^ (c-native struct-or-union
+                   scheme-type
+                   fields
+                   #!key
+                   (c-type (symbol->string scheme-type)))
+  (let* ((scheme-pointer-type `(pointer ,scheme-type ,(symbol-append scheme-type '*)))
+         (attribute-builder
           (lambda (fn)
             (lambda (field)
-              (let* ((attr (car field))
-                     (scheme-attr-name (symbol->string (if (pair? attr)
-                                                           (car attr)
-                                                           attr)))
-                     (c-attr-name (symbol->string (if (pair? attr)
-                                                      (cadr attr)
-                                                      attr)))
-                     (attr-type (cadr field))
-                     (scheme-attr-type (if (pair? attr-type)
-                                           (car attr-type)
-                                           attr-type))
-                     (c-attr-type (if (pair? attr-type)
-                                      (cadr attr-type)
-                                      attr-type))
-                     (access-type (if (null? (cddr field))
-                                      'scalar
-                                      (caddr field)))
-                     (voidstar (eq? access-type 'voidstar))
-                     (pointer (eq? access-type 'pointer)))
-                (fn scheme-attr-name
-                    c-attr-name
-                    scheme-attr-type
-                    c-attr-type
-                    voidstar
-                    pointer)))))
+              (let ((process-arguments
+                     (lambda (field)
+                       (list (car field)    ; scheme-attribute
+                             (cadr field)   ; scheme-attribute-type
+                             (caddr field)  ; c-attribute
+                             (cadddr field) ; c-attribute-type
+                             (if (null? cddddr)
+                                 #f
+                                 (let ((pointer-arg (memq pointer?: field)))
+                                   (if pointer-arg (cadr field) #f)))))))
+                (apply fn (process-arguments field))))))
          (accessor
-          (attr-worker
-           (lambda (scheme-attr-name c-attr-name scheme-attr-type c-attr-type
-                                voidstar pointer)
-             (let ((_voidstar (if (or voidstar pointer) "_voidstar" ""))
-                   (ampersand (if voidstar "&" ""))
-                   (scheme-attr-type (if voidstar
-                                         (symbol-append unmanaged-prefix
-                                                        scheme-attr-type)
-                                         scheme-attr-type)))
-               `(##define (,(symbol-append scheme-type
-                                           "-"
-                                           scheme-attr-name)
-                           parent)
-                  (let ((ret
-                         ((c-lambda
-                           (,scheme-type) ,scheme-attr-type
-                           ,(string-append
-                             "___result" _voidstar
-                                        ; XXX: correctly cast to type, should help with enums in C++.
-                                        ;" = (" (symbol->string c-attr-type) ")"
-                             " = "
-                             ampersand "(((" c-type-name
-                             "*)___arg1_voidstar)->"
-                             c-attr-name ");"))
-                          parent)))
-                    ,@(if voidstar
-                          '((ffi:link parent ret))
-                          '())
-                    ret))))))
-         (mutator
-          (attr-worker
-           (lambda (scheme-attr-name c-attr-name scheme-attr-type c-attr-type
-                                voidstar pointer)
-             (let ((_voidstar (if (or voidstar pointer) "_voidstar" ""))
-                   (cast
-                    (cond
-                     (voidstar
-                      (mixed-append "(" c-attr-type "*)"))
-                     (pointer
-                      (mixed-append "(" c-attr-type ")"))
-                                        ; XXX: cast primitive types too, should help with enums in C++
-                     (else "")))
-                   (dereference (if voidstar "*" "")))
-               `(##define ,(symbol-append
-                            scheme-type "-" scheme-attr-name "-set!")
+          (attribute-builder
+           (lambda (scheme-attribute
+               scheme-attribute-type
+               c-attribute
+               c-attribute-type
+               pointer?)
+             (let ((_voidstar (if pointer? "_voidstar" ""))
+                   (ampersand (if pointer? "&" ""))
+                   (return-type (if pointer?
+                                    `(pointer ,scheme-attribute-type ,(symbol-append scheme-attribute-type '*))
+                                    scheme-attribute-type)))
+               `(define ,(symbol-append scheme-type
+                                        "-"
+                                        scheme-attribute)
                   (c-lambda
-                   (,scheme-type ,scheme-attr-type) void
+                   (,scheme-pointer-type) ,return-type
+                   ,(generic-string-append
+                     "___result" _voidstar " = "
+                     ampersand "(((" c-type  "*)___arg1_voidstar)->" c-attribute ");")))))))
+         #;
+         (mutator
+          (attribute-builder
+           (lambda (scheme-attribute
+               scheme-attribute-type
+               c-attribute
+               c-attribute-type
+               pointer?)
+             (let ((_voidstar (if pointer? "_voidstar" ""))
+                   (cast (if pointer?
+                             (generic-string-append "(" c-attribute-type "*)")
+                             ""))
+                   (dereference (if pointer? "*" "")))
+               `(define ,(symbol-append
+                          scheme-type "-" scheme-attribute "-set!")
+                  (c-lambda
+                   (,scheme-type ,scheme-attribute-type) void
                    ,(string-append
-                     "(*(" c-type-name "*)___arg1_voidstar)." c-attr-name
+                     "(*(" c-type "*)___arg1_voidstar)." c-attribute
                      " = " dereference cast "___arg2" _voidstar ";"))))))))
-      (append
-       `(begin
-          (c-define-type ,scheme-type (,struct-or-union ,c-type-name ,c-type))
-                                        ; Unmanaged version of structure.
-          (c-define-type ,(symbol-append unmanaged-prefix scheme-type)
-                         (,struct-or-union ,c-type-name ,c-type "ffimacro__leave_alone"))
-          (c-define-type
-           ,pointer-type
-           (pointer ,scheme-type ,pointer-type))
-          (c-define-type
-           ,(symbol-append managed-prefix pointer-type)
-           (pointer ,scheme-type ,pointer-type "ffimacro__free_foreign"))
-          (##define ,(symbol-append "make-" scheme-type)
-                                        ; Constructor.
-            (c-lambda
-             () ,scheme-type
-             ,(string-append "___result_voidstar = malloc(sizeof(" c-type-name "));")))
-          (##define (,(symbol-append scheme-type "?") x)
-                                        ; Type predicate.
-            (and (foreign? x) (memq (quote ,c-type) (foreign-tags x)) #t))
-          (##define (,(symbol-append scheme-type "-pointer?") x)
-                                        ; Pointer type predicate.
-            (and (foreign? x)
-                 (memq (quote ,pointer-type)
-                       (foreign-tags x))
-                 #t))
-          (##define (,(symbol-append scheme-type "-pointer") x)
-                                        ; Take pointer.
-            (let ((ret
-                   ((c-lambda
-                     (,scheme-type) ,pointer-type
-                     "___result_voidstar = ___arg1_voidstar;")
-                    x)))
-              (ffi:link x ret)
-              ret))
-          (##define (,(symbol-append "pointer->" scheme-type) x)
-                                        ; Pointer dereference
-            (let ((ret
-                   ((c-lambda
-                     (,pointer-type) ,(symbol-append unmanaged-prefix scheme-type)
-                     "___result_voidstar = ___arg1_voidstar;")
-                    x)))
-              (ffi:link x ret)
-              ret))
-          (##define ,(symbol-append "make-" scheme-type "-array")
-            (c-lambda
-             (int) ,(symbol-append managed-prefix pointer-type)
-             ,(string-append
-               "___result_voidstar = malloc(___arg1 * sizeof(" c-type-name "));")))
-          (##define (,(symbol-append scheme-type "-pointer-offset") p i)
-            (let ((ret
-                   ((c-lambda
-                     (,pointer-type int) ,pointer-type
-                     ,(string-append "___result_voidstar = (" c-type-name "*)___arg1_voidstar + ___arg2;"))
-                    p i)))
-              (ffi:link p ret)
-              ret)))
-       (map accessor fields)
-       (map mutator fields)))))
+    `(begin
+       ;; Type definitions
+       (c-define-type ,scheme-type (,struct-or-union ,c-type ,scheme-type))
+       (c-define-type ,(symbol-append scheme-type '*) ,scheme-pointer-type)
+       ;; Allocator
+       (define ,(symbol-append "alloc-" scheme-type)
+         (c-lambda (size-t) ,scheme-pointer-type
+                   ,(generic-string-append "___result_voidstar = malloc(sizeof(" c-type ") * ___arg1);")))
+       ;; Type predicate
+       (define (,(symbol-append scheme-type "?") x)
+         (and (foreign? x)
+              (memq ',scheme-type (foreign-tags x))
+              #t))
+       ;; Pointer type predicate
+       (define (,(symbol-append scheme-type "*?") x)
+         (and (foreign? x)
+              (memq ',(symbol-append scheme-type '*) (foreign-tags x))
+              #t))
+       ;; Pointer dereference
+       (define ,(symbol-append "*->" scheme-type)
+         (c-lambda (,scheme-pointer-type) ,scheme-type
+                   "___result_voidstar = ___arg1_voidstar;"))
+       ;; Take pointer
+       (define ,(symbol-append scheme-type "->*")
+         (c-lambda (,scheme-type) ,scheme-pointer-type
+                   "___result_voidstar = ___arg1_voidstar;"))
+       ;; Attribute accessors
+       ,@(map accessor fields)
+       ;; Attribute mutators
+       #;,@(map mutator fields)
+       )))
 
-(##define-macro
-  (c-struct . type.fields)
-  (c-native 'struct (car type.fields) (cdr type.fields)))
-
-(##define-macro
-  (c-union . type.fields)
-  (c-native 'union (car type.fields) (cdr type.fields)))
+(##define-macro (build-c-struct type #!rest fields)
+  (c-native 'struct type fields))
+(##define-macro (build-c-union type #!rest fields)
+  (c-native 'union type fields))
+(##define-macro (test-build-c-struct type #!rest fields)
+  (pp (c-native 'struct type fields)))
 
 ;;! Build a size-of value equivalent to the C operator
 ;; c-build-sizeof float -> sizeof-float
-
 (##define-macro (build-c-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
   `(define ,(symbol-append scheme-type '-size)
      ((c-lambda () size-t
@@ -283,13 +206,13 @@
                 ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
    `(define ,(symbol-append scheme-type '*-ref)
       (c-lambda ((pointer ,scheme-type) size-t) ,scheme-type
-                ,(generic-string-append "___result = ___arg1[___arg2];")))
+                "___result = ___arg1[___arg2];"))
    `(define ,(symbol-append scheme-type '*-set!)
       (c-lambda ((pointer ,scheme-type) size-t ,scheme-type) void
-                ,(generic-string-append "___arg1[___arg2] = ___arg3;")))
+                "___arg1[___arg2] = ___arg3;"))
    `(define ,(symbol-append '*-> scheme-type)
       (c-lambda ((pointer ,scheme-type #f)) ,scheme-type
-                ,(generic-string-append "___result = *___arg1;")))
+                "___result = *___arg1;"))
    (if scheme-vector
        `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
          (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
@@ -302,43 +225,9 @@
                  buf))))
        '())))
 
-;;; Automatic memory freeing macro
-
+;;! Automatic memory freeing macro
 ;; (##define-macro (with-alloc ?b ?e . ?rest)
 ;;   `(let ((,?b ,?e))
 ;;      (let ((ret (begin ,@?rest)))
 ;;        (free ,(car expr))
 ;;        ret)))
-
-
- 
-  
-(c-declare #<<c-declare-end
-
-#ifndef FFIMACRO
-#define FFIMACRO
-
-#include <malloc.h>
-
-___SCMOBJ ffimacro__leave_alone(void *p)
-{
-  return ___FIX(___NO_ERR);
-}
-
-___SCMOBJ ffimacro__free_foreign(void *p)
-{
-  if (p)
-    free(p);
-  return ___FIX(___NO_ERR);
-}
-
-#endif
-
-c-declare-end
-)
-
-;; (c-declare #<<c-declare-end
-;;            ___SCMOBJ ffimacro__leave_alone(void *p)  ;
-;;            ___SCMOBJ ffimacro__free_foreign(void *p) ;
-;; c-declare-end
-;; )
