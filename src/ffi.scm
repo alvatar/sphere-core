@@ -7,18 +7,6 @@
 
 (##include "../src/ffi-header.scm")
 
-;; (define ffi:references
-;;   (if (table? ffi:references)
-;;     ffi:references
-;;     (make-table weak-keys: #t weak-values: #f test: eq?)))
-
-;; (define ffi:link
-;;   (if (procedure? ffi:link)
-;;     ffi:link
-;;     (lambda (parent child)
-;;       (table-set! ffi:references child parent)
-;;       (make-will child (lambda (x) (table-set! ffi:references x))))))
-
 ;-------------------------------------------------------------------------------
 ; Gambit memory
 ;-------------------------------------------------------------------------------
@@ -40,19 +28,19 @@
 ;; terms of implementation, the data slot is stored immediately before the
 ;; first byte of the block.
 (define alloc-rc
-  (c-lambda (int) void*
+  (c-lambda (int) (pointer void #f)
             "___result_voidstar = ___EXT(___alloc_rc)(___arg1);"))
 
 ;;! ___release_rc
 ;; decrements the reference count and reclaims the block of memory when the
 ;; reference count reaches 0.  So ___alloc_rc and ___release_rc are drop-in
 ;; replacements for malloc and free (but you must not mix ___alloc_rc and free).
-(define release-rc
+(define release-rc!
   (c-lambda ((pointer void #f)) void "___release_rc"))
 
 ;;! ___addref_rc
 ;; increments the reference count.
-(define addref-rc
+(define addref-rc!
   (c-lambda ((pointer void #f)) void "___addref_rc"))
 
 ;;! ___set_data_rc(ptr, val)
@@ -86,7 +74,7 @@
   (c-lambda ((pointer void #f)) void "free"))
 
 ;-------------------------------------------------------------------------------
-; Memory operations
+; Memory operations and conversions
 ;-------------------------------------------------------------------------------
 
 ;;! offset
@@ -96,13 +84,17 @@
 
 ;;! Any pointer to void* casting
 (define *->void*
-  (c-lambda ((pointer void #f)) void*
+  (c-lambda ((pointer void #f)) (pointer void #f)
             "___result_voidstar = (void*)___arg1_voidstar;"))
 
 ;;! Integer to void* casting
 (define integer->void*
-  (c-lambda (unsigned-long-long) void*
+  (c-lambda (unsigned-long-long) (pointer void #f)
             "___result_voidstar = (void*)___arg1;"))
+
+(define ->string
+  (c-lambda ((pointer void #f)) char-string
+            "___result = ___arg1_voidstar;"))
 
 ;-------------------------------------------------------------------------------
 ; C arrays
@@ -110,46 +102,59 @@
 
 (c-declare "#include <stdint.h>")
 
-(build-c-sizeof unsigned-char c-type: "unsigned char")
-
-(build-c-sizeof unsigned-short c-type: "unsigned short")
-(build-c-sizeof short)
-(build-c-sizeof unsigned-long c-type: "unsigned long")
-(build-c-sizeof long)
-(build-c-sizeof float)
-(build-c-sizeof double)
+;;!! size_t
 (build-c-sizeof size-t c-type: "size_t")
 
 ;;!! char
-
 (build-c-sizeof char)
 (build-c-array-ffi char
                    scheme-vector: s8)
 
-(define char*->string
-  (c-lambda (char*) char-string
-            "___result = ___arg1_voidstar;"))
-
 ;;!! unsigned char
-
 (build-c-sizeof unsigned-char c-type: "unsigned char")
 (build-c-array-ffi unsigned-char
                    c-type: "unsigned char"
                    scheme-vector: u8)
 
-(define unsigned-char*->string
-  (c-lambda (unsigned-char*) char-string
-            "___result = ___arg1_voidstar;"))
+;;!! short
+(build-c-sizeof short)
+(build-c-array-ffi short
+                   scheme-vector: s16)
+
+;;!! unsigned short
+(build-c-sizeof unsigned-short c-type: "unsigned short")
+(build-c-array-ffi unsigned-short
+                   c-type: "unsigned short"
+                   scheme-vector: u16)
 
 ;;!! int
-
 (build-c-sizeof int)
 (build-c-array-ffi int
                    scheme-vector: s32)
 
-;;!! unsigned-int
-
+;;!! unsigned int
 (build-c-sizeof unsigned-int c-type: "unsigned int")
 (build-c-array-ffi unsigned-int
                    c-type: "unsigned int"
                    scheme-vector: u32)
+
+;;!! long
+(build-c-sizeof long)
+(build-c-array-ffi long
+                   scheme-vector: s64)
+
+;;!! unsigned int
+(build-c-sizeof unsigned-int c-type: "unsigned long")
+(build-c-array-ffi unsigned-long
+                   c-type: "unsigned long"
+                   scheme-vector: u64)
+
+;;!! float
+(build-c-sizeof float)
+(build-c-array-ffi float
+                   scheme-vector: f32)
+
+;;!! double
+(build-c-sizeof double)
+(build-c-array-ffi double
+                   scheme-vector: f32)

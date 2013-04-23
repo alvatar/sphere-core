@@ -14,7 +14,7 @@
 (define^ (symbol-append #!rest ol)
   (string->symbol (apply generic-string-append ol)))
 
-(define^ (build-defines #!rest define-blocks)
+(define^ (build-top-level-forms #!rest define-blocks)
   (cons 'begin
         (let recur ((ds define-blocks))
           (cond ((null? ds) '())
@@ -26,35 +26,109 @@
 ; Types
 ;-------------------------------------------------------------------------------
 
-(c-define-type void* (pointer void))
-(c-define-type bool* (pointer bool))
-(c-define-type short* (pointer short))
-(c-define-type unsigned-short* (pointer unsigned-short))
-(c-define-type int* (pointer int))
-(c-define-type unsigned-int* (pointer unsigned-int))
-(c-define-type long* (pointer long))
-(c-define-type unsigned-long* (pointer unsigned-long))
-(c-define-type long-long* (pointer long-long))
-(c-define-type unsigned-long-long* (pointer unsigned-long-long))
-(c-define-type float* (pointer float))
-(c-define-type double* (pointer double))
-(c-define-type char* (pointer char))
-(c-define-type char** (pointer char*))
-(c-define-type unsigned-char* (pointer unsigned-char))
-(c-define-type unsigned-char** (pointer unsigned-char*))
-(c-define-type int8* (pointer int8))
-(c-define-type unsigned-int8* (pointer unsigned-int8))
-(c-define-type int16* (pointer int16))
-(c-define-type unsigned-int16* (pointer unsigned-int16))
-(c-define-type int32* (pointer int32))
-(c-define-type unsigned-int32* (pointer unsigned-int32))
-(c-define-type int64* (pointer int64))
-(c-define-type unsigned-int64* (pointer unsigned-int64))
 (c-define-type size-t unsigned-long-long)
 
 ;-------------------------------------------------------------------------------
 ; FFI generation
 ;-------------------------------------------------------------------------------
+
+;; Defines the c-define-struct macro, which extends the Gambit FFI to
+;; interface to C structures.
+(define-macro (c-define-struct type . fields)
+  (define (sym . strs)
+    (string->symbol (apply string-append strs)))
+  (let* ((type-str
+          (symbol->string type))
+         (struct-type-str
+          (string-append "struct " type-str))
+         (struct-type*-str
+          (string-append struct-type-str "*"))
+         (release-type-str
+          (string-append "release_" type-str))
+         (type*
+          (sym type-str "*"))
+         (type*/nonnull
+          (sym type-str "*/nonnull"))
+         (type*/release-rc
+          (sym type-str "*/release-rc")))
+    (define (field-getter-setter field-spec)
+      (let* ((field (car field-spec))
+             (field-str (symbol->string field))
+             (field-type (cadr field-spec)))
+        (cond ((and (pair? field-type)
+                    (eq? (car field-type) 'array))
+               (let* ((elem-type
+                       (cadr field-type))
+                      (elem-type-str
+                       (symbol->string elem-type)))
+                 (if (table-ref
+                      c-define-struct-table
+                      elem-type
+                      #f)
+                     ;; array element is a struct =>
+                     ;; only generate a getter returning struct address
+                     `((define ,(sym type-str "-" field-str "-ref")
+                         (c-lambda (,type*/nonnull int)
+                                   ,(sym elem-type-str "*/nonnull")
+                                   ,(string-append "___result_voidstar = &___arg1->" field-str "[___arg2];"))))
+
+                     ;; array element is not a struct =>
+                     ;; generate a getter and a setter
+                     `((define ,(sym type-str "-" field-str "-ref")
+                         (c-lambda (,type*/nonnull int)
+                                   ,elem-type
+                                   ,(string-append "___result = ___arg1->" field-str "[___arg2];")))
+                       (define ,(sym type-str "-" field-str "-set!")
+                         (c-lambda (,type*/nonnull int ,elem-type)
+                                   void
+                                   ,(string-append "___arg1->" field-str "[___arg2] = ___arg3;")))))))
+              (else
+               `((define ,(sym type-str "-" field-str)
+                   (c-lambda (,type*/nonnull)
+                             ,field-type
+                             ,(string-append "___result = ___arg1->" field-str ";")))
+
+                 (define ,(sym type-str "-" field-str "-set!")
+                   (c-lambda (,type*/nonnull ,field-type)
+                             void
+                             ,(string-append "___arg1->" field-str " = ___arg2;"))))))))
+    (table-set! c-define-struct-table type #t) ;; remember it is a struct
+    (let ((expansion
+           `(begin
+              ;; Define the release function which is called when the
+              ;; object is no longer accessible from the Scheme world.
+              (c-declare
+               ,(string-append
+                 "static ___SCMOBJ " release-type-str "( void* ptr )\n"
+                 "{\n"
+                 "  ___EXT(___release_rc)( ptr );\n"
+                 "  return ___FIX(___NO_ERR);\n"
+                 "}\n"))
+              ;; Define the C types.
+              (c-define-type ,type (struct ,type-str))
+              (c-define-type ,type* (pointer ,type (,type*)))
+              (c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
+              (c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
+              ;; Define type allocator procedure.
+              (define ,(sym "alloc-" type-str)
+                (c-lambda ()
+                          ,type*/release-rc
+                          ,(string-append "___result_voidstar = ___EXT(___alloc_rc)( sizeof( " struct-type-str " ) );")))
+              ;; Define field getters and setters.
+              ,@(apply append (map field-getter-setter fields)))))
+      (if #t ;; change to #f if not debugging
+          (pp `(definition:
+                 (c-define-struct ,type ,@fields)
+                 expansion:
+                 ,expansion)))
+      expansion)))
+
+(define-macro (c-define-struct-initialize!)
+  ;; Define c-define-struct-table at macro expansion time.
+  (eval '(define c-define-struct-table (make-table)))
+  `(begin))
+
+(c-define-struct-initialize!)
 
 ;;! C constants generation macro
 ;; Creating the bindings in a simple C function makes for more compact
@@ -85,101 +159,7 @@
                 (interval 0 nb-names)
                 names)))))
 
-;;! Struct and union generation macro
-(define^ (c-native struct-or-union
-                   scheme-type
-                   fields
-                   #!key
-                   (c-type (symbol->string scheme-type)))
-  (let* ((scheme-pointer-type `(pointer ,scheme-type ,(symbol-append scheme-type '*)))
-         (attribute-builder
-          (lambda (fn)
-            (lambda (field)
-              (let ((process-arguments
-                     (lambda (field)
-                       (list (car field)    ; scheme-attribute
-                             (cadr field)   ; scheme-attribute-type
-                             (caddr field)  ; c-attribute
-                             (cadddr field) ; c-attribute-type
-                             (if (null? cddddr)
-                                 #f
-                                 (let ((pointer-arg (memq pointer?: field)))
-                                   (if pointer-arg (cadr field) #f)))))))
-                (apply fn (process-arguments field))))))
-         (accessor
-          (attribute-builder
-           (lambda (scheme-attribute
-               scheme-attribute-type
-               c-attribute
-               c-attribute-type
-               pointer?)
-             (let ((_voidstar (if pointer? "_voidstar" ""))
-                   (ampersand (if pointer? "&" ""))
-                   (return-type (if pointer?
-                                    `(pointer ,scheme-attribute-type ,(symbol-append scheme-attribute-type '*))
-                                    scheme-attribute-type)))
-               `(define ,(symbol-append scheme-type
-                                        "-"
-                                        scheme-attribute)
-                  (c-lambda
-                   (,scheme-pointer-type) ,return-type
-                   ,(generic-string-append
-                     "___result" _voidstar " = "
-                     ampersand "(((" c-type  "*)___arg1_voidstar)->" c-attribute ");")))))))
-         (mutator
-          (attribute-builder
-           (lambda (scheme-attribute
-               scheme-attribute-type
-               c-attribute
-               c-attribute-type
-               pointer?)
-             (let ((cast (if pointer?
-                             (generic-string-append "(" c-attribute-type "*)")
-                             ""))
-                   (dereference (if pointer? "*" "")))
-               `(define ,(symbol-append
-                          scheme-type "-" scheme-attribute "-set!")
-                  (c-lambda
-                   (,scheme-pointer-type ,scheme-attribute-type) void
-                   ,(string-append
-                     "(*(" c-type "*)___arg1_voidstar)." c-attribute " = ___arg2;"))))))))
-    `(begin
-       ;; Type definitions
-       (c-define-type ,scheme-type (,struct-or-union ,c-type ,scheme-type))
-       (c-define-type ,(symbol-append scheme-type '*) ,scheme-pointer-type)
-       ;; Allocator
-       (define ,(symbol-append "alloc-" scheme-type)
-         (c-lambda (size-t) ,scheme-pointer-type
-                   ,(generic-string-append "___result_voidstar = malloc(sizeof(" c-type ") * ___arg1);")))
-       ;; Type predicate
-       (define (,(symbol-append scheme-type "?") x)
-         (and (foreign? x)
-              (memq ',scheme-type (foreign-tags x))
-              #t))
-       ;; Pointer type predicate
-       (define (,(symbol-append scheme-type "*?") x)
-         (and (foreign? x)
-              (memq ',(symbol-append scheme-type '*) (foreign-tags x))
-              #t))
-       ;; Pointer dereference
-       (define ,(symbol-append "*->" scheme-type)
-         (c-lambda (,scheme-pointer-type) ,scheme-type
-                   "___result_voidstar = ___arg1_voidstar;"))
-       ;; Take pointer
-       (define ,(symbol-append scheme-type "->*")
-         (c-lambda (,scheme-type) ,scheme-pointer-type
-                   "___result_voidstar = ___arg1_voidstar;"))
-       ;; Attribute accessors
-       ,@(map accessor fields)
-       ;; Attribute mutators
-       ,@(map mutator fields))))
 
-(##define-macro (build-c-struct type #!rest fields)
-  (c-native 'struct type fields))
-(##define-macro (build-c-union type #!rest fields)
-  (c-native 'union type fields))
-(##define-macro (test-build-c-struct type #!rest fields)
-  (pp (c-native 'struct type fields)))
 
 ;;! Build a size-of value equivalent to the C operator
 ;; c-build-sizeof float -> sizeof-float
@@ -196,30 +176,77 @@
 ;; *->float*
 ;; f32vector->float*
 (##define-macro (build-c-array-ffi scheme-type #!key (c-type scheme-type) scheme-vector)
-  (build-defines
-   `(define ,(symbol-append 'alloc- scheme-type '*)
-      (c-lambda (size-t) (pointer ,scheme-type)
-                ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
-   `(define ,(symbol-append scheme-type '*-ref)
-      (c-lambda ((pointer ,scheme-type) size-t) ,scheme-type
-                "___result = ___arg1[___arg2];"))
-   `(define ,(symbol-append scheme-type '*-set!)
-      (c-lambda ((pointer ,scheme-type) size-t ,scheme-type) void
-                "___arg1[___arg2] = ___arg3;"))
-   `(define ,(symbol-append '*-> scheme-type)
-      (c-lambda ((pointer ,scheme-type #f)) ,scheme-type
-                "___result = *___arg1;"))
-   (if scheme-vector
-       `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
-         (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
-                (buf (,(symbol-append 'alloc- scheme-type '*) length)))
-           (let loop ((i 0))
-             (if (fx< i length)
-                 (begin
-                   (,(symbol-append scheme-type '*-set!) buf i (,(symbol-append scheme-vector 'vector-ref) vec i))
-                   (loop (fx+ i 1)))
-                 buf))))
-       '())))
+  (define (sym . strs)
+    (string->symbol (apply string-append strs)))
+  (define (scheme-name->c-name name)
+    (let* ((name-str (cond ((string? name) name)
+                           ((symbol? name) (symbol->string name))
+                           (else (object->string name))))
+           (new-name (string-copy name-str))
+           (name-length (string-length new-name)))
+      (let recur ((i 0))
+        (if (< i name-length)
+            (begin (if (char=? (string-ref new-name i) #\-)
+                       (string-set! new-name i #\_))
+                   (recur (+ i 1)))
+            new-name))))
+  (let ((release-type-str (string-append
+                           "_release"
+                           (scheme-name->c-name scheme-type)))
+        (type scheme-type)
+        (type*
+         (symbol-append scheme-type "*"))
+        (type*/nonnull
+         (symbol-append scheme-type "*/nonnull"))
+        (type*/release-rc
+         (symbol-append scheme-type "*/release-rc")))
+    (build-top-level-forms
+     `(c-declare
+       ,(string-append
+         "static ___SCMOBJ " release-type-str "( void* ptr )\n"
+         "{\n"
+         ;; " printf(\"GC called free()!\\n\");\n"
+         ;; "  ___EXT(___release_rc)( ptr );\n"
+         "  free( ptr );\n"
+         "  return ___FIX(___NO_ERR);\n"
+         "}\n"))
+     `(c-define-type ,type* (pointer ,type (,type*)))
+     `(c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
+     `(c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
+     ;; Alloc managed by Gambit's GC
+     `(define ,(symbol-append 'alloc- scheme-type '*/unmanaged)
+        (c-lambda (size-t)
+                  ,type*/nonnull
+                  ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+     ;; Alloc unmanaged by Gambit's GC
+     `(define ,(symbol-append 'alloc- scheme-type '*)
+        (c-lambda (size-t)
+                  ,type*/release-rc
+                  ;; ,(generic-string-append "___result_voidstar = ___EXT(___alloc_rc)(___arg1*sizeof(" c-type "));")
+                  ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+     `(define ,(symbol-append scheme-type '*-ref)
+        (c-lambda ((pointer ,scheme-type) size-t)
+                  ,scheme-type
+                  "___result = ___arg1[___arg2];"))
+     `(define ,(symbol-append scheme-type '*-set!)
+        (c-lambda ((pointer ,scheme-type) size-t ,scheme-type)
+                  void
+                  "___arg1[___arg2] = ___arg3;"))
+     `(define ,(symbol-append '*-> scheme-type)
+        (c-lambda ((pointer ,scheme-type #f))
+                  ,scheme-type
+                  "___result = *___arg1;"))
+     (if scheme-vector
+         `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
+            (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
+                   (buf (,(symbol-append 'alloc- scheme-type '*) length)))
+              (let loop ((i 0))
+                (if (fx< i length)
+                    (begin
+                      (,(symbol-append scheme-type '*-set!) buf i (,(symbol-append scheme-vector 'vector-ref) vec i))
+                      (loop (fx+ i 1)))
+                    buf))))
+         '()))))
 
 ;;! Automatic memory freeing macro
 ;; (##define-macro (with-alloc ?b ?e . ?rest)
