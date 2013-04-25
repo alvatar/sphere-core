@@ -22,6 +22,10 @@
                 (else (cons (car ds)
                             (recur (cdr ds))))))))
 
+
+(define^ (sym #!rest strs)
+    (string->symbol (apply string-append strs)))
+
 ;-------------------------------------------------------------------------------
 ; Types
 ;-------------------------------------------------------------------------------
@@ -32,19 +36,19 @@
 ; FFI generation
 ;-------------------------------------------------------------------------------
 
-;; Defines the c-define-struct macro, which extends the Gambit FFI to
-;; interface to C structures.
-(define-macro (c-define-struct type . fields)
-  (define (sym . strs)
-    (string->symbol (apply string-append strs)))
+(define^ (%%c-define-struct-or-union struct-or-union type fields)
   (let* ((type-str
           (symbol->string type))
          (struct-type-str
-          (string-append "struct " type-str))
+          (string-append (case struct-or-union
+                           ((struct) "struct ")
+                           ((union) "union ")
+                           (else (error "%%c-define-struct-or-union: first parameter must be 'struct or 'union")))
+                         type-str))
          (struct-type*-str
           (string-append struct-type-str "*"))
          (release-type-str
-          (string-append "release_" type-str))
+          (string-append "___release_" type-str))
          (type*
           (sym type-str "*"))
          (type*/nonnull
@@ -105,7 +109,7 @@
                  "  return ___FIX(___NO_ERR);\n"
                  "}\n"))
               ;; Define the C types.
-              (c-define-type ,type (struct ,type-str))
+              (c-define-type ,type (,struct-or-union ,type-str))
               (c-define-type ,type* (pointer ,type (,type*)))
               (c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
               (c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
@@ -116,12 +120,22 @@
                           ,(string-append "___result_voidstar = ___EXT(___alloc_rc)( sizeof( " struct-type-str " ) );")))
               ;; Define field getters and setters.
               ,@(apply append (map field-getter-setter fields)))))
-      (if #t ;; change to #f if not debugging
+      (if #f ;; #t for debugging
           (pp `(definition:
                  (c-define-struct ,type ,@fields)
                  expansion:
                  ,expansion)))
       expansion)))
+
+;; Defines the c-define-struct macro, which extends the Gambit FFI to
+;; interface to C structures.
+(define-macro (c-define-struct type . fields)
+  (%%c-define-struct-or-union 'struct type fields))
+
+;; Defines the c-define-union macro, which extends the Gambit FFI to
+;; interface to C structures.
+(define-macro (c-define-union type . fields)
+  (%%c-define-struct-or-union 'union type fields))
 
 (define-macro (c-define-struct-initialize!)
   ;; Define c-define-struct-table at macro expansion time.
@@ -133,7 +147,7 @@
 ;;! C constants generation macro
 ;; Creating the bindings in a simple C function makes for more compact
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
-(##define-macro (build-c-constants . names)
+(##define-macro (c-define-constants . names)
   (let ((nb-names (length names))
         (wrapper (gensym)))
     (letrec ((interval (lambda (lo hi)
@@ -159,11 +173,9 @@
                 (interval 0 nb-names)
                 names)))))
 
-
-
 ;;! Build a size-of value equivalent to the C operator
 ;; c-build-sizeof float -> sizeof-float
-(##define-macro (build-c-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
+(##define-macro (c-define-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
   `(define ,(symbol-append scheme-type '-size)
      ((c-lambda () size-t
                 ,(string-append "___result = sizeof(" c-type ");")))))
@@ -175,7 +187,7 @@
 ;; float*-set!
 ;; *->float*
 ;; f32vector->float*
-(##define-macro (build-c-array-ffi scheme-type #!key (c-type scheme-type) scheme-vector)
+(##define-macro (c-define-array scheme-type #!key (c-type scheme-type) scheme-vector)
   (define (sym . strs)
     (string->symbol (apply string-append strs)))
   (define (scheme-name->c-name name)
@@ -200,57 +212,57 @@
          (symbol-append scheme-type "*/nonnull"))
         (type*/release-rc
          (symbol-append scheme-type "*/release-rc")))
-    (build-top-level-forms
-     `(c-declare
-       ,(string-append
-         "static ___SCMOBJ " release-type-str "( void* ptr )\n"
-         "{\n"
-         ;; " printf(\"GC called free()!\\n\");\n"
-         ;; "  ___EXT(___release_rc)( ptr );\n"
-         "  free( ptr );\n"
-         "  return ___FIX(___NO_ERR);\n"
-         "}\n"))
-     `(c-define-type ,type* (pointer ,type (,type*)))
-     `(c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
-     `(c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
-     ;; Alloc managed by Gambit's GC
-     `(define ,(symbol-append 'alloc- scheme-type '*/unmanaged)
-        (c-lambda (size-t)
-                  ,type*/nonnull
-                  ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
-     ;; Alloc unmanaged by Gambit's GC
-     `(define ,(symbol-append 'alloc- scheme-type '*)
-        (c-lambda (size-t)
-                  ,type*/release-rc
-                  ;; ,(generic-string-append "___result_voidstar = ___EXT(___alloc_rc)(___arg1*sizeof(" c-type "));")
-                  ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
-     `(define ,(symbol-append scheme-type '*-ref)
-        (c-lambda ((pointer ,scheme-type) size-t)
-                  ,scheme-type
-                  "___result = ___arg1[___arg2];"))
-     `(define ,(symbol-append scheme-type '*-set!)
-        (c-lambda ((pointer ,scheme-type) size-t ,scheme-type)
-                  void
-                  "___arg1[___arg2] = ___arg3;"))
-     `(define ,(symbol-append '*-> scheme-type)
-        (c-lambda ((pointer ,scheme-type #f))
-                  ,scheme-type
-                  "___result = *___arg1;"))
-     (if scheme-vector
-         `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
-            (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
-                   (buf (,(symbol-append 'alloc- scheme-type '*) length)))
-              (let loop ((i 0))
-                (if (fx< i length)
-                    (begin
-                      (,(symbol-append scheme-type '*-set!) buf i (,(symbol-append scheme-vector 'vector-ref) vec i))
-                      (loop (fx+ i 1)))
-                    buf))))
-         '()))))
-
-;;! Automatic memory freeing macro
-;; (##define-macro (with-alloc ?b ?e . ?rest)
-;;   `(let ((,?b ,?e))
-;;      (let ((ret (begin ,@?rest)))
-;;        (free ,(car expr))
-;;        ret)))
+    (let ((expansion
+           (build-top-level-forms
+            `(c-declare
+              ,(string-append
+                "static ___SCMOBJ " release-type-str "( void* ptr )\n"
+                "{\n"
+                ;; " printf(\"GC called free()!\\n\");\n"
+                ;; "  ___EXT(___release_rc)( ptr );\n"
+                "  free( ptr );\n"
+                "  return ___FIX(___NO_ERR);\n"
+                "}\n"))
+            `(c-define-type ,type* (pointer ,type (,type*)))
+            `(c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
+            `(c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
+            ;; Alloc managed by Gambit's GC
+            `(define ,(symbol-append 'alloc- scheme-type '*/unmanaged)
+               (c-lambda (size-t)
+                         ,type*/nonnull
+                         ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+            ;; Alloc unmanaged by Gambit's GC
+            `(define ,(symbol-append 'alloc- scheme-type '*)
+               (c-lambda (size-t)
+                         ,type*/release-rc
+                         ;; ,(generic-string-append "___result_voidstar = ___EXT(___alloc_rc)(___arg1*sizeof(" c-type "));")
+                         ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+            `(define ,(symbol-append scheme-type '*-ref)
+               (c-lambda (,type*/nonnull size-t)
+                         ,scheme-type
+                         "___result = ___arg1[___arg2];"))
+            `(define ,(symbol-append scheme-type '*-set!)
+               (c-lambda (,type*/nonnull size-t ,scheme-type)
+                         void
+                         "___arg1[___arg2] = ___arg3;"))
+            `(define ,(symbol-append '*-> scheme-type)
+               (c-lambda (,type*/nonnull)
+                         ,scheme-type
+                         "___result = *___arg1;"))
+            (if scheme-vector
+                `(define (,(symbol-append scheme-vector 'vector-> scheme-type '*) vec)
+                   (let* ((length (,(symbol-append scheme-vector 'vector-length) vec))
+                          (buf (,(symbol-append 'alloc- scheme-type '*) length)))
+                     (let loop ((i 0))
+                       (if (fx< i length)
+                           (begin
+                             (,(symbol-append scheme-type '*-set!) buf i (,(symbol-append scheme-vector 'vector-ref) vec i))
+                             (loop (fx+ i 1)))
+                           buf))))
+                '()))))
+      (if #f ;; #t for debugging
+          (pp `(definition:
+                 (c-define-array scheme-type: ,scheme-type c-type: ,c-type scheme-vector: ,scheme-vector)
+                 expansion:
+                 ,expansion)))
+      expansion)))

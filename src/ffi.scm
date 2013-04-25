@@ -92,7 +92,7 @@
   (c-lambda (unsigned-long-long) (pointer void #f)
             "___result_voidstar = (void*)___arg1;"))
 
-(define ->string
+(define *->string
   (c-lambda ((pointer void #f)) char-string
             "___result = ___arg1_voidstar;"))
 
@@ -103,58 +103,58 @@
 (c-declare "#include <stdint.h>")
 
 ;;!! size_t
-(build-c-sizeof size-t c-type: "size_t")
+(c-define-sizeof size-t c-type: "size_t")
 
 ;;!! char
-(build-c-sizeof char)
-(build-c-array-ffi char
-                   scheme-vector: s8)
+(c-define-sizeof char)
+(c-define-array char
+                scheme-vector: s8)
 
 ;;!! unsigned char
-(build-c-sizeof unsigned-char c-type: "unsigned char")
-(build-c-array-ffi unsigned-char
-                   c-type: "unsigned char"
-                   scheme-vector: u8)
+(c-define-sizeof unsigned-char c-type: "unsigned char")
+(c-define-array unsigned-char
+                c-type: "unsigned char"
+                scheme-vector: u8)
 
 ;;!! short
-(build-c-sizeof short)
-(build-c-array-ffi short
-                   scheme-vector: s16)
+(c-define-sizeof short)
+(c-define-array short
+                scheme-vector: s16)
 
 ;;!! unsigned short
-(build-c-sizeof unsigned-short c-type: "unsigned short")
-(build-c-array-ffi unsigned-short
-                   c-type: "unsigned short"
-                   scheme-vector: u16)
+(c-define-sizeof unsigned-short c-type: "unsigned short")
+(c-define-array unsigned-short
+                c-type: "unsigned short"
+                scheme-vector: u16)
 
 ;;!! int
-(build-c-sizeof int)
-(build-c-array-ffi int
-                   scheme-vector: s32)
+(c-define-sizeof int)
+(c-define-array int
+                scheme-vector: s32)
 
 ;;!! unsigned int
-(build-c-sizeof unsigned-int c-type: "unsigned int")
-(build-c-array-ffi unsigned-int
-                   c-type: "unsigned int"
-                   scheme-vector: u32)
+(c-define-sizeof unsigned-int c-type: "unsigned int")
+(c-define-array unsigned-int
+                c-type: "unsigned int"
+                scheme-vector: u32)
 
 ;;!! long
-(build-c-sizeof long)
-(build-c-array-ffi long
-                   scheme-vector: s64)
+(c-define-sizeof long)
+(c-define-array long
+                scheme-vector: s64)
 
 ;;!! unsigned int
-(build-c-sizeof unsigned-int c-type: "unsigned long")
-(build-c-array-ffi unsigned-long
-                   c-type: "unsigned long"
-                   scheme-vector: u64)
+(c-define-sizeof unsigned-int c-type: "unsigned long")
+(c-define-array unsigned-long
+                c-type: "unsigned long"
+                scheme-vector: u64)
 
 ;;!! float
-(build-c-sizeof float)
-(build-c-array-ffi float
-                   scheme-vector: f32)
+(c-define-sizeof float)
+(c-define-array float
+                scheme-vector: f32)
 
 ;;!! double
-(build-c-sizeof double)
-(build-c-array-ffi double
-                   scheme-vector: f32)
+(c-define-sizeof double)
+(c-define-array double
+                scheme-vector: f32)
