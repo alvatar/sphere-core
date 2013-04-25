@@ -1,4 +1,4 @@
-;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro. All Rights Reserved.
+;;; Copyright (c) 2012 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
 ;-------------------------------------------------------------------------------
@@ -27,33 +27,33 @@
 ;; Scheme "data".  The reference count is initially 1 and the data is #f.  In
 ;; terms of implementation, the data slot is stored immediately before the
 ;; first byte of the block.
-(define alloc-rc
-  (c-lambda (int) (pointer void #f)
-            "___result_voidstar = ___EXT(___alloc_rc)(___arg1);"))
+;; (define alloc-rc
+;;   (c-lambda (int) (pointer void #f)
+;;             "___result_voidstar = ___EXT(___alloc_rc)(___arg1);"))
 
 ;;! ___release_rc
 ;; decrements the reference count and reclaims the block of memory when the
 ;; reference count reaches 0.  So ___alloc_rc and ___release_rc are drop-in
 ;; replacements for malloc and free (but you must not mix ___alloc_rc and free).
-(define release-rc!
-  (c-lambda ((pointer void #f)) void "___release_rc"))
+;; (define release-rc!
+;;   (c-lambda ((pointer void #f)) void "___release_rc"))
 
 ;;! ___addref_rc
 ;; increments the reference count.
-(define addref-rc!
-  (c-lambda ((pointer void #f)) void "___addref_rc"))
+;; (define addref-rc!
+;;   (c-lambda ((pointer void #f)) void "___addref_rc"))
 
 ;;! ___set_data_rc(ptr, val)
 ;; sets the data slot to val.  As long as the reference count is positive, the
 ;; GC will consider the data slot to be a root (in other words the data will
 ;; remain live and will not be reclaimed by the GC).
-(define set-data-rc!
-  (c-lambda ((pointer void #f) scheme-object) void "___set_data_rc"))
+;; (define set-data-rc!
+;;   (c-lambda ((pointer void #f) scheme-object) void "___set_data_rc"))
 
 ;;! ___data_rc(ptr)
 ;; returns the data slot.
-(define data-rc
-  (c-lambda ((pointer void #f)) scheme-object "___data_rc"))
+;; (define data-rc
+;;   (c-lambda ((pointer void #f)) scheme-object "___data_rc"))
 
 ;-------------------------------------------------------------------------------
 ; C memory
