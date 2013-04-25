@@ -1,5 +1,4 @@
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
-;;; Copyright (c) 2012 by Álvaro Castro Castilla / Estevo Castro. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
 (define^ (->string o)
