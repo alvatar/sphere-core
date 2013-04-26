@@ -117,6 +117,11 @@
                 (c-lambda ()
                           ,type*/release-rc
                           ,(string-append "___result_voidstar = ___EXT(___alloc_rc)( sizeof( " struct-type-str " ) );")))
+              ;; Dereference
+              (define ,(sym "*->" type-str)
+                (c-lambda (,type*/nonnull)
+                          ,type
+                          ,(string-append "___result_voidstar = (" type-str "*)___arg1;")))
               ;; Define field getters and setters.
               ,@(apply append (map field-getter-setter fields)))))
       (if #f ;; #t for debugging
@@ -179,7 +184,7 @@
      ((c-lambda () size-t
                 ,(string-append "___result = sizeof(" c-type ");")))))
 
-;;! Build FFI procedures for C type arrays
+;;! Build FFI procedures for C type arrays. Only for use with basic types, not structs.
 ;; (build-c-array-ffi float f32) ->
 ;; alloc-float*
 ;; float*-ref
