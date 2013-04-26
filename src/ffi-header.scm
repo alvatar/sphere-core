@@ -13,7 +13,7 @@
 (define^ (symbol-append #!rest ol)
   (string->symbol (apply generic-string-append ol)))
 
-(define^ (build-top-level-forms #!rest define-blocks)
+(define^ (begin-top-level-forms #!rest define-blocks)
   (cons 'begin
         (let recur ((ds define-blocks))
           (cond ((null? ds) '())
@@ -21,9 +21,21 @@
                 (else (cons (car ds)
                             (recur (cdr ds))))))))
 
-
 (define^ (sym #!rest strs)
     (string->symbol (apply string-append strs)))
+
+(define^ (scheme-name->c-name name)
+  (let* ((name-str (cond ((string? name) name)
+                         ((symbol? name) (symbol->string name))
+                         (else (object->string name))))
+         (new-name (string-copy name-str))
+         (name-length (string-length new-name)))
+    (let recur ((i 0))
+      (if (< i name-length)
+          (begin (if (char=? (string-ref new-name i) #\-)
+                     (string-set! new-name i #\_))
+                 (recur (+ i 1)))
+          new-name))))
 
 ;-------------------------------------------------------------------------------
 ; Types
@@ -35,25 +47,51 @@
 ; FFI generation
 ;-------------------------------------------------------------------------------
 
+;;! define types for structs, unions and arrays
+;; (c-define-type* (struct MyStruct))
+;; (c-define-type* (union MyUnion))
+;; (c-define-type* myType)
+(define-macro (c-define-type* type/struct/union)
+  (let* ((type (if (pair? type/struct/union)
+                   (cadr type/struct/union)
+                   type/struct/union))
+         (struct-or-union (if (pair? type/struct/union)
+                              (car type/struct/union)
+                              #f))
+         (type-str (symbol->string type))
+         (release-type-str (string-append "___release_" (scheme-name->c-name type-str)))
+         (type* (sym type-str "*"))
+         (type*/nonnull (sym type-str "*/nonnull"))
+         (type*/release-rc (sym type-str "*/release-rc")))
+    (let ((expansion
+           (begin-top-level-forms
+            (if struct-or-union
+                `(c-define-type ,type (,struct-or-union ,type-str))
+                '())
+            `(c-define-type ,type* (pointer ,type (,type*)))
+            `(c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
+            `(c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str)))))
+      (if #f ;; #t for debugging
+          (pp `(definition:
+                 (c-define-extended-type ,type)
+                 expansion:
+                 ,expansion)))
+      expansion)))
+
+;; Helper for define-c-struct and define-c-union
 (define^ (%%c-define-struct-or-union struct-or-union type fields)
-  (let* ((type-str
-          (symbol->string type))
+  (let* ((type-str (symbol->string type))
          (struct-type-str
           (string-append (case struct-or-union
                            ((struct) "struct ")
                            ((union) "union ")
                            (else (error "%%c-define-struct-or-union: first parameter must be 'struct or 'union")))
                          type-str))
-         (struct-type*-str
-          (string-append struct-type-str "*"))
-         (release-type-str
-          (string-append "___release_" type-str))
-         (type*
-          (sym type-str "*"))
-         (type*/nonnull
-          (sym type-str "*/nonnull"))
-         (type*/release-rc
-          (sym type-str "*/release-rc")))
+         (struct-type*-str (string-append struct-type-str "*"))
+         (release-type-str (string-append "___release_" type-str))
+         (type* (sym type-str "*"))
+         (type*/nonnull (sym type-str "*/nonnull"))
+         (type*/release-rc (sym type-str "*/release-rc")))
     (define (field-getter-setter field-spec)
       (let* ((field (car field-spec))
              (field-str (symbol->string field))
@@ -117,11 +155,6 @@
                  "  ___EXT(___release_rc)( ptr );\n"
                  "  return ___FIX(___NO_ERR);\n"
                  "}\n"))
-              ;; Define the C types.
-              (c-define-type ,type (,struct-or-union ,type-str))
-              (c-define-type ,type* (pointer ,type (,type*)))
-              (c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
-              (c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
               ;; Define type allocator procedure.
               (define ,(sym "alloc-" type-str)
                 (c-lambda ()
@@ -141,12 +174,12 @@
                  ,expansion)))
       expansion)))
 
-;; Defines the c-define-struct macro, which extends the Gambit FFI to
+;;! Defines the c-define-struct macro, which extends the Gambit FFI to
 ;; interface to C structures.
 (define-macro (c-define-struct type . fields)
   (%%c-define-struct-or-union 'struct type fields))
 
-;; Defines the c-define-union macro, which extends the Gambit FFI to
+;;! Defines the c-define-union macro, which extends the Gambit FFI to
 ;; interface to C structures.
 (define-macro (c-define-union type . fields)
   (%%c-define-struct-or-union 'union type fields))
@@ -155,13 +188,12 @@
   ;; Define c-define-struct-table at macro expansion time.
   (eval '(define c-define-struct-table (make-table)))
   `(begin))
-
 (c-define-struct-initialize!)
 
 ;;! C constants generation macro
 ;; Creating the bindings in a simple C function makes for more compact
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2012-February/005688.html
-(##define-macro (c-define-constants . names)
+(define-macro (c-define-constants . names)
   (let ((nb-names (length names))
         (wrapper (gensym)))
     (letrec ((interval (lambda (lo hi)
@@ -189,7 +221,7 @@
 
 ;;! Build a size-of value equivalent to the C operator
 ;; c-build-sizeof float -> sizeof-float
-(##define-macro (c-define-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
+(define-macro (c-define-sizeof scheme-type #!key (c-type (symbol->string scheme-type)))
   `(define ,(symbol-append scheme-type '-size)
      ((c-lambda () size-t
                 ,(string-append "___result = sizeof(" c-type ");")))))
@@ -201,24 +233,8 @@
 ;; float*-set!
 ;; *->float*
 ;; f32vector->float*
-(##define-macro (c-define-array scheme-type #!key (c-type scheme-type) scheme-vector)
-  (define (sym . strs)
-    (string->symbol (apply string-append strs)))
-  (define (scheme-name->c-name name)
-    (let* ((name-str (cond ((string? name) name)
-                           ((symbol? name) (symbol->string name))
-                           (else (object->string name))))
-           (new-name (string-copy name-str))
-           (name-length (string-length new-name)))
-      (let recur ((i 0))
-        (if (< i name-length)
-            (begin (if (char=? (string-ref new-name i) #\-)
-                       (string-set! new-name i #\_))
-                   (recur (+ i 1)))
-            new-name))))
-  (let ((release-type-str (string-append
-                           "_release"
-                           (scheme-name->c-name scheme-type)))
+(define-macro (c-define-array scheme-type #!key (c-type scheme-type) scheme-vector)
+  (let ((release-type-str (string-append  "___release_" (scheme-name->c-name scheme-type)))
         (type scheme-type)
         (type*
          (symbol-append scheme-type "*"))
@@ -227,7 +243,7 @@
         (type*/release-rc
          (symbol-append scheme-type "*/release-rc")))
     (let ((expansion
-           (build-top-level-forms
+           (begin-top-level-forms
             `(c-declare
               ,(string-append
                 "static ___SCMOBJ " release-type-str "( void* ptr )\n"
@@ -237,9 +253,6 @@
                 "  free( ptr );\n"
                 "  return ___FIX(___NO_ERR);\n"
                 "}\n"))
-            `(c-define-type ,type* (pointer ,type (,type*)))
-            `(c-define-type ,type*/nonnull (nonnull-pointer ,type (,type*)))
-            `(c-define-type ,type*/release-rc (nonnull-pointer ,type (,type*) ,release-type-str))
             ;; Alloc managed by Gambit's GC
             `(define ,(symbol-append 'alloc- scheme-type '*/unmanaged)
                (c-lambda (size-t)
