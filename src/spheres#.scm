@@ -652,10 +652,11 @@ fig.scm file"))
                      (cons (let ((first (car module)))
                              (if (keyword? first)
                                  first
-                                 (let ((str (apply string
-                                                   (string->list
-                                                    (symbol->string first)))))
-                                   (string-shrink! str (- (string-length str) 1))
+                                 (let* ((str (symbol->string first))
+                                        (str-len (string-length str)))
+                                   (if (not (char=? (string-ref str (- str-len 1)) #\:))
+                                       (error "Sphere names should end with ':'"))
+                                   (string-shrink! str (- str-len 1))                                   
                                    (string->keyword str))))
                            (cdr module)))))
     (%check-module module)
