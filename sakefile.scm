@@ -73,12 +73,12 @@
     testing))
 
 (define-task compile-stage-3 ()
-  (for-each (lambda (m) (sake:compile-c-to-o (sake:compile-to-c m compiler-options: '(debug)))) modules)
-  (for-each (lambda (m) (sake:compile-c-to-o (sake:compile-to-c m))) modules))
+  (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m compiler-options: '(debug)))) modules)
+  (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m))) modules))
 
 (define-task install-stage-3 ()
-  (for-each (lambda (m) (sake:install-compiled-module m versions: '(() (debug)))) modules)
-  (sake:install-sphere-to-system))
+  (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules)
+  (sake#install-sphere-to-system))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
   'stage-3)
@@ -86,13 +86,13 @@
 ;;;
 
 (define-task uninstall ()
-  (sake:uninstall-sphere-from-system)
+  (sake#uninstall-sphere-from-system)
   (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
   (delete-file "~~bin/sake"))
 
 (define-task test ()
-  (sake:test-all))
+  (sake#test-all))
 
 (define-task clean ()
-  (sake:default-clean))
+  (sake#default-clean))
