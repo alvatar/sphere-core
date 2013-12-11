@@ -78,7 +78,15 @@
 
 (define-task install-stage-3 ()
   (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules)
-  (sake#install-sphere-to-system))
+  (sake#install-sphere-to-system)
+  (call-with-output-file
+      (string-append (user-info-home (user-info (user-name))) "/.gambcini")
+    (lambda (f)
+      (pp '(let ((spheres-file "~~spheres/spheres#.scm"))
+             (if (file-exists? spheres-file)
+                 (eval `(include ,spheres-file))
+                 (println "spheres#.scm missing -- Did you install Core Sphere?")))
+          f))))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
   'stage-3)
@@ -89,6 +97,7 @@
   (sake#uninstall-sphere-from-system)
   (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
+  (delete-file (user-info-home (user-info (user-name))))
   (delete-file "~~bin/sake"))
 
 (define-task test ()
