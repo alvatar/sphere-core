@@ -39,6 +39,11 @@
 (define alexpander-module-system-path "~~spheres/core/lib/alexpander.o1")
 
 (define-task compile-stage-2 (init)
+  (println "Compiling Spheres...")
+  (gambit-compile-file
+   (string-append (current-source-directory) "spheres/spheres.scm")
+   output: (string-append (current-build-directory) "spheres")
+   options: "-exe")
   (println "Compiling Alexpander...")
   (shell-command "gsc -f -prelude '(declare (not safe))' -o lib/alexpander.o1 src/alexpander.scm"))
 
@@ -47,6 +52,8 @@
   (copy-file "src/prelude.scm" prelude-module-system-path)
   (copy-file "src/spheres#.scm" spheres-module-system-path)
   (make-directory "~~spheres/core/lib")
+  ;; Install Spheres program
+  (copy-file (string-append (current-build-directory) "spheres") "~~/bin/spheres")
   ;; Install compiled Alexpander if newer than source, otherwise remove from installation
   (let ((ofile "lib/alexpander.o1")
         (scmfile "src/alexpander.scm"))
