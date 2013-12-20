@@ -1,5 +1,6 @@
 # Installation #
 Clone the repository and run
+
     sh bootstrap
 
 # Prerequisites #
