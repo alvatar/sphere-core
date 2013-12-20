@@ -391,7 +391,7 @@
                                          (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t)
   (make-directory (%sphere-system-path sphere))
-  (copy-files '("config.scm")
+  (copy-files '("config.scm" "sakefile.scm")
               (%sphere-system-path sphere))
   (for-each (lambda (dir)
               (make-directory (string-append (%sphere-system-path sphere) dir))
