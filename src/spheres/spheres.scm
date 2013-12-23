@@ -73,7 +73,7 @@ Commands:
                           (if (eqv? (file-info-type (file-info full-path)) 'directory)
                               (begin (recur (directory-files (list path: full-path
                                                                    ignore-hidden: 'dot-and-dot-dot))
-                                            (string-append full-path "/"))
+                                            full-path)
                                      (delete-directory full-path)
                                      (recur (cdr files) path))
                               (begin

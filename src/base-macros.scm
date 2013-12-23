@@ -75,6 +75,65 @@
            iftrue
            iffalse)))))
 
+;;! Anaphoric if (unhygienic)
+;; Note: the caveat that it can't handle single symbol consequents
+;; (easy to fix... add two rules to the four argument part of %subst)
+;; .author pelpel
+;; origin: http://c2.com/cgi/wiki?DefineSyntax
+(define-syntax aif!!
+  (letrec-syntax
+      ((%reverse
+        (syntax-rules ()
+          ((_ () <result>) <result>)
+          ((_ (<hd> . <tl>) <result>)
+           (%reverse <tl> (<hd> . <result>)))))
+       (%subst  
+        (syntax-rules ()
+          ;; 1. Three argument form: substitute <new> for all occurrences of <old>
+          ;; in <form> 
+          ((_ <new> <old> <form>)
+           (letrec-syntax
+               ((f (syntax-rules (<old>)
+                     ;; (1) Substitution complete, reverse the result.
+                     ((_ () <result>) (%reverse <result> ()))
+                     ;; (2) recurse into sublists (deferred)
+                     ((_ ((<hd> . <tl>) . <rest>) <res>)
+                      (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
+                     ;; (3) These two rules does (substitute <new> <old> ls)
+                     ((_ (<old> . <tl>) <res>)
+                      (f <tl> (<new> . <res>)))
+                     ((_ (<hd> . <tl>) <res>)
+                      (f <tl> (<hd> . <res>))))))
+             (f <form> ())))
+          ;; 2. Four argument form: substitute <new> for all occurrences of <old> in
+          ;; <form> but those inside of sublists (<but> ...).  Useful for defining
+          ;; macros that can be nested.
+          ((_ <new> <old> <form> <but>)
+           (letrec-syntax
+               ((f (syntax-rules (<old> <but>)
+                     ((_ () <result>) (%reverse <result> ()))
+                     ;; (4) ignore (<but> ...)
+                     ((_ ((<but> . <tl>) . <rest>) <res>)
+                      (f <rest> ((<but> . <tl>) . <res>)))
+                     ((_ ((<hd> . <tl>) . <rest>) <res>)
+                      (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
+                     ((_ (<old> . <tl>) <res>)
+                      (f <tl> (<new> . <res>)))
+                     ((_ (<hd> . <tl>) <res>)
+                      (f <tl> (<hd> . <res>))))))
+             (f <form> ()))))))
+    (syntax-rules ()
+      ((_ <condition> <consequent>)
+       (let ((temp <condition>))
+         (if temp
+             (%subst temp it <consequent> aif))))
+      ((_ <condition> <consequent> <alternative>)
+       (let ((temp <condition>))
+         (if temp
+             (%subst temp it <consequent> aif)
+             <alternative>))))))
+
+
 ;;! when
 ;; R5RS standard states that an if with only one branch returns an unspecified
 ;; value if the test is false. This macro places an #f automatically
