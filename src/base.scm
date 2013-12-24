@@ -21,7 +21,7 @@
    ((null? object) 'null)
    ((eof-object? object) 'eof-object)
    ((keyword? object) 'keyword)
-   ((eq? object #!void) 'void)
+   ((eq? object (void)) 'void)
    (else 'unknown)))
 
 

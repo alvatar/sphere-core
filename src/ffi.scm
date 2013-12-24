@@ -1,15 +1,14 @@
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
-;-------------------------------------------------------------------------------
-; Code needed by FFI-generation macros
-;-------------------------------------------------------------------------------
+(declare (standard-bindings) (extended-bindings) (mostly-fixnum) (block))
+
 
 (##include "../src/ffi-header.scm")
 
-;-------------------------------------------------------------------------------
-; Gambit memory
-;-------------------------------------------------------------------------------
+;;-------------------------------------------------------------------------------
+
+;; Gambit memory
 
 ;; The C interface uses ___alloc_rc for all of the C structures that it allocates.
 ;; In particular, when a Scheme string is passed to a C function, the Scheme string
@@ -55,9 +54,78 @@
 ;; (define data-rc
 ;;   (c-lambda ((pointer void #f)) scheme-object "___data_rc"))
 
-;-------------------------------------------------------------------------------
-; C memory
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! C Types: readers/writers
+;;
+;; Use like this:
+;; (call-with-output-file
+;;      "f64test"
+;;    (lambda (port)
+;;      (write-f64 -1.5 port)
+;;      (write-f64 +inf.0 port)
+;;      (write-f64 3.1415926 port)))
+;;
+;; (call-with-input-file
+;;      "f64test"
+;;    (lambda (port)
+;;      (let* ((a (read-f64 port))
+;;             (b (read-f64 port))
+;;             (c (read-f64 port))
+;;             (d (read-f64 port)))
+;;        (pp (list a b c d)))))
+
+;;! u8vector reader/writer
+;; Already defined in Gambit
+
+;;! s8vector reader/writer
+(define-writer write-s8 s8vector)
+(define-reader read-s8 s8vector s8vector-subtype s8vector-ref 0)
+
+;;! u16vector reader/writer
+(define-writer write-u16 u16vector)
+(define-reader read-u16 u16vector u16vector-subtype u16vector-ref 0)
+
+;;! s16vector reader/writer
+(define-writer write-s16 s16vector)
+(define-reader read-s16 s16vector s16vector-subtype s16vector-ref 0)
+
+;;! u32vector reader/writer
+(define-writer write-u32 u32vector)
+(define-reader read-u32 u32vector u32vector-subtype u32vector-ref 0)
+
+;;! s32vector reader/writer
+(define-writer write-s32 s32vector)
+(define-reader read-s32 s32vector s32vector-subtype s32vector-ref 0)
+
+;;! u64vector reader/writer
+(define-writer write-u64 u64vector)
+(define-reader read-u64 u64vector u64vector-subtype u64vector-ref 0)
+
+;;! s64vector reader/writer
+(define-writer write-s64 s64vector)
+(define-reader read-s64 s64vector s64vector-subtype s64vector-ref 0)
+
+;;! f32vector reader/writer
+(define-writer write-f32 f32vector)
+(define-reader read-f32 f32vector f32vector-subtype f32vector-ref 0.0)
+
+;;! f64vector reader/writer
+(define-writer write-f64 f64vector)
+(define-reader read-f64 f64vector f64vector-subtype f64vector-ref 0.0)
+
+
+;;------------------------------------------------------------------------------
+
+;;!! FFI types serialization
+
+
+
+
+;;------------------------------------------------------------------------------
+
+;;!! C memory
 
 (c-declare "#include <malloc.h>")
 
@@ -73,9 +141,10 @@
 (define free
   (c-lambda ((pointer void #f)) void "free"))
 
-;-------------------------------------------------------------------------------
-; Memory operations and conversions
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! Memory operations and conversions
 
 ;;! offset
 (define *-offset
@@ -96,75 +165,77 @@
   (c-lambda ((pointer void #f)) char-string
             "___result = ___arg1_voidstar;"))
 
-;-------------------------------------------------------------------------------
-; C arrays
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;! C arrays
 
 (c-declare "#include <stdint.h>")
 
-;;!! size_t
+;;! size_t
 (c-define-sizeof size-t c-type: "size_t")
 
-;;!! char
+;;! char
 (c-define-type* char)
 (c-define-sizeof char)
 (c-define-array char
                 scheme-vector: s8)
 
-;;!! unsigned char
+;;! unsigned char
 (c-define-type* unsigned-char)
 (c-define-sizeof unsigned-char c-type: "unsigned char")
 (c-define-array unsigned-char
                 c-type: "unsigned char"
                 scheme-vector: u8)
 
-;;!! short
+;;! short
 (c-define-type* short)
 (c-define-sizeof short)
 (c-define-array short
                 scheme-vector: s16)
 
-;;!! unsigned short
+;;! unsigned short
 (c-define-type* unsigned-short)
 (c-define-sizeof unsigned-short c-type: "unsigned short")
 (c-define-array unsigned-short
                 c-type: "unsigned short"
                 scheme-vector: u16)
 
-;;!! int
+;;! int
 (c-define-type* int)
 (c-define-sizeof int)
 (c-define-array int
                 scheme-vector: s32)
 
-;;!! unsigned int
+;;! unsigned int
 (c-define-type* unsigned-int)
 (c-define-sizeof unsigned-int c-type: "unsigned int")
 (c-define-array unsigned-int
                 c-type: "unsigned int"
                 scheme-vector: u32)
 
-;;!! long
+;;! long
 (c-define-type* long)
 (c-define-sizeof long)
 (c-define-array long
                 scheme-vector: s64)
 
-;;!! unsigned long
+;;! unsigned long
 (c-define-type* unsigned-long)
 (c-define-sizeof unsigned-long c-type: "unsigned long")
 (c-define-array unsigned-long
                 c-type: "unsigned long"
                 scheme-vector: u64)
 
-;;!! float
+;;! float
 (c-define-type* float)
 (c-define-sizeof float)
 (c-define-array float
                 scheme-vector: f32)
 
-;;!! double
+;;! double
 (c-define-type* double)
 (c-define-sizeof double)
 (c-define-array double
                 scheme-vector: f32)
+

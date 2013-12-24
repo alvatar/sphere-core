@@ -1,6 +1,8 @@
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
+;;!! Basic utilities
+
 (define^ (->string o)
   (cond ((string? o) o)
         ((symbol? o) (symbol->string o))
@@ -77,15 +79,52 @@
          ((string? symbol-or-string) symbol-or-string)
          (else (error "schemify-name: expected symbol or string")))))
 
-;-------------------------------------------------------------------------------
-; Types
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! C Types
 
 (c-define-type size-t unsigned-long-long)
 
-;-------------------------------------------------------------------------------
-; FFI generation
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! C Types: readers/writers generation
+
+(define u8vector-subtype (##subtype (u8vector)))
+(define s8vector-subtype (##subtype (s8vector)))
+(define u16vector-subtype (##subtype (u16vector)))
+(define s16vector-subtype (##subtype (s16vector)))
+(define u32vector-subtype (##subtype (u32vector)))
+(define s32vector-subtype (##subtype (s32vector)))
+(define u64vector-subtype (##subtype (u64vector)))
+(define s64vector-subtype (##subtype (s64vector)))
+(define f32vector-subtype (##subtype (f32vector)))
+(define f64vector-subtype (##subtype (f64vector)))
+
+;;! Macros for defining readers and writers.
+;; .author Marco Benelli
+;; ref: https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-June/003671.html
+(define-macro (define-writer name vtype)
+  `(define (,name x #!optional (port (current-output-port)))
+     (let ((v (,vtype x)))
+       (##subtype-set! v u8vector-subtype)
+       (write-subu8vector v 0 (u8vector-length v) port))))
+
+(define-macro (define-reader name vtype vsubtype vtype-ref init)
+  `(define (,name #!optional (port (current-input-port)))
+     (let ((v (,vtype ,init)))
+       (##subtype-set! v u8vector-subtype)
+       (let ((n (read-subu8vector v 0 (u8vector-length v) port)))
+         (if (= n (u8vector-length v))
+             (begin
+               (##subtype-set! v ,vsubtype)
+               (,vtype-ref v 0))
+             #!eof)))))
+
+;;------------------------------------------------------------------------------
+
+;;!! FFI generation
 
 ;;! define types for structs, unions and arrays
 ;; (c-define-type* (struct MyStruct))
@@ -333,3 +372,4 @@
                  expansion:
                  ,expansion)))
       expansion)))
+
