@@ -76,7 +76,8 @@
 ;;; Stage 3
 
 (define modules
-  '(ffi
+  '(base
+    ffi
     testing))
 
 (define-task compile-stage-3 ()

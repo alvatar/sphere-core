@@ -24,6 +24,7 @@
 (define^ (sym #!rest strs)
     (string->symbol (apply string-append strs)))
 
+;;! Turn a scheme-name into a c_name, simply changing the - to _
 (define^ (scheme-name->c-name name)
   (let* ((name-str (cond ((string? name) name)
                          ((symbol? name) (symbol->string name))
@@ -36,6 +37,45 @@
                      (string-set! new-name i #\_))
                  (recur (+ i 1)))
           new-name))))
+
+;;! Schemify a name: turn-it-into-a-scheme-name
+;; .author Fred LeMaster
+(define^ (schemify-name symbol-or-string)
+  ((lambda (str)
+     (letrec
+         ((str-length (string-length str))
+          (case-changed?
+           (lambda (i)
+             (let ((h (- i 1)))
+               (cond ((< h 0) #f)
+                     ((and (char-lower-case? (string-ref str h))
+                           (char-upper-case? (string-ref str i)))
+                      #t)
+                     (else #f)))))
+          (char-loop
+           (lambda (i out)
+             (cond ((>= i str-length) out)
+                   ((char=? (string-ref str i) #\_)
+                    (char-loop (+ i 1) (cons #\- out)))
+                   ((and (char=? (string-ref str i) #\:)
+                         (< (+ i 1) str-length)
+                         (char=? (string-ref str (+ i 1)) #\:))
+                    (char-loop (+ i 2) (cons #\- out)))
+                   ((case-changed? i)
+                    (char-loop (+ i 1)
+                               (cons (char-downcase
+                                      (string-ref str i))
+                                     (cons #\-
+                                           out))))
+                   (else (char-loop (+ i 1)
+                                    (cons
+                                     (char-downcase
+                                      (string-ref str i))
+                                     out)))))))
+       (list->string (reverse (char-loop 0 '())))))
+   (cond ((symbol? symbol-or-string) (symbol->string symbol-or-string))
+         ((string? symbol-or-string) symbol-or-string)
+         (else (error "schemify-name: expected symbol or string")))))
 
 ;-------------------------------------------------------------------------------
 ; Types
