@@ -122,11 +122,13 @@
                (,vtype-ref v 0))
              #!eof)))))
 
+
 ;;------------------------------------------------------------------------------
 
 ;;!! FFI generation
 
 ;;! define types for structs, unions and arrays
+;; .author Álvaro Castro-Castilla, based on code by Estevo Castro
 ;; (c-define-type* (struct MyStruct))
 ;; (c-define-type* (union MyUnion))
 ;; (c-define-type* myType)
