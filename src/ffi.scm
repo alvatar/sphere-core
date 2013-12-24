@@ -120,7 +120,91 @@
 
 ;;!! FFI types serialization
 
+;;! Adds ability to properly serialize FFI types on (write) and properly deserialize them on (read).
+;; .author Mikael More. MIT License.
+;; ref: https://mercure.iro.umontreal.ca/pipermail/gambit-list/2013-March/006510.html
+;;
+;; Usage:
+;; (ffi-write-transformer-add!
+;;  'name-of-your-ffi-type  
+;;  (lambda (v) `(name-of-constructor-procedure-to-create-an-instance-of-this-ffi-type
+;;                [ arguments needed to constructor to produce an instance exactly like
+;;                the one in the v variable ])))
+;; Example:
+;;
+;; (c-declare #<<end-of-c-declare
+;; #include <stdlib.h>
+;; typedef struct { int x, y; } point;
+;; point *make_point( int x, int y ) {
+;;   point *p = ___CAST(point*, malloc(sizeof(point)));
+;;   p->x = x;
+;;   p->y = y;
+;;   return p;
+;; }
+;; int point_x( point* p ) { return p->x; }
+;; int point_y( point* p ) { return p->y; }
+;; end-of-c-declare
+;; )
+;;
+;; (c-define-type point "point")
+;; (c-define-type point* (pointer point))
+;; (define make-point (c-lambda (int int) point* "make_point"))
+;; (define point-x (c-lambda (point*) int "point_x"))
+;; (define point-y (c-lambda (point*) int "point_y"))
+;;
+;; (ffi-write-transformer-add! 'point* (lambda (v) `(make-point ,(point-x v) ,(point-y v))))
+;; REPL will show:
+;; #.(make-point 2 1)
+;; Instead of
+;; #<point* #2 0x1160a90>
 
+;; Serialize:
+;; (object->string (make-point 3 4)) 
+;; Deserialize:
+;; (string->object "#.(make-point 2 1)")
+
+(define *ffi-writer-transformers* (make-table test: eq?))
+(define *writer-default* #f)
+
+(define (ffi-write-transformer-add! type serializer-proc)
+  (table-set! *ffi-writer-transformers* type serializer-proc))
+
+(define (%%sexp-ext:wr we obj)
+  (if (##foreign? obj)
+      (let* ((name (let ((v (foreign-tags obj)))
+                     (and (pair? v) (car v))))
+             (transformer (table-ref *ffi-writer-transformers* name #f)))
+        (if transformer
+            (let ((transformed-to (transformer obj)))
+              (##wr-str we "#.")
+              ;; (##wr-pair we transformed-to) - transformed-to may be sth else for instance a symbol
+              ;; so instead go with the universal:
+              (*writer-default* we transformed-to))
+            (##wr-foreign we obj)))
+      (*writer-default* we obj)))
+
+;;! Initialize FFI serialization extension
+(define (%%sexp-ext-install!)
+  (and (not (eq? *writer-default* ##wr))
+       (begin
+         (set! *writer-default* ##wr)
+         (set! ##wr %%sexp-ext:wr)
+         (let* ((port (repl-input-port))
+                (rt (input-port-readtable port)))
+           ;; (##readtable-char-sharp-handler-set! rt #\< sexp-ext:read-sharp-less)
+           (input-port-readtable-set! port (readtable-eval-allowed?-set rt #t))
+           (void)))))
+;;! Call to initialize FFI serialization extension
+(%%sexp-ext-install!)
+
+;;! Object from string
+(define (string->object s)
+  (call-with-input-string
+   s
+   (lambda (port)
+     (input-port-readtable-set!
+      port (readtable-eval-allowed?-set (input-port-readtable port) #t))
+     (read port))))
 
 
 ;;------------------------------------------------------------------------------
