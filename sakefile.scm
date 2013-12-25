@@ -109,7 +109,7 @@
   (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
-  'stage-3)
+  (sake#install-sphere-to-system))
 
 ;;; General tasks
 
@@ -119,12 +119,7 @@
 (define-task clean ()
   (sake#default-clean))
 
-;;; Manual system installation
-
-(define-task system-install ()
-  (sake#install-sphere-to-system))
-
-(define-task system-uninstall ()
+(define-task uninstall ()
   (sake#uninstall-sphere-from-system)
   (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
