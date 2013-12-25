@@ -29,7 +29,7 @@
 (define (classify-pair pair environment history)
   (receive (operator operator-history)
            (classify-subform car-selector (car pair) environment history)
-    (if (keyword? operator)
+    (if (riaxpander-keyword? operator)
         (classify/keyword operator pair environment history)
         (classify-combination operator operator-history
                               pair environment history))))
@@ -64,7 +64,7 @@
           (classify form*
                     environment*
                     (history/replace-reduction history form* environment*))))))
-
+
 (define (classify/keyword keyword form environment history)
   (let ((name (keyword/name keyword))
         (denotation (keyword/denotation keyword)))
@@ -160,7 +160,7 @@
   (classify-subforms* classify-location selector forms environment history))
 
 (define classify-keyword
-  (guarded-classifier (lambda (classification) (keyword? classification))
+  (guarded-classifier (lambda (classification) (riaxpander-keyword? classification))
                      "Non-keyword in keyword context:"))
 
 (define (classify-subkeyword selector form environment history)
@@ -168,7 +168,7 @@
 
 (define (classify-subkeywords selector forms environment history)
   (classify-subforms* classify-keyword selector forms environment history))
-
+
 ;;;; Temporary Classifiers
 
 ;;; These must be extremely careful only to generate aliases for
@@ -477,7 +477,7 @@
                  (lambda ()
                    (classify-subform form-selector form environment history))))
        (receive (classification history) (classifier)
-         (cond ((keyword? classification)
+         (cond ((riaxpander-keyword? classification)
                 (keyword-binding name definition-environment classification))
                ((expression? classification)
                 (variable-binding name definition-environment

@@ -1,5 +1,3 @@
-(define gambit-keyword? keyword?)
-
 ;;; I'm not really sure what I'm doing here, but this looks vaguely
 ;;; plausible.
 
@@ -19,7 +17,7 @@
 ;  close-syntax
 ;  close-syntax*
 ;  ))
-
+
 (##declare
   (standard-bindings)
 ;  (extended-bindings)

@@ -399,7 +399,7 @@
       (char? datum)
       (number? datum)
       (string? datum)
-      (gambit-keyword? datum)
+      (keyword? datum)
       (memq datum
             '(
               #!eof         ;ARGH!  What *stupid* lossage.

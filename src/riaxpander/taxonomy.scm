@@ -14,7 +14,7 @@
 
 (define-record-type <keyword>
     (make-keyword name denotation)
-    keyword?
+    riaxpander-keyword?
   (name keyword/name)
   (denotation keyword/denotation))
 
@@ -49,7 +49,7 @@
   (or (%expression? object)
       (location? object)
       (sequence? object)))
-
+
 ;;;; Sequences and Definitions
 
 ;;; Sequences suffer from a split personality disorder: they're not
