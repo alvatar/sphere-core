@@ -1,22 +1,36 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Sphere (module system)
 
-(let ((ofile "~~spheres/core/lib/alexpander.o1")
-      (scmfile "~~spheres/core/src/alexpander.scm"))
-  (with-exception-catcher
-   (lambda (e)
-     (if (unbound-global-exception? e)
-         (if (file-exists? ofile)
-             (load ofile)
-             (if (file-exists? scmfile)
-                 (begin (println "--- Loading source version of Alexpander")
-                        (load scmfile))
-                 (load "src/alexpander")))))
-   (lambda () ##current-expander)))
-(define ##current-expander 'alexpander)
+;; (let ((ofile "~~spheres/core/lib/alexpander.o1")
+;;       (scmfile "~~spheres/core/src/riaxpander/riaxpander-gambit.scm"))
+;;   (with-exception-catcher
+;;    (lambda (e)
+;;      (if (unbound-global-exception? e)
+;;          (if (file-exists? ofile)
+;;              (load ofile)
+;;              (if (file-exists? scmfile)
+;;                  (begin (println "--- Loading source version of Alexpander")
+;;                         (load scmfile))
+;;                  (load "src/alexpander")))))
+;;    (lambda () ##current-expander)))
+;; (define ##current-expander 'alexpander)
 
 
-
+(if (file-exists? "~~/spheres/core/src/riaxpander/")
+    (begin
+      (eval '(##begin (##include "~~/spheres/core/src/riaxpander/utils.scm")
+                      (##include "~~/spheres/core/src/riaxpander/history.scm")
+                      (##include "~~/spheres/core/src/riaxpander/closure.scm")
+                      (##include "~~/spheres/core/src/riaxpander/denotation.scm")
+                      (##include "~~/spheres/core/src/riaxpander/environment.scm")
+                      (##include "~~/spheres/core/src/riaxpander/transform.scm")
+                      (##include "~~/spheres/core/src/riaxpander/taxonomy.scm")
+                      (##include "~~/spheres/core/src/riaxpander/classify.scm")
+                      (##include "~~/spheres/core/src/riaxpander/standard.scm")
+                      (##include "~~/spheres/core/src/riaxpander/synrules.scm")
+                      (##include "~~/spheres/core/src/riaxpander/gambit.scm")))
+      (riaxpander:install))
+    (println "RIAXPANDER HAS NOT BEEN LOADED"))
 
 (include "prelude.scm")
 

@@ -50,7 +50,7 @@
 (define prelude-module-system-path "~~spheres/prelude.scm")
 (define spheres-module-system-path "~~spheres/spheres#.scm")
 ;;(define alexpander-module-system-path "~~spheres/core/lib/alexpander.o1")
-(define riaxpander-module-system-path "~~spheres/core/lib/riaxpander/riaxpander-gambit.scm")
+(define riaxpander-module-system-path "~~spheres/core/src/riaxpander/riaxpander-gambit.scm")
 
 (define-task compile-stage-2 (init)
   ;(println "Compiling Alexpander...")
@@ -69,6 +69,15 @@
                        test: (ends-with? ".scm")
                        recursive: #t)
               "~~spheres/core/src/riaxpander")
+  ;; Create .gambcini
+  (call-with-output-file
+      (string-append (user-info-home (user-info (user-name))) "/.gambcini")
+    (lambda (f)
+      (pp '(let ((spheres-file "~~spheres/spheres#.scm"))
+             (if (file-exists? spheres-file)
+                 (eval `(include ,spheres-file))
+                 (println "spheres#.scm missing -- Did you install Core Sphere?")))
+          f)))
   ;; Install compiled Alexpander if newer than source, otherwise remove from installation
   #;
   (let ((ofile "lib/alexpander.o1")
@@ -101,15 +110,7 @@
   (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m))) modules))
 
 (define-task install-stage-3 ()
-  (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules)
-  (call-with-output-file
-      (string-append (user-info-home (user-info (user-name))) "/.gambcini")
-    (lambda (f)
-      (pp '(let ((spheres-file "~~spheres/spheres#.scm"))
-             (if (file-exists? spheres-file)
-                 (eval `(include ,spheres-file))
-                 (println "spheres#.scm missing -- Did you install Core Sphere?")))
-          f))))
+  (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
   'stage-3)
@@ -122,7 +123,9 @@
   (delete-file spheres-module-system-path)
   (delete-file (string-append (user-info-home (user-info (user-name))) "/.gambcini"))
   (delete-file "~~bin/sake")
-  (delete-file "~~bin/spheres"))
+  (delete-file "~~bin/spheres")
+  (delete-file "~~/#spheres")
+  (delete-file "~~/prelude.scm"))
 
 (define-task test ()
   (sake#test-all))
