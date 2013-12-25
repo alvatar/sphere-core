@@ -100,7 +100,7 @@
 
 
 
-(##define (gambit-eval-here code #!key (flags-string "") (verbose #f))
+(##define (gambit-eval-here code #!key (flags-string "") (load-spheres #f) (verbose #f))
   ;; This is a hack transforming all ' into ` since they work in all cases and makes
   ;; life easier when passed as a string with ' delimiters to bash
   (let ((quotes->semiquotes
@@ -114,14 +114,17 @@
                          (string-set! transformed n #\`))
                      (recur (+ n 1)))
                    transformed))))))
-    (let ((code-string (quotes->semiquotes
+    (let* ((code-string (quotes->semiquotes
                         (object->string (cons 'begin
-                                              (cons load-spheres-code
-                                                    code))))))
+                                              (if load-spheres
+                                                  (cons load-spheres-code
+                                                        code)
+                                                  code)))))
+           (command-string
+            (string-append (gambit-compiler) " " flags-string " -e '" code-string "'")))
       (and verbose
            (begin (info "sake eval: ") (pp code)))
-      (shell-command
-       (string-append (gambit-compiler) " -f " flags-string " -e '" code-string "'")))))
+      (shell-command command-string))))
 
 ;; (##define (gambit-eval code-string)
 ;;   (info "eval: " code-string)

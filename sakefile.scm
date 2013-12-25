@@ -1,14 +1,10 @@
-#;(with-exception-catcher
- (lambda (e)
-   (if (unbound-global-exception? e)
-       (begin (info/color 'brown "Bootstrapping Scheme Spheres")
-              (load "src/alexpander.scm"))))
- (lambda () ##current-expander))
 (info/color 'brown "Bootstrapping Scheme Spheres")
 (include "src/spheres#.scm")
 (include "src/sake/extensions.scm")
 
 ;;; Stage 1: Sake and Spheres program
+
+(define sphere-path "~~spheres/core/")
 
 (define-task init ()
   (make-directory (current-build-directory))
@@ -61,7 +57,6 @@
   ;; Install prelude and spheres# directly in the spheres directory
   (copy-file "src/prelude.scm" prelude-module-system-path)
   (copy-file "src/spheres#.scm" spheres-module-system-path)
-  (make-directory "~~spheres/core/lib")
   ;; Install Riaxpander files
   (info/color 'green "Installing Macro expander")
   (make-directory "~~spheres/core/src/riaxpander")
@@ -110,14 +105,26 @@
   (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m))) modules))
 
 (define-task install-stage-3 ()
+  (make-directory "~~spheres/core/lib")
   (for-each (lambda (m) (sake#install-compiled-module m versions: '(() (debug)))) modules))
 
 (define-task stage-3 (compile-stage-3 install-stage-3)
   'stage-3)
 
-;;; Uninstall
+;;; General tasks
 
-(define-task uninstall ()
+(define-task test ()
+  (sake#test-all))
+
+(define-task clean ()
+  (sake#default-clean))
+
+;;; Manual system installation
+
+(define-task system-install ()
+  (sake#install-sphere-to-system))
+
+(define-task system-uninstall ()
   (sake#uninstall-sphere-from-system)
   (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
@@ -126,10 +133,4 @@
   (delete-file "~~bin/spheres")
   (delete-file "~~/#spheres")
   (delete-file "~~/prelude.scm"))
-
-(define-task test ()
-  (sake#test-all))
-
-(define-task clean ()
-  (sake#default-clean))
 

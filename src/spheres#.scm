@@ -1,21 +1,6 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Sphere (module system)
 
-;; (let ((ofile "~~spheres/core/lib/alexpander.o1")
-;;       (scmfile "~~spheres/core/src/riaxpander/riaxpander-gambit.scm"))
-;;   (with-exception-catcher
-;;    (lambda (e)
-;;      (if (unbound-global-exception? e)
-;;          (if (file-exists? ofile)
-;;              (load ofile)
-;;              (if (file-exists? scmfile)
-;;                  (begin (println "--- Loading source version of Alexpander")
-;;                         (load scmfile))
-;;                  (load "src/alexpander")))))
-;;    (lambda () ##current-expander)))
-;; (define ##current-expander 'alexpander)
-
-
 (if (file-exists? "~~/spheres/core/src/riaxpander/")
     (begin
       (eval '(##begin (##include "~~/spheres/core/src/riaxpander/utils.scm")
@@ -544,14 +529,14 @@ fig.scm file"))
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
-                        (##alexpander-include include-file))))
+                        (riaxpander:include include-file))))
                 (begin
                   (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
-                        (##alexpander-include (%module-filename-scm module))))))))))
+                        (riaxpander:include (%module-filename-scm module))))))))))
   (set!
    ##include-module-and-dependencies
    (lambda (root-module options)
@@ -572,7 +557,7 @@ fig.scm file"))
               (let ((header-module (%module-header module))
                     (macros-module (%module-macros module)))
                 (if header-module
-                    (eval `(##alexpander-include ,(string-append (%module-path-src header-module)
+                    (eval `(riaxpander:include ,(string-append (%module-path-src header-module)
                                                                  (%module-filename-scm header-module)))))
                 (if includes
                     (for-each (lambda (m) (include-single-module m '(verbose)))
@@ -590,7 +575,7 @@ fig.scm file"))
                                         ;(pp file-o)
                              file-o)
                             ((file-exists? file-scm)
-                             (##alexpander-include file-scm)
+                             (riaxpander:include file-scm)
                              (if verbose
                                  (display (string-append "-- loading source -- " (object->string module) "\n")))
                              file-scm)
@@ -613,24 +598,32 @@ fig.scm file"))
 
 ;;! import-include macro
 (##define-macro (##import-include . module)
-  (if (string? (car module))
-      ;; If filename given, just include it (doesn't register as loaded module)
-      (eval `(##alexpander-include ,(car module)))
-      ;; oterwise act normally
-      (let ((module (if (null? (cdr module))
-                        (car module)
-                        ;; If it defines the sphere, process the sphere name to make it a keyword
-                        (cons (let ((first (car module)))
-                                (if (keyword? first)
-                                    first
-                                    (let ((str (apply string
-                                                      (string->list
-                                                       (symbol->string first)))))
-                                      (string-shrink! str (- (string-length str) 1))
-                                      (string->keyword str))))
-                              (cdr module)))))
-        (%check-module module)
-        `(##include-module-and-dependencies ',module '(verbose)))))
+  (cond
+   ((string? (car module))
+    ;; If filename given, just include it (doesn't register as loaded module)
+    (eval `(riaxpander:include ,(car module))))
+   ;; It comes quoted (it's a monster)
+   ((eq? 'quote (caar module))
+    (let ((module (cadar module)))
+      (%check-module module)
+      `(##include-module-and-dependencies ',module '(verbose))))
+   ;; oterwise act normally
+   (else
+    (let ((module (if (null? (cdr module))
+                      (car module)
+                      ;; If it defines the sphere, process the sphere name to make it a keyword
+                      (cons (let ((first (car module)))
+                              (if (keyword? first)
+                                  first
+                                  (let ((str (apply string
+                                                    (string->list
+                                                     (symbol->string first)))))
+                                    (string-shrink! str (- (string-length str) 1))
+                                    (string->keyword str))))
+                            (cdr module)))))
+      (pp module)
+      (%check-module module)
+      `(##include-module-and-dependencies ',module '(verbose))))))
 
 ;;; Load only module dependencies, do not load the module
 ;; (##define-macro (##load-module-dependencies . module)

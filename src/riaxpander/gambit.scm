@@ -1,26 +1,25 @@
 ;;;; Sourcification and Desourcification
 
+(define riaxpander:source-mapping (make-parameter #f))
 
-;; (define riaxpander:source-mapping (make-parameter #f))
-
-;; (define (riaxpander:desourcify form)
-;;   (cond ((riaxpander:source-mapping)
-;;          => (lambda (mapping)
-;;               (let recur ((form form))
-;;                 (cond ((##source? form)
-;;                        (let ((code (##source-code form)))
-;;                          (cond ((pair? code)
-;;                                 (table-set! mapping code (##source-locat form))
-;;                                 (cons (recur (car code))
-;;                                       (recur (cdr code))))
-;;                                ((symbol? code)
-;;                                 code)   ;++ fix
-;;                                (else code))))
-;;                       ((pair? form)
-;;                        (cons (recur (car form))
-;;                              (recur (cdr form))))
-;;                       (else form)))))
-;;         (else (##desourcify form))))
+(define (riaxpander:desourcify form)
+  (cond ((riaxpander:source-mapping)
+         => (lambda (mapping)
+              (let recur ((form form))
+                (cond ((##source? form)
+                       (let ((code (##source-code form)))
+                         (cond ((pair? code)
+                                (table-set! mapping code (##source-locat form))
+                                (cons (recur (car code))
+                                      (recur (cdr code))))
+                               ((symbol? code)
+                                code)   ;++ fix
+                               (else code))))
+                      ((pair? form)
+                       (cons (recur (car form))
+                             (recur (cdr form))))
+                      (else form)))))
+        (else (##desourcify form))))
 
 ;; (define (riaxpander:resourcify form history)
 ;;   (cond ((not (pair? form)) form)
@@ -78,6 +77,11 @@
         macro*+form*))
      (else
       form*))))
+
+(define (riaxpander:include file)
+  (for-each eval (with-input-from-file
+                     file
+                   (lambda () (read-all)))))
 
 (define (expand-toplevel-syntax-definition name)
   (let ((transformer (syntactic-lookup riaxpander:top-level-environment name)))
@@ -212,7 +216,7 @@
       (let ((uid (current-location-uid)))
         (current-location-uid (+ uid 1))
         uid)))
-
+
 ;;;; S-Expression Syntactic Environment
 
 (define (make-gambit-environment)
@@ -283,7 +287,7 @@
           ((eq? key location-allocator) gambit/allocate-location)
           ((eq? key meta-evaluator) gambit/meta-evaluate)
           (else #f))))
-
+
 ;;;; Gambit Specifics
 
 (define-record-type <declaration>
@@ -386,7 +390,7 @@
    (macrology/gambit-sequence)
    (macrology/gambit-cond-expand)
    (macrology/gambit-define)))
-
+
 ;;;;; S-Expression Syntactic Parameters
 
 (define (gambit/classify-datum datum environment history)
@@ -443,7 +447,7 @@
               (classify-subexpressions selector forms environment history)
               history)))
           history))))
-
+
 ;;;;; S-Expression Compilers
 
 (define (gambit/compile-quotation datum history)
@@ -502,7 +506,7 @@
            '())
           (else
            (procedure bvl)))))
-
+
 ;;;;; S-Expression Compilation Utilities
 
 (define (gambit/compile-expression expression)
@@ -540,13 +544,13 @@
 ;;     ((_ (id . llist) . body) 
 ;;      (define-syntax id
 ;;        (rsc-macro-transformer 
-;; 	(lambda (exp env)
-;; 	  (apply (lambda llist . body) (cdr exp))))))
+;;  (lambda (exp env)
+;;    (apply (lambda llist . body) (cdr exp))))))
 ;;     ((_ id expander) 
 ;;      (define-syntax id
 ;;        (rsc-macro-transformer 
-;; 	(lambda (exp env)
-;; 	  (apply expander (cdr exp))))))))
+;;  (lambda (exp env)
+;;    (apply expander (cdr exp))))))))
 
 ;; (define-syntax include
 ;;   (rsc-macro-transformer
@@ -554,11 +558,11 @@
 ;;      (syntax-check '(keyword expression) exp)
 ;;      (let ((filename (cadr exp)))
 ;;        (let ((path (##sys#resolve-include-filename filename #t)))
-;; 	 (if (load-verbose) (print "; including " path " ..."))
-;; 	 `(,(make-syntactic-closure env '() 'begin)
-;; 	   ,@(with-input-from-file path
-;; 	       (lambda ()
-;; 		 (do ((x (read) (read))
-;; 		      (xs '() (cons x xs)))
-;; 		     ((eof-object? x) 
-;; 		      (reverse xs)))))))))))
+;;   (if (load-verbose) (print "; including " path " ..."))
+;;   `(,(make-syntactic-closure env '() 'begin)
+;;     ,@(with-input-from-file path
+;;         (lambda ()
+;;     (do ((x (read) (read))
+;;          (xs '() (cons x xs)))
+;;         ((eof-object? x) 
+;;          (reverse xs)))))))))))

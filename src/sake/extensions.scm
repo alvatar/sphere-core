@@ -1,47 +1,6 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Utilities and procedures to be used within sakefiles (needs scheme-base installed)
 
-;;! Parallel for-each, suitable mainly for parallel compilation, which spawns external
-;; processes
-(##define (sake#parallel-for-each f l #!key (max-thread-number 2))
-  (let ((pending-elements l)
-        (elements-mutex (make-mutex))
-        (results '())
-        (results-mutex (make-mutex)))
-    (let ((main-thread (current-thread))
-          (add-to-results! (lambda (r)
-                             (mutex-lock! results-mutex)
-                             (set! results (cons r results))
-                             (mutex-unlock! results-mutex))))
-      (let recur ((n 0)
-                  (thread-pool '()))
-        (if (< n max-thread-number)
-            (recur (+ n 1)
-                   (cons (thread-start!
-                          (make-thread
-                           (lambda ()
-                             (with-exception-catcher
-                              (lambda (e) (thread-send main-thread e))
-                              (lambda ()
-                                (let recur ((n 0))
-                                  (mutex-lock! elements-mutex)
-                                  (if (null? pending-elements)
-                                      (begin (mutex-unlock! elements-mutex)
-                                             'finished-thread)
-                                      (let ((next (car pending-elements)))
-                                        (set! pending-elements (cdr pending-elements))
-                                        (mutex-unlock! elements-mutex)
-                                        (add-to-results! (f next))
-                                        (recur (++ n))))))))))
-                         thread-pool)))
-        (for-each thread-join! thread-pool)
-        (let read-messages ()
-          (let ((m (thread-receive 0 'finished)))
-            (if (not (eq? m 'finished))
-                (begin (pp m)
-                       (read-messages)))))))
-    (reverse results)))
-
 ;;! Generate a unique C file from a module or a file
 ;; Returns the path of the generated file
 ;; version: generate module version with specific features (compiler options, cond-expand...)
@@ -50,7 +9,7 @@
                              (cond-expand-features '())
                              (compiler-options '())
                              (version compiler-options)
-                             (expander 'alexpander)
+                             (expander 'riaxpander)
                              (output #f)
                              (verbose #f))
   (or (file-exists? (default-build-directory))
@@ -192,38 +151,73 @@
                                        options: ',compiler-options))
                                     flags-string: "-f"))
                                 (error "error compiling generated C file")))))
-          ;; Portable syntax-case works by compiling a wrapper module that includes all necessary code
-          ;; Currently deactivated
-          ;; ((syntax-case) (let ((generated-code
-          ;;                       `(,(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
-          ;;                         ,@(map (lambda (m) `(include ,(string-append (%module-path-src m) (%module-filename-scm m))))
-          ;;                                (%module-dependencies-to-include module))
-          ;;                         (include ,(string-append (%module-path-src module) (%module-filename-scm module)))))
-          ;;                      (compilation-code
-          ;;                       `((load "~~lib/syntax-case")
-          ;;                         ,@(map (lambda (m) `(eval '(include ,(string-append (%module-path-src m) (%module-filename-scm m)))))
-          ;;                                (%module-dependencies-to-include module))
-          ;;                         (compile-file-to-target
-          ;;                          ,intermediate-file
-          ;;                          output: ,output-file
-          ;;                          options: ',compiler-options))))
-          ;;                  (error "Syntax-case currently unsupported")
-          ;;                  (if verbose
-          ;;                      (begin (display "Expander: ")
-          ;;                             (pp expander)
-          ;;                             (println "Generated module wrapper code:")
-          ;;                             (pp generated-code)
-          ;;                             (println "Command-line compiler code")
-          ;;                             (pp compilation-code)))
-          ;;                  (call-with-output-file
-          ;;                      intermediate-file
-          ;;                    (lambda (f)
-          ;;                      (for-each (lambda (c) (pp c f)) generated-code)))
-          ;;                  (or (= 0
-          ;;                         (gambit-eval-here
-          ;;                          compilation-code
-          ;;                          verbose: #f))
-          ;;                      (error "error generating C file"))))
+          ((riaxpander) (let ((compilation-code
+                               `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+                                 ,@(map (lambda (m) `(##import-include ',m))
+                                        (append (%module-dependencies-to-include module)
+                                                (if header-module (list header-module) '())
+                                                (if macros-module (list macros-module) '()))))))
+                          (if verbose
+                              (begin
+                                (info/color 'light-green "compilation environment code:")
+                                (for-each pp compilation-code)))
+                          ;; Eval compilation code in current environment
+                          (for-each eval compilation-code)
+                          (let* ((code (map (lambda (f) (riaxpander:desourcify (riaxpander:expand-toplevel f)))
+                                            (with-input-from-file input-file read-all)))
+                                 (intermediate-code
+                                  `( ;; Compile-time cond-expand-features
+                                    ,@(map (lambda (f)
+                                             `(define-cond-expand-feature ,f))
+                                           (cons 'compile-to-c cond-expand-features))
+                                    ;; Append general compilation prelude
+                                    ,@(with-input-from-file
+                                          (string-append
+                                           (%module-path-src '(core: prelude))
+                                           (%module-filename-scm 'prelude))
+                                        read-all)
+                                    ;; Include custom compilation preludes defined in config.scm
+                                    ,@(map (lambda (p)
+                                             `(##include ,(string-append
+                                                           (%module-path-src p)
+                                                           (%module-filename-scm p))))
+                                           (%module-dependencies-to-prelude module))
+                                    ;; If there is a header module set up proper namespace
+                                    ,@(if header-module
+                                          `((##namespace (,(%module-namespace header-module))))
+                                          '())
+                                    ,@(if header-module
+                                          '((##include "~~lib/gambit#.scm"))
+                                          '())
+                                    ;; Include load dependencies' headers if they have
+                                    ,@(filter-map
+                                       (lambda (m) (let ((module-header (%module-header m)))
+                                                (and module-header
+                                                     `(##include ,(string-append
+                                                                   (%module-path-src module-header)
+                                                                   (%module-filename-scm module-header))))))
+                                       (%module-dependencies-to-load module))
+                                    ;; Include header module if we have one
+                                    ,@(if header-module
+                                          `((##include ,(string-append
+                                                         (%module-path-src header-module)
+                                                         (%module-filename-scm header-module))))
+                                          '())
+                                    ,@code)))
+                            (if verbose
+                                (begin (info/color 'light-green "macro-expanded code:")
+                                       (for-each pp intermediate-code)))
+                            (call-with-output-file
+                                intermediate-file
+                              (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
+                            (or (= 0
+                                   (gambit-eval-here
+                                    `((compile-file-to-target
+                                       ,intermediate-file
+                                       output: ,output-file
+                                       options: ',compiler-options))
+                                    flags-string: "-f"))
+                                (error "error compiling generated C file")))))
           ((gambit)
            (error "Gambit expander workflow not implemented"))
           (else (error "Unknown expander"))))
@@ -402,3 +396,48 @@
 ;;! Uninstall all the files from the system installation
 (##define (sake#uninstall-sphere-from-system #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))
+
+
+;;!! Utilities
+
+
+;;! Parallel for-each, suitable mainly for parallel compilation, which spawns external
+;; processes
+(##define (sake#parallel-for-each f l #!key (max-thread-number 2))
+  (let ((pending-elements l)
+        (elements-mutex (make-mutex))
+        (results '())
+        (results-mutex (make-mutex)))
+    (let ((main-thread (current-thread))
+          (add-to-results! (lambda (r)
+                             (mutex-lock! results-mutex)
+                             (set! results (cons r results))
+                             (mutex-unlock! results-mutex))))
+      (let recur ((n 0)
+                  (thread-pool '()))
+        (if (< n max-thread-number)
+            (recur (+ n 1)
+                   (cons (thread-start!
+                          (make-thread
+                           (lambda ()
+                             (with-exception-catcher
+                              (lambda (e) (thread-send main-thread e))
+                              (lambda ()
+                                (let recur ((n 0))
+                                  (mutex-lock! elements-mutex)
+                                  (if (null? pending-elements)
+                                      (begin (mutex-unlock! elements-mutex)
+                                             'finished-thread)
+                                      (let ((next (car pending-elements)))
+                                        (set! pending-elements (cdr pending-elements))
+                                        (mutex-unlock! elements-mutex)
+                                        (add-to-results! (f next))
+                                        (recur (++ n))))))))))
+                         thread-pool)))
+        (for-each thread-join! thread-pool)
+        (let read-messages ()
+          (let ((m (thread-receive 0 'finished)))
+            (if (not (eq? m 'finished))
+                (begin (pp m)
+                       (read-messages)))))))
+    (reverse results)))
