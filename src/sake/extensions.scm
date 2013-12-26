@@ -352,7 +352,7 @@
 (##define (sake#test-all)
   (for-each (lambda (f)
               (gambit-eval-here
-               `((eval '(include ,f)))))
+               `((eval '(expander:include ,f)))))
             (fileset dir: "test/"
                      test: (f-and (extension=? ".scm")
                                   (f-not (ends-with? "#.scm")))
@@ -364,7 +364,7 @@
    ((string? module)
     (if (file-exists? module)
         (gambit-eval-here
-         `((eval '(include ,module))))
+         `((eval '(expander:include ,module))))
         (error "Testing file doesn't exist")))
    ((%module? module)
     (%check-module module)

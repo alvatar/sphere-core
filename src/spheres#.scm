@@ -15,7 +15,11 @@
                       (##include "~~/spheres/core/src/riaxpander/synrules.scm")
                       (##include "~~/spheres/core/src/riaxpander/gambit.scm")))
       (riaxpander:install))
-    (println "RIAXPANDER HAS NOT BEEN LOADED"))
+    (println "*** Info: Riaxpander has NOT been loaded!"))
+
+(define expander:include riaxpander:include)
+
+
 
 (include "prelude.scm")
 
@@ -529,14 +533,14 @@ fig.scm file"))
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
-                        (riaxpander:include include-file))))
+                        (expander:include include-file))))
                 (begin
                   (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
                             (display (string-append "-- including -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
-                        (riaxpander:include (%module-filename-scm module))))))))))
+                        (expander:include (%module-filename-scm module))))))))))
   (set!
    ##include-module-and-dependencies
    (lambda (root-module options)
@@ -557,7 +561,7 @@ fig.scm file"))
               (let ((header-module (%module-header module))
                     (macros-module (%module-macros module)))
                 (if header-module
-                    (eval `(riaxpander:include ,(string-append (%module-path-src header-module)
+                    (eval `(expander:include ,(string-append (%module-path-src header-module)
                                                                  (%module-filename-scm header-module)))))
                 (if includes
                     (for-each (lambda (m) (include-single-module m '(verbose)))
@@ -575,7 +579,7 @@ fig.scm file"))
                                         ;(pp file-o)
                              file-o)
                             ((file-exists? file-scm)
-                             (riaxpander:include file-scm)
+                             (expander:include file-scm)
                              (if verbose
                                  (display (string-append "-- loading source -- " (object->string module) "\n")))
                              file-scm)
@@ -601,9 +605,10 @@ fig.scm file"))
   (cond
    ((string? (car module))
     ;; If filename given, just include it (doesn't register as loaded module)
-    (eval `(riaxpander:include ,(car module))))
+    (eval `(expander:include ,(car module))))
    ;; It comes quoted (it's a monster)
-   ((eq? 'quote (caar module))
+   ((and (pair? (car module))
+         (eq? 'quote (caar module)))
     (let ((module (cadar module)))
       (%check-module module)
       `(##include-module-and-dependencies ',module '(verbose))))
@@ -621,7 +626,6 @@ fig.scm file"))
                                     (string-shrink! str (- (string-length str) 1))
                                     (string->keyword str))))
                             (cdr module)))))
-      (pp module)
       (%check-module module)
       `(##include-module-and-dependencies ',module '(verbose))))))
 
