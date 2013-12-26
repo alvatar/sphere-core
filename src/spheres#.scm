@@ -1,6 +1,9 @@
 ;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
 ;;; Sphere (module system)
 
+
+(define expander:include #f)
+
 (if (file-exists? "~~/spheres/core/src/riaxpander/")
     (begin
       (eval '(##begin (##include "~~/spheres/core/src/riaxpander/utils.scm")
@@ -14,18 +17,17 @@
                       (##include "~~/spheres/core/src/riaxpander/standard.scm")
                       (##include "~~/spheres/core/src/riaxpander/synrules.scm")
                       (##include "~~/spheres/core/src/riaxpander/gambit.scm")))
-      (riaxpander:install))
+      (riaxpander:install)
+      (set! expander:include riaxpander:include))
     (println "*** Info: Riaxpander has NOT been loaded!"))
-
-(define expander:include riaxpander:include)
-
 
 
 (include "prelude.scm")
 
-;-------------------------------------------------------------------------------
-; Sphere
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! Sphere
 
 (define^ default-src-directory
   (make-parameter "src/"))
@@ -210,9 +212,10 @@ fig.scm file"))
               (cdr deps-pair))))
            '())))))
 
-;-------------------------------------------------------------------------------
-; Module
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! Module
 
 (define^ (%make-module #!key (sphere #f) id (version '()))
   (if sphere
@@ -458,9 +461,10 @@ fig.scm file"))
 (define^ (%module-deep-dependencies-to-include module)
   ((%module-deep-dependencies-select 'include) module))
 
-;-------------------------------------------------------------------------------
-; Utils
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! Utils
 
 ;;! Builds a new list of modules merging two lists
 ;; Not optimized
@@ -486,9 +490,10 @@ fig.scm file"))
              (cons (car output) (recur (cdr output))))
             (else (recur (cdr output)))))))
 
-;-------------------------------------------------------------------------------
-; Including and loading
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+
+;;!! Including and loading
 
 ;;! Is there a header for this module? If so, return the header module
 (define^ (%module-header module)
