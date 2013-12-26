@@ -314,7 +314,7 @@
      flags-string: "-f")))
 
 ;;! Make a module that includes a set of modules
-(##define (sake#merge-modules modules #!key (output "merged-modules.scm"))
+(##define (sake#generate-includer modules #!key (output "merged-modules.scm"))
   (let ((output-path (string-append (current-build-directory) output)))
     (call-with-output-file
         output-path
@@ -369,8 +369,8 @@
    ((%module? module)
     (%check-module module)
     (gambit-eval-here
-     `((eval '(include ,(string-append "test/"
-                                       (%module-filename-scm module)))))))
+     `((eval '(expander:include ,(string-append "test/"
+                                                (%module-filename-scm module)))))))
    (else
     (error "Bad testing module description: file path or module"))))
 
