@@ -8,6 +8,22 @@
                                (object->string val)
                                " in: "
                                (object->string ',caller))))))
+
+;;------------------------------------------------------------------------------
+
+;;!! Macro Hacks
+
+;; This nasty hack substitutes the '() for ()
+;; It turns out that Gambit uses () for argument lists, which is not an acceptable
+;; syntax for most syntax-rules expanders
+(define-macro (c-lambda #!rest body)
+  `(##c-lambda ,@(map (lambda (f) (if (and (pair? f)
+                                      (pair? (cdr f))
+                                      (eq? (cadr f) '()))
+                                 '()
+                                 f))
+                      body)))
+
 ;;------------------------------------------------------------------------------
 
 ;;!! Macro utils

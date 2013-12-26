@@ -3,6 +3,7 @@
 
 
 (define expander:include #f)
+(define (riaxpander:current?) #f)
 
 (if (file-exists? "~~/spheres/core/src/riaxpander/")
     (begin
@@ -18,7 +19,8 @@
                       (##include "~~/spheres/core/src/riaxpander/synrules.scm")
                       (##include "~~/spheres/core/src/riaxpander/gambit.scm")))
       (riaxpander:install)
-      (set! expander:include riaxpander:include))
+      (set! expander:include riaxpander:include)
+      (set! riaxpander:include #t))
     (println "*** Info: Riaxpander has NOT been loaded!"))
 
 
