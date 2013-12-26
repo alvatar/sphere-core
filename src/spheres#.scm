@@ -538,14 +538,14 @@ fig.scm file"))
                   (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
-                            (display (string-append "-- including -- " (object->string module) "\n")))
+                            (display (string-append "-- source included -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
                         (expander:include include-file))))
                 (begin
                   (if (not (member (%module-normalize module override-version: '()) *included-modules*))
                       (begin
                         (if verbose
-                            (display (string-append "-- including -- " (object->string module) "\n")))
+                            (display (string-append "-- source included -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
                         (expander:include (%module-filename-scm module))))))))))
   (set!
@@ -581,14 +581,14 @@ fig.scm file"))
                           (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
                       (cond ((file-exists? file-o)
                              (if verbose
-                                 (display (string-append "-- loading -- " (object->string module) "\n")))
+                                 (display (string-append "-- object loaded -- " (object->string module) "\n")))
                              (load file-o)
                                         ;(pp file-o)
                              file-o)
                             ((file-exists? file-scm)
                              (expander:include file-scm)
                              (if verbose
-                                 (display (string-append "-- loading source -- " (object->string module) "\n")))
+                                 (display (string-append "-- source loaded -- " (object->string module) "\n")))
                              file-scm)
                             (else
                              (error (string-append "Module: "
@@ -596,7 +596,7 @@ fig.scm file"))
                                                    " cannot be found in current sphere's path"))))
                       (set! *loaded-modules* (cons (%module-normalize module override-version: '()) *loaded-modules*)))
                     (begin (if verbose
-                               (display (string-append "-- loading -- " (object->string module) "\n")))
+                               (display (string-append "-- object loaded -- " (object->string module) "\n")))
                            (load (%module-filename-scm module)))))))))
      (lambda (root-module options)
        ;; Get options, as #t or #f
