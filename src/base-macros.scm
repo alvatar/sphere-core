@@ -29,6 +29,7 @@
      y)))
 
 
+
 ;;------------------------------------------------------------------------------
 
 ;;!! SRFIs
@@ -68,7 +69,6 @@
 ;; Modifications
 ;; - Rewritten let-loop as a local syntax definition
 ;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
-
 (define-syntax let-rest
   (let-syntax
       ((let-loop
@@ -117,6 +117,14 @@
        (let-loop name bindings () () (body ...))))))
 
 
+;;! SRFI-8: RECEIVE
+(define-syntax receive
+  (syntax-rules ()
+    ((receive formals expression body ...)
+     (call-with-values (lambda () expression)
+       (lambda formals body ...)))))
+
+
 ;;! SRFI-11 Syntax for receiving multiple values
 ;; Copyright (C) Lars T Hansen (1999). All Rights Reserved.
 
@@ -138,8 +146,6 @@
 ;;                     `(call-with-values (lambda () ,initializer)
 ;;                        (lambda ,vars ,cont))))))
 ;;               (car bindings)))))
-
-;;! let-values
 (define-syntax let-values
   (syntax-rules ()
     ((let-values (?binding ...) ?body0 ?body1 ...)
@@ -161,7 +167,6 @@
        (lambda (?arg ... . x)
          (let-values "bind" ?bindings (?tmp ... (?a x)) ?body))))))
 
-;;! let*-values
 (define-syntax let*-values
   (syntax-rules ()
     ((let*-values () ?body0 ?body1 ...)
