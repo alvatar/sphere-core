@@ -245,36 +245,36 @@
   (if delete-c
       (delete-file c-file recursive: #t)))
 
-;;! Compile to o, for dynamic loading, takes care of introducing 'compile-to-o cond-expand feature
-(##define (sake#compile-to-o module
-                             #!key
-                             (version '())
-                             (cond-expand-features '())
-                             (compiler-options '())
-                             (cc-options "")
-                             (ld-options "")
-                             (output #f)
-                             (verbose #f))
-  (info "compiling module to o -- "
-        (%module-sphere module)
-        ": "
-        (%module-id module)
-        (if (null? version) "" (string-append " version: " (object->string version))))
-  (let ((file-already-existed?
-         (file-exists? (string-append (current-build-directory)
-                                      (%module-filename-c module version: version))))
-        (c-file (sake#compile-to-c
-                 module
-                 version: version
-                 cond-expand-features: (cons 'compile-to-o cond-expand-features)
-                 compiler-options: compiler-options
-                 verbose: verbose)))
-    (sake#compile-c-to-o
-     c-file
-     output: (or output (path-strip-extension c-file))
-     cc-options: cc-options
-     ld-options: ld-options
-     delete-c: (not file-already-existed?))))
+;;! Compile to o in one step, through a C intermediary file
+(##define (sake#compile-module module
+                               #!key
+                               (cond-expand-features '())
+                               (compiler-options '())
+                               (version compiler-options)
+                               (expander 'riaxpander)
+                               (c-output-file #f)
+                               (o-output-file #f)
+                               (override-cc-options "")
+                               (override-ld-options "")
+                               (verbose #f)
+                               (delete-c #f))
+  ;; (info "compiling module to o -- "
+  ;;       (%module-sphere module)
+  ;;       ": "
+  ;;       (%module-id module)
+  ;;       (if (null? version) "" (string-append " version: " (object->string version))))
+  (let ((c-file (sake#compile-to-c module
+                                   cond-expand-features: cond-expand-features
+                                   compiler-options: compiler-options
+                                   version: version
+                                   expander: expander
+                                   output: c-output-file
+                                   verbose: verbose)))
+    (sake#compile-c-to-o c-file
+                         output: (or o-output-file (path-strip-extension c-file))
+                         cc-options: override-cc-options
+                         ld-options: override-ld-options
+                         delete-c: delete-c)))
 
 ;;! Compile to exe
 (##define (sake#compile-to-exe exe-name
@@ -283,50 +283,54 @@
                                (version '())
                                (cond-expand-features '())
                                (compiler-options '())
-                               (cc-options "")
-                               (ld-options "")
+                               override-cc-options
+                               override-ld-options
                                (output (string-append (current-build-directory) exe-name))
                                (strip #t)
                                (verbose #f))
-  (info "compiling modules to exe: ")
-  (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
-            modules)
-  (let ((c-files (apply
-                  append
-                  (map (lambda (m)
-                         (info "The following dependencies for \033[00;32m"
-                               (object->string (%module-normalize m))
-                               "\033[00m will be linked:")
-                         (map (lambda (mdep)
-                                (info "    * " (object->string mdep) "")
-                                (cond
-                                 ((%module=? m mdep)
-                                  (sake#compile-to-c
-                                   mdep
-                                   version: version
-                                   cond-expand-features: (cons 'compile-to-o cond-expand-features)
-                                   compiler-options: compiler-options
-                                   verbose: verbose))
-                                 (else
-                                  (string-append
-                                   (%module-path-lib mdep)
-                                   (%module-filename-c mdep)))))
-                              (%module-deep-dependencies-to-load m)))
-                       modules))))
-    (gambit-eval-here
-     `((let* ((link-file (link-incremental ',c-files))
-              (gcc-cli (string-append ,(c-compiler)
-                                      " " ,@(map (lambda (f) (string-append f " ")) c-files)
-                                      " " link-file
-                                      " -o" ,output
-                                      " -I" (path-expand "~~include")
-                                      " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil")))
-         (if (not link-file) (error "error generating link file"))
-         (if ,verbose (begin (pp link-file) (pp gcc-cli)))
-         (shell-command gcc-cli)
-         (if ,strip (shell-command ,(string-append "strip " output)))
-         (delete-file link-file)))
-     flags-string: "-f")))
+  (let ((cc-options (or override-cc-options
+                        (%merge-cc-options (map %module-deep-dependencies-cc-options modules))))
+        (ld-options (or override-ld-options
+                        (%merge-ld-options (map %module-deep-dependencies-ld-options modules)))))
+    (info "compiling modules to exe: ")
+    (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
+              modules)
+    (let ((c-files (apply
+                    append
+                    (map (lambda (m)
+                           (info "The following dependencies for \033[00;32m"
+                                 (object->string (%module-normalize m))
+                                 "\033[00m will be linked:")
+                           (map (lambda (mdep)
+                                  (cond
+                                   ((%module=? m mdep)
+                                    (sake#compile-to-c
+                                     mdep
+                                     version: version
+                                     cond-expand-features: (cons 'compile-to-o cond-expand-features)
+                                     compiler-options: compiler-options
+                                     verbose: verbose))
+                                   (else
+                                    (info "    * " (object->string mdep) "")
+                                    (string-append
+                                     (%module-path-lib mdep)
+                                     (%module-filename-c mdep)))))
+                                (%module-deep-dependencies-to-load m)))
+                         modules))))
+      (gambit-eval-here
+       `((let* ((link-file (link-incremental ',c-files))
+                (gcc-cli (string-append ,(c-compiler)
+                                        " " ,@(map (lambda (f) (string-append f " ")) c-files)
+                                        " " link-file
+                                        " -o" ,output
+                                        " -I" (path-expand "~~include")
+                                        " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil")))
+           (if (not link-file) (error "error generating link file"))
+           (if ,verbose (begin (pp link-file) (pp gcc-cli)))
+           (shell-command gcc-cli)
+           (if ,strip (shell-command ,(string-append "strip " output)))
+           (delete-file link-file)))
+       flags-string: "-f"))))
 
 ;;! Make a module that includes a set of modules
 (##define (sake#generate-includer modules #!key (output "merged-modules.scm"))

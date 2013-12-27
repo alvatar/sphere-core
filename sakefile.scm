@@ -101,8 +101,8 @@
     testing))
 
 (define-task compile-stage-3 ()
-  (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m compiler-options: '(debug)))) modules)
-  (for-each (lambda (m) (sake#compile-c-to-o (sake#compile-to-c m))) modules))
+  (for-each (lambda (m) (sake#compile-module m compiler-options: '(debug))) modules)
+  (for-each sake#compile-module modules))
 
 (define-task install-stage-3 ()
   (make-directory "~~spheres/core/lib")

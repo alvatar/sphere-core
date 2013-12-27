@@ -394,6 +394,8 @@ fig.scm file"))
 ;; If the root module doesn't have a dependencies for the exact version, the unversioned dependencies will
 ;; be used instead. In this case, the same version requested for the root module will be tried for every
 ;; dependency first before falling back.
+;; Resulting dependency lists are normalized modules. However, if the dependency lists contains stuff
+;; other than modules, they are not normalized (obviously).
 (define^ (%module-shallow-dependencies-select type)
   (letrec ((find-dependencies-list
             (lambda (module sphere sphere-deps omit-version?)
@@ -432,7 +434,10 @@ fig.scm file"))
                                                  (%sphere-dependencies module-sphere)
                                                  #f)))
           (if versioned
-              (get-dependency-list versioned)
+              (map (lambda (m) (if (%module? m)
+                              (%module-normalize m)
+                              m))
+                   (get-dependency-list versioned))
               ;; ...otherwise try to find unversioned module in dependency list
               (let ((unversioned (find-dependencies-list module
                                                          module-sphere
@@ -440,7 +445,9 @@ fig.scm file"))
                                                          #t)))
                 (if unversioned
                     ;; ...but we will make them versioned, propagating the version
-                    (map (lambda (m) (%module-normalize m override-version: (%module-version module)))
+                    (map (lambda (m) (if (%module? m)
+                                    (%module-normalize m override-version: (%module-version module))
+                                    m))
                          (get-dependency-list unversioned))
                     '()))))))))
 
@@ -453,21 +460,55 @@ fig.scm file"))
 (define^ (%module-shallow-dependencies-to-load module)
   ((%module-shallow-dependencies-select 'load) module))
 
+(define^ (%module-shallow-dependencies-cc-options module)
+  (apply string-append ((%module-shallow-dependencies-select 'cc-options) module)))
+
+(define^ (%module-shallow-dependencies-ld-options module)
+  (apply string-append ((%module-shallow-dependencies-select 'ld-options) module)))
+
 ;;! Gets the full tree of dependencies, building a list in the right order
-(define^ (%module-deep-dependencies-select type)
+;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
+;; following its subdependencies recursively
+;; .parameter symbol-to-return The symbol that the function will record, returning
+;; it after the whole dependency tree has been traversed
+;; .parameter append The procedure used to append the returned results
+(define^ (%module-deep-dependencies-select type-to-follow type-to-return)
   (lambda (module)
     (let ((deps '()))
       (let recur ((module module))
-        (for-each recur ((%module-shallow-dependencies-select type) module))
-        (or (member (%module-normalize module) deps)
-            (set! deps (cons (%module-normalize module) deps))))
-      (reverse deps))))
+        (for-each recur ((%module-shallow-dependencies-select type-to-follow) module))
+        (or (assq (%module-normalize module) deps)
+            (set! deps (cons (list
+                              (%module-normalize module)
+                              ((%module-shallow-dependencies-select type-to-return) module))
+                             deps))))
+      (apply append (map cadr (reverse deps))))))
 
+;;! Gets a list with all the dependencies to load in the right order
 (define^ (%module-deep-dependencies-to-load module)
-  ((%module-deep-dependencies-select 'load) module))
+  ((%module-deep-dependencies-select 'load 'load) module))
 
+;;! Gets a list with all the dependencies to include in the right order
 (define^ (%module-deep-dependencies-to-include module)
-  ((%module-deep-dependencies-select 'include) module))
+  ((%module-deep-dependencies-select 'include 'include) module))
+
+;;! Merge cc-options
+(define^ (%merge-cc-options option-strings)
+  (println "*** IMPLEMENT PROPER %merge-cc/ld-options")
+  (apply string-append option-strings))
+
+;;! Merge-ld-options
+(define^ (%merge-ld-options option-strings)
+  (println "*** IMPLEMENT PROPER %merge-cc/ld-options")
+  (apply string-append option-strings))
+
+;;! Get a string of cc-options from the full deep of dependencies
+(define^ (%module-deep-dependencies-cc-options module)
+  (%merge-cc-options ((%module-deep-dependencies-select 'load 'cc-options) module)))
+
+;;! Get a string of ld-options from the full deep of dependencies
+(define^ (%module-deep-dependencies-ld-options module)
+  (%merge-ld-options ((%module-deep-dependencies-select 'load 'ld-options) module)))
 
 
 ;;------------------------------------------------------------------------------
