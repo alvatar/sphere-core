@@ -250,9 +250,15 @@ fig.scm file"))
                 id: (%module-id module)
                 version: (if override-version override-version (%module-version module))))
 
+;;! Module predicate
 (define^ (%module? module)
   (or (%module-reduced-form? module)
       (%module-normal-form? module)))
+
+;;! Module equality
+(define^ (%module=? m1 m2)
+  (equal? (%module-normalize m1)
+          (%module-normalize m2)))
 
 ;;! Throw a module format error
 (define^ (%module-error module)
@@ -388,7 +394,7 @@ fig.scm file"))
 ;; If the root module doesn't have a dependencies for the exact version, the unversioned dependencies will
 ;; be used instead. In this case, the same version requested for the root module will be tried for every
 ;; dependency first before falling back.
-(define^ (%module-dependencies-select type)
+(define^ (%module-shallow-dependencies-select type)
   (letrec ((find-dependencies-list
             (lambda (module sphere sphere-deps omit-version?)
               (cond ((null? sphere-deps) #f)
@@ -438,21 +444,21 @@ fig.scm file"))
                          (get-dependency-list unversioned))
                     '()))))))))
 
-(define^ (%module-dependencies-to-prelude module)
-  ((%module-dependencies-select 'prelude) module))
+(define^ (%module-shallow-dependencies-to-prelude module)
+  ((%module-shallow-dependencies-select 'prelude) module))
 
-(define^ (%module-dependencies-to-include module)
-  ((%module-dependencies-select 'include) module))
+(define^ (%module-shallow-dependencies-to-include module)
+  ((%module-shallow-dependencies-select 'include) module))
 
-(define^ (%module-dependencies-to-load module)
-  ((%module-dependencies-select 'load) module))
+(define^ (%module-shallow-dependencies-to-load module)
+  ((%module-shallow-dependencies-select 'load) module))
 
 ;;! Gets the full tree of dependencies, building a list in the right order
 (define^ (%module-deep-dependencies-select type)
   (lambda (module)
     (let ((deps '()))
       (let recur ((module module))
-        (for-each recur ((%module-dependencies-select type) module))
+        (for-each recur ((%module-shallow-dependencies-select type) module))
         (or (member (%module-normalize module) deps)
             (set! deps (cons (%module-normalize module) deps))))
       (reverse deps))))
@@ -555,7 +561,7 @@ fig.scm file"))
        (let recur ((module root-module))
          (if (or force-include
                  (not (member (%module-normalize module override-version: '()) *included-modules*)))
-             (begin (for-each recur (%module-dependencies-to-include module))
+             (begin (for-each recur (%module-shallow-dependencies-to-include module))
                     (include-single-module module '(verbose #t))))))))
   (set!
    ##load-module-and-dependencies
@@ -572,7 +578,7 @@ fig.scm file"))
                                                                  (%module-filename-scm header-module)))))
                 (if includes
                     (for-each (lambda (m) (include-single-module m '(verbose)))
-                              (%module-dependencies-to-include module)))
+                              (%module-shallow-dependencies-to-include module)))
                 (if macros-module
                     (##include-module-and-dependencies macros-module '()))
                 ;; (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
@@ -603,7 +609,7 @@ fig.scm file"))
        (let ((omit-root (and (memq 'omit-root options) #t)))
          (let recur ((module root-module))
            (if (not (member (%module-normalize module override-version: '()) *loaded-modules*))
-               (begin (for-each recur (%module-dependencies-to-load module))
+               (begin (for-each recur (%module-shallow-dependencies-to-load module))
                       (or (and omit-root (equal? root-module module))
                           (load-single-module module options))))))))))
 

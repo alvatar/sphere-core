@@ -86,8 +86,9 @@
           ;; Alexpander works by creating macro-expanded code, which is then compiled by Gambit
           ((alexpander) (let ((compilation-code
                                `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+                                 ;; Import shallow dependencies, as dependencies should already be expanded
                                  ,@(map (lambda (m) `(##import-include ,m))
-                                        (append (%module-dependencies-to-include module)
+                                        (append (%module-shallow-dependencies-to-include module)
                                                 (if header-module (list header-module) '())
                                                 (if macros-module (list macros-module) '()))))))
                           (if verbose
@@ -114,7 +115,8 @@
                                              `(##include ,(string-append
                                                            (%module-path-src p)
                                                            (%module-filename-scm p))))
-                                           (%module-dependencies-to-prelude module))
+                                           ;; Dependencies here are not deep, as they should be already compiled
+                                           (%module-shallow-dependencies-to-prelude module))
                                     ;; If there is a header module set up proper namespace
                                     ,@(if header-module
                                           `((##namespace (,(%module-namespace header-module))))
@@ -129,7 +131,8 @@
                                                      `(##include ,(string-append
                                                                    (%module-path-src module-header)
                                                                    (%module-filename-scm module-header))))))
-                                       (%module-dependencies-to-load module))
+                                       ;; Dependencies here are not deep, as they should be already compiled
+                                       (%module-shallow-dependencies-to-load module))
                                     ;; Include header module if we have one
                                     ,@(if header-module
                                           `((##include ,(string-append
@@ -154,7 +157,8 @@
           ((riaxpander) (let ((compilation-code
                                `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
                                  ,@(map (lambda (m) `(##import-include ',m))
-                                        (append (%module-dependencies-to-include module)
+                                        ;; Import shallow dependencies, as dependencies should already be expanded
+                                        (append (%module-shallow-dependencies-to-include module)
                                                 (if header-module (list header-module) '())
                                                 (if macros-module (list macros-module) '()))))))
                           (if verbose
@@ -181,7 +185,8 @@
                                              `(##include ,(string-append
                                                            (%module-path-src p)
                                                            (%module-filename-scm p))))
-                                           (%module-dependencies-to-prelude module))
+                                           ;; Dependencies here are not deep, as they should be already compiled
+                                           (%module-shallow-dependencies-to-prelude module))
                                     ;; If there is a header module set up proper namespace
                                     ,@(if header-module
                                           `((##namespace (,(%module-namespace header-module))))
@@ -196,7 +201,8 @@
                                                      `(##include ,(string-append
                                                                    (%module-path-src module-header)
                                                                    (%module-filename-scm module-header))))))
-                                       (%module-dependencies-to-load module))
+                                       ;; Dependencies here are not deep, as they should be already compiled
+                                       (%module-shallow-dependencies-to-load module))
                                     ;; Include header module if we have one
                                     ,@(if header-module
                                           `((##include ,(string-append
@@ -283,21 +289,30 @@
                                (strip #t)
                                (verbose #f))
   (info "compiling modules to exe: ")
-  (for-each (lambda (m) (info (string-append "    * " (object->string m)))) modules)
-  (let* ((new-c-files
-          (map
-           (lambda (m) (sake#compile-to-c
-                   m
-                   version: version
-                   cond-expand-features: (cons 'compile-to-o cond-expand-features)
-                   compiler-options: compiler-options
-                   verbose: verbose))
-           modules))
-         (c-files (append (map (lambda (m) (string-append
-                                       (%module-path-lib m)
-                                       (%module-filename-c m)))
-                               (apply append (map %module-dependencies-to-load modules)))
-                          new-c-files)))
+  (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
+            modules)
+  (let ((c-files (apply
+                  append
+                  (map (lambda (m)
+                         (info "The following dependencies for \033[00;32m"
+                               (object->string (%module-normalize m))
+                               "\033[00m will be linked:")
+                         (map (lambda (mdep)
+                                (info "    * " (object->string mdep) "")
+                                (cond
+                                 ((%module=? m mdep)
+                                  (sake#compile-to-c
+                                   mdep
+                                   version: version
+                                   cond-expand-features: (cons 'compile-to-o cond-expand-features)
+                                   compiler-options: compiler-options
+                                   verbose: verbose))
+                                 (else
+                                  (string-append
+                                   (%module-path-lib mdep)
+                                   (%module-filename-c mdep)))))
+                              (%module-deep-dependencies-to-load m)))
+                       modules))))
     (gambit-eval-here
      `((let* ((link-file (link-incremental ',c-files))
               (gcc-cli (string-append ,(c-compiler)
