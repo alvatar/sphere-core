@@ -58,7 +58,7 @@
   (copy-file "src/prelude.scm" prelude-module-system-path)
   (copy-file "src/spheres#.scm" spheres-module-system-path)
   ;; Install Riaxpander files
-  (info/color 'green "Installing Macro expander")
+  (info/color 'green "Installing macro expander")
   (make-directory "~~spheres/core/src/riaxpander")
   (copy-files (fileset dir: (string-append (current-source-directory) "riaxpander")
                        test: (ends-with? ".scm")

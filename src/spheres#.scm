@@ -461,10 +461,10 @@ fig.scm file"))
   ((%module-shallow-dependencies-select 'load) module))
 
 (define^ (%module-shallow-dependencies-cc-options module)
-  (apply string-append ((%module-shallow-dependencies-select 'cc-options) module)))
+  ((%module-shallow-dependencies-select 'cc-options) module))
 
 (define^ (%module-shallow-dependencies-ld-options module)
-  (apply string-append ((%module-shallow-dependencies-select 'ld-options) module)))
+  ((%module-shallow-dependencies-select 'ld-options) module))
 
 ;;! Gets the full tree of dependencies, building a list in the right order
 ;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
@@ -492,23 +492,49 @@ fig.scm file"))
 (define^ (%module-deep-dependencies-to-include module)
   ((%module-deep-dependencies-select 'include 'include) module))
 
-;;! Merge cc-options
-(define^ (%merge-cc-options option-strings)
-  (println "*** IMPLEMENT PROPER %merge-cc/ld-options")
-  (apply string-append option-strings))
+;;! Convert cc-options dependencies into a string
+(define^ (%process-cc-options option-items)
+  (define (--cflag? o) (and (pair? o)
+                            (not (null? (cdr o)))
+                            (eq? (car o) 'pkg-config--cflags)))
+  ;; TODO: What works for Windows?
+  (let ((pkg-config--cflags-list
+         (let recur ((result option-items))
+           (cond ((null? result) '())
+                 ((--cflag? (car result))
+                  (cons (cadar result) (recur (cdr result))))
+                 (else (recur (cdr result)))))))
+    (if (null? pkg-config--cflags-list)
+        ""
+        (with-input-from-process
+         (list path: "pkg-config" arguments: (cons "--cflags" pkg-config--cflags-list))
+         read-line))))
 
-;;! Merge-ld-options
-(define^ (%merge-ld-options option-strings)
-  (println "*** IMPLEMENT PROPER %merge-cc/ld-options")
-  (apply string-append option-strings))
+;;! Convert ld-options dependencies into a string
+(define^ (%process-ld-options option-items)
+  (define (--libs? o) (and (pair? o)
+                           (not (null? (cdr o)))
+                           (eq? (car o) 'pkg-config--libs)))
+  ;; TODO: What works for Windows?
+  (let ((pkg-config--libs-list
+         (let recur ((result option-items))
+           (cond ((null? result) '())
+                 ((--libs? (car result))
+                  (cons (cadar result) (recur (cdr result))))
+                 (else (recur (cdr result)))))))
+    (if (null? pkg-config--libs-list)
+        ""
+        (with-input-from-process
+         (list path: "pkg-config" arguments: (cons "--libs" pkg-config--libs-list))
+         read-line))))
 
 ;;! Get a string of cc-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-cc-options module)
-  (%merge-cc-options ((%module-deep-dependencies-select 'load 'cc-options) module)))
+  ((%module-deep-dependencies-select 'load 'cc-options) module))
 
 ;;! Get a string of ld-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-ld-options module)
-  (%merge-ld-options ((%module-deep-dependencies-select 'load 'ld-options) module)))
+  ((%module-deep-dependencies-select 'load 'ld-options) module))
 
 
 ;;------------------------------------------------------------------------------

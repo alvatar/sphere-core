@@ -258,11 +258,6 @@
                                override-ld-options
                                verbose
                                delete-c)
-  ;; (info "compiling module to o -- "
-  ;;       (%module-sphere module)
-  ;;       ": "
-  ;;       (%module-id module)
-  ;;       (if (null? version) "" (string-append " version: " (object->string version))))
   (let ((c-file (sake#compile-to-c module
                                    cond-expand-features: cond-expand-features
                                    compiler-options: compiler-options
@@ -275,10 +270,10 @@
                          (or o-output-file (path-strip-extension c-file))
                          cc-options:
                          (or override-cc-options
-                             (%module-shallow-dependencies-cc-options module))
+                             (%process-cc-options (%module-shallow-dependencies-cc-options module)))
                          ld-options:
                          (or override-ld-options
-                             (%module-shallow-dependencies-ld-options module))
+                             (%process-ld-options (%module-shallow-dependencies-ld-options module)))
                          delete-c: delete-c)))
 
 ;;! Compile to exe
@@ -294,9 +289,9 @@
                                (strip #t)
                                (verbose #f))
   (let ((cc-options (or override-cc-options
-                        (%merge-cc-options (map %module-deep-dependencies-cc-options modules))))
+                        (%process-cc-options (map %module-deep-dependencies-cc-options modules))))
         (ld-options (or override-ld-options
-                        (%merge-ld-options (map %module-deep-dependencies-ld-options modules)))))
+                        (%process-ld-options (map %module-deep-dependencies-ld-options modules)))))
     (info "compiling modules to exe: ")
     (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
               modules)
