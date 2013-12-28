@@ -289,9 +289,9 @@
                                (strip #t)
                                (verbose #f))
   (let ((cc-options (or override-cc-options
-                        (%process-cc-options (map %module-deep-dependencies-cc-options modules))))
+                        (%process-cc-options (apply append (map %module-deep-dependencies-cc-options modules)))))
         (ld-options (or override-ld-options
-                        (%process-ld-options (map %module-deep-dependencies-ld-options modules)))))
+                        (%process-ld-options (apply append (map %module-deep-dependencies-ld-options modules))))))
     (info "compiling modules to exe: ")
     (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
               modules)
@@ -320,8 +320,10 @@
                                         " " ,@(map (lambda (f) (string-append f " ")) c-files)
                                         " " link-file
                                         " -o" ,output
-                                        " -I" (path-expand "~~include")
-                                        " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil")))
+                                        " -I" (path-expand "~~include") " "
+                                        ,cc-options
+                                        " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil "
+                                        ,ld-options)))
            (if (not link-file) (error "error generating link file"))
            (if ,verbose (begin (pp link-file) (pp gcc-cli)))
            (shell-command gcc-cli)

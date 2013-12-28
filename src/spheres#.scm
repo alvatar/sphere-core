@@ -498,17 +498,29 @@ fig.scm file"))
                             (not (null? (cdr o)))
                             (eq? (car o) 'pkg-config--cflags)))
   ;; TODO: What works for Windows?
-  (let ((pkg-config--cflags-list
-         (let recur ((result option-items))
-           (cond ((null? result) '())
-                 ((--cflag? (car result))
-                  (cons (cadar result) (recur (cdr result))))
-                 (else (recur (cdr result)))))))
-    (if (null? pkg-config--cflags-list)
-        ""
-        (with-input-from-process
-         (list path: "pkg-config" arguments: (cons "--cflags" pkg-config--cflags-list))
-         read-line))))
+  (let* ((free-strings '())
+         (pkg-config--cflags-list
+          (let recur ((result option-items))
+            (cond ((null? result) '())
+                  ((string? (car result))
+                   (or (member (car result) free-strings)
+                       (set! free-strings (cons (car result) free-strings)))
+                   (recur (cdr result)))
+                  ((--cflag? (car result))
+                   (cons (cadar result) (recur (cdr result))))
+                  (else (recur (cdr result)))))))
+    ;; Append free strings at the beginning of the ld-options
+    (string-append (apply string-append
+                          (reverse (cons " " free-strings)))
+                   (if (null? pkg-config--cflags-list)
+                       ""
+                       (with-input-from-process
+                        (list path: "pkg-config" arguments: (cons "--cflags" pkg-config--cflags-list))
+                        read-line)))))
+
+;;! Get a string of cc-options from the full deep of dependencies
+(define^ (%module-deep-dependencies-cc-options module)
+  ((%module-deep-dependencies-select 'load 'cc-options) module))
 
 ;;! Convert ld-options dependencies into a string
 (define^ (%process-ld-options option-items)
@@ -516,21 +528,25 @@ fig.scm file"))
                            (not (null? (cdr o)))
                            (eq? (car o) 'pkg-config--libs)))
   ;; TODO: What works for Windows?
-  (let ((pkg-config--libs-list
-         (let recur ((result option-items))
-           (cond ((null? result) '())
-                 ((--libs? (car result))
-                  (cons (cadar result) (recur (cdr result))))
-                 (else (recur (cdr result)))))))
-    (if (null? pkg-config--libs-list)
-        ""
-        (with-input-from-process
-         (list path: "pkg-config" arguments: (cons "--libs" pkg-config--libs-list))
-         read-line))))
-
-;;! Get a string of cc-options from the full deep of dependencies
-(define^ (%module-deep-dependencies-cc-options module)
-  ((%module-deep-dependencies-select 'load 'cc-options) module))
+  (let* ((free-strings '())
+         (pkg-config--libs-list
+          (let recur ((result option-items))
+            (cond ((null? result) '())
+                  ((string? (car result))
+                   (or (member (car result) free-strings)
+                       (set! free-strings (cons (car result) free-strings)))
+                   (recur (cdr result)))
+                  ((--libs? (car result))
+                   (cons (cadar result) (recur (cdr result))))
+                  (else (recur (cdr result)))))))
+    ;; Append free strings at the beginning of the ld-options
+    (string-append (apply string-append
+                          (reverse (cons " " free-strings)))
+                   (if (null? pkg-config--libs-list)
+                       ""
+                       (with-input-from-process
+                        (list path: "pkg-config" arguments: (cons "--libs" pkg-config--libs-list))
+                        read-line)))))
 
 ;;! Get a string of ld-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-ld-options module)
