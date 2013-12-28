@@ -252,12 +252,12 @@
                                (compiler-options '())
                                (version compiler-options)
                                (expander 'riaxpander)
-                               (c-output-file #f)
-                               (o-output-file #f)
-                               (override-cc-options "")
-                               (override-ld-options "")
-                               (verbose #f)
-                               (delete-c #f))
+                               c-output-file
+                               o-output-file
+                               override-cc-options
+                               override-ld-options
+                               verbose
+                               delete-c)
   ;; (info "compiling module to o -- "
   ;;       (%module-sphere module)
   ;;       ": "
@@ -271,9 +271,14 @@
                                    output: c-output-file
                                    verbose: verbose)))
     (sake#compile-c-to-o c-file
-                         output: (or o-output-file (path-strip-extension c-file))
-                         cc-options: override-cc-options
-                         ld-options: override-ld-options
+                         output:
+                         (or o-output-file (path-strip-extension c-file))
+                         cc-options:
+                         (or override-cc-options
+                             (%module-shallow-dependencies-cc-options module))
+                         ld-options:
+                         (or override-ld-options
+                             (%module-shallow-dependencies-ld-options module))
                          delete-c: delete-c)))
 
 ;;! Compile to exe
