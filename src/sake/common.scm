@@ -67,7 +67,7 @@
   (display "\033[00;31m")
   (apply log (cons "ERROR" message))
   (display "\033[00m")
-  (apply error (cons "sake error" message)))
+  (error "sake error, aborting"))
 
 ;-------------------------------------------------------------------------------
 ; Util
@@ -82,29 +82,36 @@
 ; Main
 ;-------------------------------------------------------------------------------
 
-(##define (sake #!key 
-                (dir (current-directory))
-                (file "sakefile.scm")
-                (tasks '(all)))
-  (info "entering directory " dir)
-  (eval `(begin
-           (##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
-           (##include "~~lib/gambit#.scm")
-           (##include "~~spheres/core/src/sake/sakelib#.scm")
-           (##namespace ("" alexpand))
-           ,(let ((prelude-file "~~spheres/spheres#.scm")
-                  (sake-extensions "~~spheres/core/src/sake/extensions.scm"))
-              (if (file-exists? prelude-file)
-                  `(begin (include ,prelude-file)
-                          (include ,sake-extensions))))
-           (include ,(string-append dir file))
-           ,@(map (lambda (t) `(task-run ,t)) tasks)
-           ;;  (with-exception-catcher
-           ;;    (lambda (ex)
-           ;;      (if (unbound-global-exception? ex) 
-           ;;        (err ,(string-append "task '" (symbol->string task) "' not found in " file))
-           ;;        (raise ex)))
-           ;;    (task-run ,task))
-           ))
-  (info "exiting directory " dir))
+(define (sake #!key 
+              (file "sakefile.scm")
+              (tasks '(all)))
+  (let* ((file (path-expand file))
+         (dir (path-directory file)))
+    (info "entering directory " dir)
+    (if (not (file-exists? file))
+        (err (string-append "file '" file "' not found in "
+                            (if (string=? dir (current-directory))
+                                "current directory."
+                                dir))))
+    (eval `(begin
+             (##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
+             (##include "~~lib/gambit#.scm")
+             (##include "~~spheres/core/src/sake/sakelib#.scm")
+             (##namespace ("" alexpand))
+             ,(let ((prelude-file "~~spheres/spheres#.scm")
+                    (sake-extensions "~~spheres/core/src/sake/extensions.scm"))
+                (if (file-exists? prelude-file)
+                    `(begin (include ,prelude-file)
+                            (include ,sake-extensions))))
+             (##include ,file)
+             ,@(map (lambda (t)
+                      `(with-exception-catcher
+                        (lambda (ex)
+                          (if (unbound-global-exception? ex) 
+                              (err ,(string-append "task '" (symbol->string t) "' not found in " file))
+                              (raise ex)))
+                        (lambda () (task-run ,t)))) tasks)
+           
+             ))
+    (info "exiting directory " dir)))
 
