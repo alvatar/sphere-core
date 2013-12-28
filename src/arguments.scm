@@ -11,11 +11,13 @@
     (display "\n") err)
   (exit 1))
 
-(define short-opts
-  ;; 1 means that takes an argument, 0 it doesn't
-  '((#\g 0 "global")))
-
-(define (parse-opts args kont)
+;;!! Parse arguments
+;; .parameter args List of arguments to process
+;; .parameter options List of options following this structure:
+;; '((#\g 0 "global")
+;;   (#\f 1 "file"))
+;; 1 means that takes an argument, 0 it doesn't
+(define (parse-arguments args kont options)
   (define (string-contains haystack chr)
     (call/cc
      (lambda (ret)
@@ -85,7 +87,7 @@
 
            (else
             (let* ((opt-chr (string-ref str idx))
-                   (opt (assq opt-chr short-opts)))
+                   (opt (assq opt-chr options)))
               (if (not opt)
                   (die/error "Unrecognized option" (car args)))
 

@@ -80,7 +80,8 @@
 ;;!! Stage 3: Modules
 
 (define modules
-  '(base
+  '(arguments
+    base
     ffi
     testing))
 

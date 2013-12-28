@@ -6,53 +6,48 @@
 (##namespace ("sake#"))
 (##include "~~/lib/gambit#.scm")
 (##include "sakelib.scm")
+(##include "../arguments.scm")
 
-(define (assc e es)
-  (let assc ((es es))
-  (cond
-   ((null? es) #f)
-   ((equal? (car es) e) es)
-   (else (assc (cdr es))))))
+(define *help* #<<end-help-string
 
-(##define (get-parameter parameters p #!optional (default #f))
-  (cond
-   ((assc p parameters) => (lambda (e)
-                             (if (null? (cdr e))
-                                 'no-arguments
-                                 (cadr e))))
-   (else default)))
+Usage: sake [--file <sake-file>] [<initial-task> <tasks>]
 
-(##define (get-tasks parameters #!optional (default #f))
-  (define (flag? el) (and (>= 2 (string-length el))
-                          (string=? "--" (substring el 0 2))))
-  (let remove-flags ((lst parameters))
-    (cond
-     ((null? lst) default)
-     ((flag? (car lst))
-      (if (and (not (null? (cdr lst)))
-               (flag? (cdr lst)))
-          (remove-flags (cddr lst))
-          (remove-flags (cdr lst))))
-     (else (map string->symbol lst)))))
+Arguments:
+    <sake-file> is the file containing tasks description (defaults to sakefile.scm)
+    <initial-task> is the first task to be run
+    <tasks> follow the same order as in the command line
 
-(define *help* #<<end-of-help
-  
-sake [--file <sake-file>] [<initial-task>]
-sake --help
-
-sake is an utility like make for scheme.
-<sake-file> is the file containing tasks description (defaults to sakefile.scm)
-<initial-task> is the entry point task
-
-end-of-help
+end-help-string
 )
 
-(define (main command-line) 
-  (let ((parameters (cdr command-line)))
-    (if (get-parameter parameters "--help")
-       (display *help*)
-       (let ((tasks (get-tasks parameters '(all)))
-             (file (get-parameter parameters "--file" "sakefile.scm")))
-         (sake file: file tasks: tasks)))))
+(define (main args)
+  (define *options*
+    '((#\f 1 "file")))
+  (define (process-tasks explicit-tasks? opts args)
+    (define help #f)
+    (define file "sakefile.scm")
+    (handle-opts!
+     opts
+     `(("file"
+        ,@(lambda (val)
+            (set! file (with-input-from-string val read))))
+       ("help"
+        ,@(lambda (val)
+            (println *help*)
+            (exit 0)))))
+    (if explicit-tasks? (ensure-args! args))
+    (sake file: file tasks: (map string->symbol args)))
+  (parse-arguments
+   args
+   (lambda (args-sans-opts opts)
+     (if (or (null? (cdr args-sans-opts))
+             (char=? #\- (string-ref (cadr args-sans-opts) 0)))
+         (process-tasks #f
+                        opts
+                        '("all"))
+         (process-tasks #t
+                        opts
+                        (cdr args-sans-opts))))
+   *options*))
 
 (main (command-line))

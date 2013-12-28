@@ -1,9 +1,10 @@
 ;;; Copyright (c) 2013 by Álvaro Castro-Castilla
 ;;; Spheres: manage packages from SchemeSpheres.org
 
-(include "parse-args.scm")
+(include "../arguments.scm")
 
-(define help:general #<<end-help-string
+
+(define *help:general* #<<end-help-string
 
 Usage: spheres [command] [operand]
 
@@ -25,16 +26,21 @@ Commands:
 end-help-string
 )
 
+;; List of options
+;; 1 means that takes an argument, 0 it doesn't
+(define *options*
+  '((#\g 0 "global")))
+
 ;; Command: HELP
 (define (help-cmd cmd opts args)
   (define help-topics
-    `(("install" ,@help:general)
-      ("uninstall" ,@help:general)))
+    `(("install" ,@*help:general*)
+      ("uninstall" ,@*help:general*)))
   (define num-args (length args))
   (handle-opts! opts `(("help" ,@(lambda (val) #t))))
   (cond
    ((zero? num-args)
-    (println help:general))
+    (println *help:general*))
    ((= 1 num-args)
     (let* ((arg (car args))
            (res (assoc arg help-topics)))
@@ -118,6 +124,7 @@ end-help-string
         (begin
           (let ((files (directory-files (list path: sphere-path
                                               ignore-hidden: 'dot-and-dot-dot))))
+
             (let recur ((files files)
                         (path (path-expand sphere-path)))
               (if (null? files)
@@ -155,7 +162,7 @@ end-help-string
              cmd
              "To get a list of options, type 'bh help'"))
 
-(define (main)
+(define (main args)
   (let ((commands
          `(("install" ,@install-cmd)
            ("uninstall" ,@uninstall-cmd)
@@ -164,8 +171,8 @@ end-help-string
            ("search" ,@search-cmd)
            ("set" ,@set-cmd)
            ("unknown-command" ,@unknown-cmd))))
-    (parse-opts
-     (cdr (command-line))
+    (parse-arguments
+     (cdr args)
      (lambda (actual-args-sans-opts opts)
        (let* ((args-sans-opts (if (null? actual-args-sans-opts)
                                   '("help")
@@ -176,7 +183,8 @@ end-help-string
                        (cdr (assoc "unknown-command" commands)))))
          (cmd (car args-sans-opts)
               opts
-              (cdr args-sans-opts)))))))
+              (cdr args-sans-opts))))
+     *options*)))
 
 ;; Run!
-(main)
+(main (command-line))
