@@ -1,6 +1,6 @@
 (info/color 'brown "Bootstrapping Scheme Spheres")
 (##include "src/spheres#.scm")
-(##include "src/sake/extensions.scm")
+(##include "src/sake/extensions/core.scm")
 
 ;;------------------------------------------------------------------------------
 ;;!! Stage 1: Sake and Spheres program

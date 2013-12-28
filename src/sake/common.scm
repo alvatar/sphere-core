@@ -93,26 +93,34 @@
                             (if (string=? dir (current-directory))
                                 "current directory."
                                 dir))))
-    (eval `(begin
-             (##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
-             (##include "~~lib/gambit#.scm")
-             (##include "~~spheres/core/src/sake/sakelib#.scm")
-             (##namespace ("" alexpand))
-             ,(let ((prelude-file "~~spheres/spheres#.scm")
-                    (sake-extensions "~~spheres/core/src/sake/extensions.scm"))
-                (if (file-exists? prelude-file)
-                    `(begin (include ,prelude-file)
-                            (include ,sake-extensions))))
-             (##include ,file)
-             ,@(map (lambda (t)
-                      `(with-exception-catcher
-                        (lambda (ex)
-                          (if (unbound-global-exception? ex)
-                              (let ((undefined-variable (unbound-global-exception-variable ex)))
-                               (if (eq? ,t undefined-variable)
-                                   (err ,(string-append "task '" (symbol->string t) "' not found in " file))
-                                   (err (string-append "unbound global variable '" (symbol->string undefined-variable) "'."))))
-                              (raise ex)))
-                        (lambda () (task-run ,t)))) tasks)))
+    (let* ((prelude-file "~~spheres/spheres#.scm")
+           (extensions-directory "~~spheres/core/src/sake/extensions/")
+           (bootstrapping? (not (and (file-exists? prelude-file)
+                                     (file-exists? extensions-directory)))))
+      (eval `(begin
+               (##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
+               (##include "~~lib/gambit#.scm")
+               (##include "~~spheres/core/src/sake/sakelib#.scm")
+               ,(let ((sake-extensions (if bootstrapping?
+                                           '("src/sake/extensions/core.scm")
+                                           (map (lambda (f) (string-append extensions-directory f))
+                                                (directory-files
+                                                 (list path: extensions-directory
+                                                       ignore-hidden: 'dot-and-dot-dot))))))
+                  (if (not bootstrapping?)
+                      `(begin (include ,prelude-file)
+                              ,@(map (lambda (e) `(include ,e)) sake-extensions))))
+               (##include ,file)
+               ,@(map (lambda (t)
+                        `(with-exception-catcher
+                          (lambda (ex)
+                            (if (unbound-global-exception? ex)
+                                (let ((undefined-variable (unbound-global-exception-variable ex)))
+                                  (if (eq? ,t undefined-variable)
+                                      (err ,(string-append "task '" (symbol->string t) "' not found in " file))
+                                      (err (string-append "unbound global variable '"
+                                                          (symbol->string undefined-variable) "'."))))
+                                (raise ex)))
+                          (lambda () (task-run ,t)))) tasks))))
     (info "exiting directory " dir)))
 
