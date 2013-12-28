@@ -301,21 +301,18 @@
                            (info "The following dependencies for \033[00;32m"
                                  (object->string (%module-normalize m))
                                  "\033[00m will be linked:")
-                           (map (lambda (mdep)
-                                  (cond
-                                   ((%module=? m mdep)
-                                    (sake#compile-to-c
-                                     mdep
-                                     version: version
-                                     cond-expand-features: (cons 'compile-to-o cond-expand-features)
-                                     compiler-options: compiler-options
-                                     verbose: verbose))
-                                   (else
-                                    (info "    * " (object->string mdep) "")
-                                    (string-append
-                                     (%module-path-lib mdep)
-                                     (%module-filename-c mdep)))))
-                                (%module-deep-dependencies-to-load m)))
+                           (append (map (lambda (mdep)
+                                          (info "    * " (object->string mdep) "")
+                                          (string-append
+                                           (%module-path-lib mdep)
+                                           (%module-filename-c mdep)))
+                                        (%module-deep-dependencies-to-load m))
+                                   (list (sake#compile-to-c
+                                          m
+                                          version: version
+                                          cond-expand-features: cond-expand-features
+                                          compiler-options: compiler-options
+                                          verbose: verbose))))
                          modules))))
       (gambit-eval-here
        `((let* ((link-file (link-incremental ',c-files))
