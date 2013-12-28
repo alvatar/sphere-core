@@ -349,11 +349,11 @@
     output-path))
 
 ;;! Install o and/or C file in the lib/ directory
-(##define (sake#install-compiled-module m
-                                        #!key
-                                        (versions '(()))
-                                        (omit-o #f)
-                                        (omit-c #f))
+(##define (sake#make-module-available m
+                                      #!key
+                                      (versions '(()))
+                                      (omit-o #f)
+                                      (omit-c #f))
   (or (file-exists? (default-lib-directory))
       (make-directory (default-lib-directory)))
   (for-each
