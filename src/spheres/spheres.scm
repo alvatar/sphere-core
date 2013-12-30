@@ -15,7 +15,7 @@ Commands:
     uninstall [sphere]
         [sphere]        uninstall sphere
     update
-        install all dependencies in current project
+        update all dependencies in current project
         --all           update all spheres in the system
         [sphere]        install a sphere
     search
@@ -70,35 +70,48 @@ end-help-string
            (not (= 1 (length args))))
       (die/error "When specifying a version, only one package can be \
                   installed at a time:" args))
-  ;; Do the task
+  ;; Check arguments
   (if (null? args)
-      (die/error "Automatic installation of dependencies NOT IMPLEMENTED")
-      (let ((target-id (car args)))
-        ;; Special handling of the Core Sphere
-        (if (string=? "core" (car args))
-            (die/error "Don't try to install the Core Sphere like this. Please read http://www.schemespheres.org/guides/en/quickstart"))
-        (with-input-from-process
-         (list path: "curl"
-               arguments: '("https://raw.github.com/alvatar/spheres/master/universe.scm"))
-         (lambda () (let ((index (read-all)))
-                 (let recur ((i index))
-                   (cond ((null? i)
-                          (println "No Sphere found with that name in the repository"))
-                         ((and (equal? sphere: (caar i))
-                               (assq id: (cdar i))                                
-                               (string=? (cadr (assq id: (cdar i))) target-id))
-                          (if (file-exists? (string-append (path-expand "~~spheres/") target-id))
-                              (println (string-append "Sphere " target-id " is already installed"))
-                              (shell-command
-                               (string-append "git clone "
-                                              (cadr (assq repository: (cdar i)))
-                                              " "
-                                              (path-expand "~~spheres/")
-                                              target-id)))
-                          (shell-command
-                           (string-append
-                            "cd " (path-expand "~~spheres/") target-id " && sake")))
-                         (else (recur (cdr i)))))))))))
+      (die/error "Automatic installation of dependencies NOT IMPLEMENTED"))
+  (for-each (lambda (arg)
+              (if (string=? "core" arg)
+                  (die/error "Core Sphere is not intended to be installed with the 'spheres' program.")))
+            args)
+  ;; Do the task
+  (with-input-from-process
+   (list path: "curl"
+         arguments: '("https://raw.github.com/alvatar/spheres/master/universe.scm"))
+   (lambda ()
+     (let ((index (read-all)))
+      (for-each
+       (lambda (target-id)
+         (let recur ((i index))
+           (cond ((null? i)
+                  (die/error "No Sphere found with name" target-id "in the repository"))
+                 ((and (equal? sphere: (caar i))
+                       (assq id: (cdar i))                                
+                       (string=? (cadr (assq id: (cdar i))) target-id))
+                  ;; Clone or update
+                  (if (file-exists? (string-append (path-expand "~~spheres/") target-id))
+                      (begin
+                        (println (string-append "*** INFO -- Sphere " target-id " is already installed. Pulling latest changes."))
+                        (shell-command
+                         (string-append "cd " (path-expand "~~spheres/") target-id " && git pull")))
+                      (shell-command
+                       (string-append "git clone "
+                                      (cadr (assq repository: (cdar i)))
+                                      " "
+                                      (path-expand "~~spheres/")
+                                      target-id)))
+                  ;; Run Sake
+                  (shell-command
+                   (string-append
+                    "cd " (path-expand "~~spheres/") target-id " && sake")))
+                 (else (recur (cdr i))))))
+       args))))
+  ;; End info
+  (println (string-append "*** INFO -- The following Spheres have been successfully installed:"))
+  (for-each (lambda (target-id) (println (string-append "*** INFO --      * " target-id))) args))
 
 ;; Command: UNINSTALL
 (define (uninstall-cmd cmd opts args)
@@ -116,7 +129,7 @@ end-help-string
                   uninstalled at a time:" args))
   ;; Special handling of the Core Sphere
   (if (string=? "core" (car args))
-            (die/error "Don't try to uninstall the Core Sphere like this, you won't be able to run this program again."))
+      (die/error "Core Sphere is not intended to be uninstalled with the 'spheres' program. Please do so manually: remove " (path-expand "~~spheres/")))
   ;; Do the task
   (let ((sphere-path (string-append (path-expand "~~spheres") (car args))))
     (if (file-exists? sphere-path)
@@ -142,7 +155,10 @@ end-help-string
           (delete-directory sphere-path))
         (begin
           (println (string-append "Sphere " (car args) " is not installed"))
-          (exit 1)))))
+          (exit 1))))
+  ;; End info
+  (println (string-append "*** INFO -- The following Spheres have been successfully uninstalled:"))
+  (for-each (lambda (target-id) (println (string-append "*** INFO --      * " target-id))) args))
 
 ;; Command: INSTALL
 (define (update-cmd cmd opts args)
