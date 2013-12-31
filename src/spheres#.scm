@@ -514,9 +514,12 @@ fig.scm file"))
                           (reverse (cons " " free-strings)))
                    (if (null? pkg-config--cflags-list)
                        ""
-                       (with-input-from-process
-                        (list path: "pkg-config" arguments: (cons "--cflags" pkg-config--cflags-list))
-                        read-line)))))
+                       (let ((p (open-process
+                                 (list path: "pkg-config"
+                                       arguments: (cons "--cflags" pkg-config--cflags-list)))))
+                         (if (zero? (process-status p))
+                             (read-line p)
+                             (error "Error running pkg-config: any C library in the dependency list might not be installed, pkg-config might not be installed, or config.scm file might be misconfigured.")))))))
 
 ;;! Get a string of cc-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-cc-options module)
@@ -544,9 +547,12 @@ fig.scm file"))
                           (reverse (cons " " free-strings)))
                    (if (null? pkg-config--libs-list)
                        ""
-                       (with-input-from-process
-                        (list path: "pkg-config" arguments: (cons "--libs" pkg-config--libs-list))
-                        read-line)))))
+                       (let ((p (open-process
+                                 (list path: "pkg-config"
+                                       arguments: (cons "--libs" pkg-config--libs-list)))))
+                         (if (zero? (process-status p))
+                             (read-line p)
+                             (error "Error running pkg-config: any C library in the dependency list might not be installed, pkg-config might not be installed, or config.scm file might be misconfigured.")))))))
 
 ;;! Get a string of ld-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-ld-options module)

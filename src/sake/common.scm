@@ -114,13 +114,25 @@
                ,@(map (lambda (t)
                         `(with-exception-catcher
                           (lambda (ex)
-                            (if (unbound-global-exception? ex)
-                                (let ((undefined-variable (unbound-global-exception-variable ex)))
-                                  (if (eq? ,t undefined-variable)
-                                      (err ,(string-append "task '" (symbol->string t) "' not found in " file))
-                                      (err (string-append "unbound global variable '"
-                                                          (symbol->string undefined-variable) "'."))))
-                                (raise ex)))
+                            (let ((seems-same-symbol?
+                                   (lambda (unmangled mangled)
+                                     (let* ((task-str unmangled)
+                                            (undefined-variable mangled)
+                                            (undef-str (symbol->string undefined-variable))
+                                            (undef-str-len (string-length undef-str))
+                                            (task-str (symbol->string ',t))
+                                            (task-str-len (string-length task-str)))
+                                       (substring undef-str
+                                                  (- undef-str-len task-str-len)
+                                                  undef-str-len)))))
+                              (if (unbound-global-exception? ex)
+                                  (let ((undefined-variable (unbound-global-exception-variable ex)))
+                                  
+                                    (if (seems-same-symbol? ',t undefined-variable)
+                                        (err ,(string-append "seems like you are calling a task '" (symbol->string t) "' not found in " file))
+                                        (err (string-append "unbound global variable '"
+                                                            (symbol->string undefined-variable) "'."))))
+                                  (raise ex))))
                           (lambda () (task-run ,t)))) tasks))))
     (info "exiting directory " dir)))
 

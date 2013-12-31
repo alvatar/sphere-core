@@ -8,6 +8,7 @@
 (define sphere-path "~~spheres/core/")
 
 (define-task init ()
+  (sake#default-clean)
   (make-directory (current-build-directory))
   (make-directory (current-lib-directory)))
 
