@@ -6,6 +6,7 @@
 ;;!! Stage 1: Sake and Spheres program
 
 (define sphere-path "~~spheres/core/")
+(define sake-extensions-path "~~spheres/sake-extensions/src/")
 
 (define-task init ()
   (sake#default-clean)
@@ -31,6 +32,10 @@
   ;; Install Sake program
   (delete-file "~~/bin/sake")
   (make-directory "~~spheres/core/src/sake")
+  (if (not (file-exists? sake-extensions-path))
+      (make-directory sake-extensions-path))
+  (copy-file (string-append (current-source-directory) "sake/extensions/core.scm")
+             (string-append sake-extensions-path "core.scm"))
   (copy-file (string-append (current-build-directory) "sake") "~~/bin/sake")
   (copy-files (fileset dir: (string-append (current-source-directory) "sake")
                        test: (ends-with? ".scm")
@@ -113,6 +118,7 @@
   (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
   (delete-file (string-append (user-info-home (user-info (user-name))) "/.gambcini"))
+  (delete-file (string-append sake-extensions-path "core.scm"))
   (delete-file "~~bin/sake")
   (delete-file "~~bin/spheres")
   (delete-file "~~/#spheres")

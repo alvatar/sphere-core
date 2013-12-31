@@ -94,7 +94,7 @@
                                 "current directory."
                                 dir))))
     (let* ((prelude-file "~~spheres/spheres#.scm")
-           (extensions-directory "~~spheres/core/src/sake/extensions/")
+           (extensions-directory "~~spheres/sake-extensions/")
            (bootstrapping? (not (and (file-exists? prelude-file)
                                      (file-exists? extensions-directory)))))
       (eval `(begin
