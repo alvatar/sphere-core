@@ -116,15 +116,20 @@
                           (lambda (ex)
                             (let ((seems-same-symbol?
                                    (lambda (unmangled mangled)
-                                     (let* ((task-str unmangled)
+                                     (let* ((task unmangled)
                                             (undefined-variable mangled)
                                             (undef-str (symbol->string undefined-variable))
                                             (undef-str-len (string-length undef-str))
-                                            (task-str (symbol->string ',t))
-                                            (task-str-len (string-length task-str)))
-                                       (substring undef-str
-                                                  (- undef-str-len task-str-len)
-                                                  undef-str-len)))))
+                                            (task-str (symbol->string task))
+                                            (task-str-len (string-length task-str))
+                                            (diff-lengths (- undef-str-len task-str-len)))
+                                       (if (zero? diff-lengths)
+                                           (string=? undef-str task-str)
+                                           (and (string=? (substring undef-str
+                                                                     diff-lengths
+                                                                     undef-str-len)
+                                                          task-str)
+                                                (char=? #\# (string-ref undef-str (- diff-lengths 1)))))))))
                               (if (unbound-global-exception? ex)
                                   (let ((undefined-variable (unbound-global-exception-variable ex)))
                                   
