@@ -105,7 +105,7 @@ end-help-string
                 (with-input-from-string val read))))
      ("branch"
       ,@(lambda (val)
-          (set! branch (with-input-from-string val read))))
+          (set! branch val)))
      ("update"
       ,@(lambda (val)
           (set! update (with-input-from-string val read))))
@@ -173,7 +173,7 @@ end-help-string
                     (if (not (zero? (shell-command
                                      (string-append
                                       "cd " (path-expand "~~spheres/") target-id
-                                      (if branch (string-append " && git checkout " (symbol->string branch)))
+                                      (if branch (string-append " && git checkout " branch))
                                       " && sake"))))
                         (die/error "Error running Sake. Please contact the Sphere maintainer."))
                     (println (string-append "*** INFO -- Not compiling " target-id ". Force with --update if you wish otherwise."))))
