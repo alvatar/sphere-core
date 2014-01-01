@@ -11,8 +11,9 @@
 Usage: spheres [command] [operand]
 
 Commands:
-    install [sphere]
+    install [flags] [sphere]
         install all dependencies in current project (not implemented)
+        -b [branch]     for development purposes, forces a git branch to be used
         [sphere]        install sphere
     uninstall [sphere]
         [sphere]        uninstall sphere
@@ -31,7 +32,9 @@ end-help-string
 ;; List of options
 ;; 1 means that takes an argument, 0 it doesn't
 (define *options*
-  '((#\g 0 "global")))
+  '((#\g 0 "global")
+    (#\b 1 "branch")
+    (#\u 0 "update")))
 
 ;; Command: HELP
 (define (help-cmd cmd opts args)
@@ -57,15 +60,58 @@ end-help-string
   (define version #t)
   (define compile #t)
   (define ignore-dependencies #f)
-
+  (define branch "master")
+  (define update #f)
+  (define (index-spheres index)
+    (map cdr (filter (lambda (e) (and (pair? e) (eq? (car e) sphere:))) index)))
+  (define index-find-sphere
+    (lambda (index target)
+      (call/cc (lambda (done)
+                 (foldl (lambda (x sphere)
+                          (let ((id (assq id: sphere)))
+                            (and id (string=? target (cadr id)) (done sphere))))
+                        #f (index-spheres index))))))
+  (define sphere-find-attribute
+    (lambda (sphere attr)
+      (let ((attr (assq attr sphere))) (and attr (cdr attr)))))
+  (define compute-dependencies
+    (let ((result '()))
+      (lambda (index root-spheres)
+        (letrec
+            ((recur
+              (lambda (sphere)
+                (let* ((deps-sym (sphere-find-attribute
+                                  (index-find-sphere index sphere) dependencies:))
+                       (deps (and deps-sym (map symbol->string deps-sym))))
+                  (if deps
+                      (for-each (lambda (dep)
+                                  (if (not (member dep result))
+                                      (begin
+                                        (set! result (cons dep result))
+                                        (for-each (lambda (dep) (recur dep)) deps))))
+                                deps))))))
+          (for-each (lambda (s)
+                      (recur s)
+                      ;; After adding all the dependencies of a root sphere, add it
+                      (if (not (member s result))
+                          (set! result (cons s result))))
+                    root-spheres)
+          (reverse result)))))
   (handle-opts!
    opts
    `(("version"
       ,@(lambda (val)
           (set! version
                 (with-input-from-string val read))))
+     ("branch"
+      ,@(lambda (val)
+          (set! branch (with-input-from-string val read))))
+     ("update"
+      ,@(lambda (val)
+          (set! update (with-input-from-string val read))))
      ("ignore-dependencies"
       ,@(lambda (val)
+          (error "Not implemented")
           (set! ignore-dependencies (not (equal? val "no")))))))
 
   (if (and (not (eqv? #t version))
@@ -99,11 +145,14 @@ end-help-string
                 ;; Clone or update
                 (if (file-exists? (string-append (path-expand "~~spheres/") target-id))
                     ;; It seems the sphere is already installed
-                    (begin
-                      (println (string-append "*** INFO -- Sphere " target-id " is already installed. Pulling latest changes."))
-                      (if (not (zero? (shell-command
-                                       (string-append "cd " (path-expand "~~spheres/") target-id " && git pull"))))
-                          (die/error "Git error: Check network connectivity, uninstall the Sphere and try again.")))
+                    (if (or (member target-id args)
+                            update)
+                        (begin
+                          (println (string-append "*** INFO -- Sphere " target-id " is already installed. Pulling latest changes."))
+                          (if (not (zero? (shell-command
+                                           (string-append "cd " (path-expand "~~spheres/") target-id " && git pull"))))
+                              (die/error "Git error: Check network connectivity, uninstall the Sphere and try again.")))
+                        (println (string-append "*** INFO -- Not updating " target-id ". Force with --update if you wish otherwise.")))
                     ;; First try with Git protocol, then Https
                     (if (not (or (zero? (shell-command
                                          (string-append "git clone "
@@ -118,13 +167,18 @@ end-help-string
                                                         (path-expand "~~spheres/")
                                                         target-id)))))
                         (die/error "Git error: Check network connectivity, uninstall the Sphere and try again.")))
-                ;; Run Sake
-                (if (not (zero? (shell-command
-                                 (string-append
-                                  "cd " (path-expand "~~spheres/") target-id " && sake"))))
-                    (die/error "Error running Sake. Please contact the Sphere maintainer.")))
+                ;; Run Sake (if mentioned in the command line or forcing with --update)
+                (if (or (member target-id args)
+                        update)
+                    (if (not (zero? (shell-command
+                                     (string-append
+                                      "cd " (path-expand "~~spheres/") target-id
+                                      (if branch (string-append " && git checkout " (symbol->string branch)))
+                                      " && sake"))))
+                        (die/error "Error running Sake. Please contact the Sphere maintainer."))
+                    (println (string-append "*** INFO -- Not compiling " target-id ". Force with --update if you wish otherwise."))))
                (else (recur (cdr i))))))
-     args))
+     (compute-dependencies index args)))
   ;; End info
   (println (string-append "*** INFO -- The following Spheres have been successfully installed:"))
   (for-each (lambda (target-id) (println (string-append "*** INFO --      * " target-id))) args))
@@ -207,7 +261,7 @@ end-help-string
 (define (unknown-cmd cmd opts args-sans-opts)
   (die/error "Unknown command:"
              cmd
-             "To get a list of options, type 'bh help'"))
+             "To get a list of options, type 'spheres help'"))
 
 (define (main . args)
   (let ((commands
