@@ -22,7 +22,9 @@
     (let* ((header-module (%module-header module))
            (macros-module (%module-macros module))
            (version (if (null? version) (%module-version module) version))
-           (input-file (string-append (default-src-directory) (%module-filename-scm module)))
+           (input-file (string-append (%sphere-path (%module-sphere module))
+                                      (default-src-directory)
+                                      (%module-filename-scm module)))
            (intermediate-file (string-append (default-build-directory)
                                              "_%_"
                                              (%module-flat-name module)
@@ -305,9 +307,25 @@
                                  "\033[00m will be linked:")
                            (append (map (lambda (mdep)
                                           (info "    * " (object->string mdep) "")
-                                          (string-append
-                                           (%module-path-lib mdep)
-                                           (%module-filename-c mdep)))
+                                          ;; First try with the default path
+                                          (let ((default-path (string-append
+                                                               (%module-path-lib mdep)
+                                                               (%module-filename-c mdep))))
+                                            (if (file-exists? default-path)
+                                                default-path
+                                                (let ((local-path (string-append
+                                                                   (current-build-directory)
+                                                                   (%module-filename-c mdep))))
+                                                  (if (file-exists? local-path)
+                                                      local-path
+                                                      (begin
+                                                        (info "Compiling deferred dependency "
+                                                              (object->string (%module-normalize mdep)))
+                                                        (sake#compile-to-c mdep
+                                                                           version: version
+                                                                           cond-expand-features: cond-expand-features
+                                                                           compiler-options: compiler-options
+                                                                           verbose: verbose)))))))
                                         (%module-deep-dependencies-to-load m))
                                    (list (sake#compile-to-c
                                           m
