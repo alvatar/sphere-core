@@ -18,7 +18,7 @@
   (let ((module (if (string? module-or-file)
                     (error "Handling of module as file is unimplemented")
                     module-or-file)))
-    (%check-module module)
+    (%check-module module 'sake#compile-to-c)
     (let* ((header-module (%module-header module))
            (macros-module (%module-macros module))
            (version (if (null? version) (%module-version module) version))
@@ -387,7 +387,7 @@
          `((eval '(expander:include ,module))))
         (error "Testing file doesn't exist")))
    ((%module? module)
-    (%check-module module)
+    (%check-module module 'sake#test)
     (gambit-eval-here
      `((eval '(expander:include ,(string-append "test/"
                                                 (%module-filename-scm module)))))))

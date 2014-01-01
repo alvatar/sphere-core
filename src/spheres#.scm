@@ -216,9 +216,13 @@ fig.scm file"))
 
 
 ;;------------------------------------------------------------------------------
+;;!! Module (unchecked functions)
 
-;;!! Module
+;;! Throw a module format error
+(define^ (%module-error module)
+  (error "Error parsing module directive (wrong module format): " module))
 
+;;! Build a module
 (define^ (%make-module #!key (sphere #f) id (version '()))
   (if sphere
       (append (list (->keyword sphere)
@@ -228,7 +232,6 @@ fig.scm file"))
 
 ;;! Module structure: (sphere: module-id [version: '(list-of-version-features)])
 (define^ %module-reduced-form? symbol?)
-
 (define^ (%module-normal-form? module)
   (and (list? module)
        (or (keyword? (car module))
@@ -242,6 +245,7 @@ fig.scm file"))
            (and (eq? version: (caddr module))
                 (list? (cadddr module))))))
 
+;;! Normalize module to the normal form, allowing comparison of modules with different formats
 (define^ (%module-normalize module
                             #!key
                             (override-sphere #f)
@@ -260,17 +264,14 @@ fig.scm file"))
   (equal? (%module-normalize m1)
           (%module-normalize m2)))
 
-;;! Throw a module format error
-(define^ (%module-error module)
-  (error "Error parsing module directive (wrong module format): " module))
-
 ;;! Check if module exists
-(define^ (%check-module module)
+(define^ (%check-module module caller)
   (or (%module? module)
-      (error "Ill-defined module: " module))
+      (error (string-append "Ill-defined module: " (object->string module)
+                            " -> detected in " (object->string caller))))
   (let ((sphere (%module-sphere module)))
     (or (%sphere-exists? sphere)
-        (error "Sphere doesn't exist: " (symbol->string sphere))))
+        (error (string-append "Sphere '" (symbol->string sphere) "' not found in the system."))))
   (or (string-append (%module-path-src module) (%module-filename-scm module))
       (string-append (%module-path-lib module) (%module-filename-o module))
       (error "Module doesn't exist: " (object->string module))))
@@ -299,23 +300,30 @@ fig.scm file"))
       '()))
 
 (define^ (%module-path module)
+  (or (%module? module) (%module-error module))
   (let ((sphere (%module-sphere module)))
     (if sphere
         (%sphere-path sphere)
         "")))
 
 (define^ (%module-path-src module)
+  (or (%module? module) (%module-error module))
   (string-append (%module-path module) (default-src-directory)))
 
 (define^ (%module-path-lib module)
+  (or (%module? module) (%module-error module))
   (string-append (%module-path module) (default-lib-directory)))
 
 (define^ (%module-namespace module)
+  (or (%module? module) (%module-error module))
   (string-append
    (symbol->string (%module-sphere module))
    ":"
    (symbol->string (%module-id module))
    "#"))
+
+;;------------------------------------------------------------------------------
+;;!! Module (checked functions)
 
 ;;! Module versions identify debug, architecture or any compiled-in features
 ;; Normalizes removing duplicates and sorting alphabetically
@@ -350,7 +358,6 @@ fig.scm file"))
 
 ;;! Transforms / into _
 (define^ (%module-flat-name module)
-  (or (%module? module) (%module-error module))
   (let ((name (string-copy (symbol->string (%module-id module)))))
     (let recur ((i (- (string-length name) 1)))
       (if (= i 0)
@@ -360,12 +367,10 @@ fig.scm file"))
                  (recur (- i 1)))))))
 
 (define^ (%module-filename-scm module)
-  (or (%module? module) (%module-error module))
   (string-append (symbol->string (%module-id module))
                  (default-scm-extension)))
 
 (define^ (%module-filename-c module #!key (version '()))
-  (or (%module? module) (%module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -375,7 +380,6 @@ fig.scm file"))
                  (default-c-extension)))
 
 (define^ (%module-filename-o module #!key (version '()))
-  (or (%module? module) (%module-error module))
   (string-append (if (null? version)
                      (%version->string (%module-version module))
                      (%version->string version))
@@ -386,7 +390,7 @@ fig.scm file"))
 
 ;;! Module dependecies, as directly read from the %config
 (define^ (%module-dependencies module)
-  (%check-module module)
+  (%check-module module '%module-dependencies)
   (assq (%module-id module) (%sphere-dependencies (%module-sphere module))))
 
 ;;! Builds a procedure to get a list of dependencies of one type
@@ -424,7 +428,7 @@ fig.scm file"))
                      (car sphere-deps))
                     (else (find-dependencies-list module sphere (cdr sphere-deps) omit-version?))))))
     (lambda (module)
-      (%check-module module)
+      (%check-module module %module-shallow-dependencies-select)
       (let ((module-sphere (%module-sphere module))
             (get-dependency-list (lambda (l) (let ((type-pair (assq type (cdr l))))
                                           (if type-pair (cdr type-pair) '())))))
@@ -452,18 +456,23 @@ fig.scm file"))
                     '()))))))))
 
 (define^ (%module-shallow-dependencies-to-prelude module)
+  (%check-module module '%module-shallow-dependencies-to-prelude)
   ((%module-shallow-dependencies-select 'prelude) module))
 
 (define^ (%module-shallow-dependencies-to-include module)
+  (%check-module module '%module-shallow-dependencies-to-include)
   ((%module-shallow-dependencies-select 'include) module))
 
 (define^ (%module-shallow-dependencies-to-load module)
+  (%check-module module '%module-shallow-dependencies-to-load)
   ((%module-shallow-dependencies-select 'load) module))
 
 (define^ (%module-shallow-dependencies-cc-options module)
+  (%check-module module '%module-shallow-dependencies-cc-options)
   ((%module-shallow-dependencies-select 'cc-options) module))
 
 (define^ (%module-shallow-dependencies-ld-options module)
+  (%check-module module '%module-shallow-dependencies-ld-options)
   ((%module-shallow-dependencies-select 'ld-options) module))
 
 ;;! Gets the full tree of dependencies, building a list in the right order
@@ -486,10 +495,12 @@ fig.scm file"))
 
 ;;! Gets a list with all the dependencies to load in the right order
 (define^ (%module-deep-dependencies-to-load module)
+  (%check-module module '%module-deep-dependencies-to-load)
   ((%module-deep-dependencies-select 'load 'load) module))
 
 ;;! Gets a list with all the dependencies to include in the right order
 (define^ (%module-deep-dependencies-to-include module)
+  (%check-module module '%module-deep-dependencies-to-include)
   ((%module-deep-dependencies-select 'include 'include) module))
 
 ;;! Convert cc-options dependencies into a string
@@ -523,6 +534,7 @@ fig.scm file"))
 
 ;;! Get a string of cc-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-cc-options module)
+  (%check-module module '%module-deep-dependencies-cc-options)
   ((%module-deep-dependencies-select 'load 'cc-options) module))
 
 ;;! Convert ld-options dependencies into a string
@@ -556,11 +568,11 @@ fig.scm file"))
 
 ;;! Get a string of ld-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-ld-options module)
+  (%check-module module '%module-deep-dependencies-ld-options)
   ((%module-deep-dependencies-select 'load 'ld-options) module))
 
 
 ;;------------------------------------------------------------------------------
-
 ;;!! Utils
 
 ;;! Builds a new list of modules merging two lists
@@ -589,11 +601,11 @@ fig.scm file"))
 
 
 ;;------------------------------------------------------------------------------
-
 ;;!! Including and loading
 
 ;;! Is there a header for this module? If so, return the header module
 (define^ (%module-header module)
+  (%check-module module '%module-header)
   (let ((header-module (%make-module
                         sphere: (%module-sphere module)
                         id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
@@ -605,6 +617,7 @@ fig.scm file"))
 
 ;;! Is there a macros module for this module? If so, return the macros module
 (define^ (%module-macros module)
+  (%check-module module '%module-macros)
   (let ((macros-module (%make-module
                         sphere: (%module-sphere module)
                         id: (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
@@ -656,7 +669,7 @@ fig.scm file"))
    ##load-module-and-dependencies
    (let ((load-single-module
           (lambda (module options)
-            (%check-module module)
+            (%check-module module '##load-module-and-dependencies#load-single-module)
             (let ((verbose (and (memq 'verbose options) #t))
                   (includes (and (memq 'includes options) #t))
                   (sphere (%module-sphere module)))
@@ -712,7 +725,7 @@ fig.scm file"))
    ((and (pair? (car module))
          (eq? 'quote (caar module)))
     (let ((module (cadar module)))
-      (%check-module module)
+      (%check-module module '##import-include)
       `(##include-module-and-dependencies ',module '(verbose))))
    ;; oterwise act normally
    (else
@@ -728,7 +741,7 @@ fig.scm file"))
                                     (string-shrink! str (- (string-length str) 1))
                                     (string->keyword str))))
                             (cdr module)))))
-      (%check-module module)
+      (%check-module module '##import-include)
       `(##include-module-and-dependencies ',module '(verbose))))))
 
 ;;; Load only module dependencies, do not load the module
@@ -754,5 +767,5 @@ fig.scm file"))
                                    (string-shrink! str (- str-len 1))                                   
                                    (string->keyword str))))
                            (cdr module)))))
-    (%check-module module)
+    (%check-module module '##import)
     `(##load-module-and-dependencies ',module '(verbose includes))))
