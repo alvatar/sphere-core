@@ -81,7 +81,8 @@ end-help-string
             ((recur
               (lambda (sphere)
                 (let* ((deps-sym (sphere-find-attribute
-                                  (index-find-sphere index sphere) dependencies:))
+                                  (or (index-find-sphere index sphere)
+                                      (die/error "Sphere" sphere "not found in the repository")) dependencies:))
                        (deps (and deps-sym (map symbol->string deps-sym))))
                   (if deps
                       (for-each (lambda (dep)
@@ -138,7 +139,7 @@ end-help-string
      (lambda (target-id)
        (let recur ((i index))
          (cond ((null? i)
-                (die/error "No Sphere \"" target-id "\" found in the repository"))
+                (die/error "Sphere" target-id "not found in the repository"))
                ((and (equal? sphere: (caar i))
                      (assq id: (cdar i))                                
                      (string=? (cadr (assq id: (cdar i))) target-id))
