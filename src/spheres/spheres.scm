@@ -3,6 +3,7 @@
 ;;; Spheres: manage packages from SchemeSpheres.org
 
 (include "../arguments.scm")
+(include "tiny.scm")
 
 
 (define *help:general* #<<end-help-string
@@ -146,34 +147,49 @@ end-help-string
   (if (string=? "core" (car args))
       (die/error "Core Sphere is not intended to be uninstalled with the 'spheres' program. Please do so manually: remove " (path-expand "~~spheres/")))
   ;; Do the task
-  (let ((sphere-path (string-append (path-expand "~~spheres") (car args))))
-    (if (file-exists? sphere-path)
-        ;; All this just to remove files recursively
-        (begin
-          (let ((files (directory-files (list path: sphere-path
-                                              ignore-hidden: 'dot-and-dot-dot))))
+  (let ((results
+         (map
+          (lambda (sphere-id)
+            (let ((sphere-path (string-append (path-expand "~~spheres") sphere-id)))
+              (if (file-exists? sphere-path)
+                  ;; All this just to remove files recursively
+                  (begin
+                    (let ((files (directory-files (list path: sphere-path
+                                                        ignore-hidden: 'dot-and-dot-dot))))
 
-            (let recur ((files files)
-                        (path (path-expand sphere-path)))
-              (if (null? files)
-                  'done
-                  (let ((full-path (string-append path "/" (car files))))
-                    (if (eqv? (file-info-type (file-info full-path)) 'directory)
-                        (begin (recur (directory-files (list path: full-path
-                                                             ignore-hidden: 'dot-and-dot-dot))
-                                      full-path)
-                               (delete-directory full-path)
-                               (recur (cdr files) path))
-                        (begin
-                          (delete-file full-path)
-                          (recur (cdr files) path)))))))
-          (delete-directory sphere-path))
-        (begin
-          (println (string-append "Sphere " (car args) " is not installed"))
-          (exit 1))))
-  ;; End info
-  (println (string-append "*** INFO -- The following Spheres have been successfully uninstalled:"))
-  (for-each (lambda (target-id) (println (string-append "*** INFO --      * " target-id))) args))
+                      (let recur ((files files)
+                                  (path (path-expand sphere-path)))
+                        (if (null? files)
+                            'done
+                            (let ((full-path (string-append path "/" (car files))))
+                              (if (eqv? (file-info-type (file-info full-path)) 'directory)
+                                  (begin (recur (directory-files (list path: full-path
+                                                                       ignore-hidden: 'dot-and-dot-dot))
+                                                full-path)
+                                         (delete-directory full-path)
+                                         (recur (cdr files) path))
+                                  (begin
+                                    (delete-file full-path)
+                                    (recur (cdr files) path)))))))
+                    (delete-directory sphere-path)
+                    (list sphere-id "OK"))
+                  (list error: sphere-id "\033[00;31mERROR -- Sphere is not found in the system\033[00m"))))
+          args)))
+    ;; End info
+    (println (string-append "*** INFO -- The following Spheres have been uninstalled:"))
+    (foldl (lambda (unused result)
+             ;; Errors are encoded as (error: sphere-id 
+             (if (eq? error: (car result))
+                 (println (string-append "*** INFO --      * "
+                                         (cadr result)
+                                         ": "
+                                         (caddr result)))
+                 (println (string-append "*** INFO --      * "
+                                         (car result)
+                                         ": "
+                                         (cadr result)))))
+           #f
+           results)))
 
 ;; Command: INSTALL
 (define (update-cmd cmd opts args)
@@ -219,3 +235,4 @@ end-help-string
 
 ;; Run!
 (apply main (cdr (command-line)))
+
