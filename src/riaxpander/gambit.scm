@@ -78,11 +78,6 @@
      (else
       form*))))
 
-(define (riaxpander:include file)
-  (for-each eval (with-input-from-file
-                     file
-                   (lambda () (read-all)))))
-
 (define (expand-toplevel-syntax-definition name)
   (let ((transformer (syntactic-lookup riaxpander:top-level-environment name)))
     (if (transformer? transformer)
@@ -539,6 +534,19 @@
   history                               ;ignore
   `(##begin ,@(map gambit/compile-expression expressions)))
 
+(define (riaxpander:include file)
+  (with-input-from-file
+      file
+    (lambda () (let recur ((form (read)))
+            (if (not (eof-object? form))
+                (begin (eval form)
+                       (recur (read))))))))
+;; (define (riaxpander:include file)
+;;   (for-each eval (with-input-from-file file read-all)))
+
+;; Redefine include
+(eval '(define-macro (include #!rest f) `(expander:include ,@f)))
+
 ;; (define-syntax define-macro
 ;;   (syntax-rules ()
 ;;     ((_ (id . llist) . body) 
@@ -566,4 +574,3 @@
 ;;          (xs '() (cons x xs)))
 ;;         ((eof-object? x) 
 ;;          (reverse xs)))))))))))
-
