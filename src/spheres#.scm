@@ -259,11 +259,6 @@ fig.scm file"))
   (or (%module-reduced-form? module)
       (%module-normal-form? module)))
 
-;;! Module equality
-(define^ (%module=? m1 m2)
-  (equal? (%module-normalize m1)
-          (%module-normalize m2)))
-
 ;;! Check if module exists
 (define^ (%check-module module caller)
   (or (%module? module)
@@ -299,6 +294,20 @@ fig.scm file"))
             '()))
       '()))
 
+
+;;! Module equality
+(define^ (%module=? m1 m2)
+  (equal? (%module-normalize m1)
+          (%module-normalize m2)))
+
+;;! Module equality (without version
+(define^ (%module~=? m1 m2)
+  (and (equal? (%module-sphere m1)
+               (%module-sphere m2))
+       (equal? (%module-id m1)
+               (%module-id m2))))
+
+;;! Path of the module's sphere
 (define^ (%module-path module)
   (or (%module? module) (%module-error module))
   (let ((sphere (%module-sphere module)))
@@ -321,9 +330,6 @@ fig.scm file"))
    ":"
    (symbol->string (%module-id module))
    "#"))
-
-;;------------------------------------------------------------------------------
-;;!! Module (checked functions)
 
 ;;! Module versions identify debug, architecture or any compiled-in features
 ;; Normalizes removing duplicates and sorting alphabetically
@@ -388,6 +394,35 @@ fig.scm file"))
                  (%module-flat-name module)
                  (default-o-extension)))
 
+
+;;------------------------------------------------------------------------------
+;;!! Module (checked functions)
+
+
+;;! Is there a header for this module? If so, return the header module
+(define^ (%module-header module)
+  (%check-module module '%module-header)
+  (let ((header-module (%make-module
+                        sphere: (%module-sphere module)
+                        id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
+                        version: (%module-version module))))
+    (and (file-exists?
+          (string-append (%module-path-src header-module)
+                         (%module-filename-scm header-module)))
+         header-module)))
+
+;;! Is there a macros module for this module? If so, return the macros module
+(define^ (%module-macros module)
+  (%check-module module '%module-macros)
+  (let ((macros-module (%make-module
+                        sphere: (%module-sphere module)
+                        id: (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
+                        version: (%module-version module))))
+    (and (file-exists?
+          (string-append (%module-path-src macros-module)
+                         (%module-filename-scm macros-module)))
+         macros-module)))
+
 ;;! Module dependecies, as directly read from the %config
 (define^ (%module-dependencies module)
   (%check-module module '%module-dependencies)
@@ -400,7 +435,7 @@ fig.scm file"))
 ;; dependency first before falling back.
 ;; Resulting dependency lists are normalized modules. However, if the dependency lists contains stuff
 ;; other than modules, they are not normalized (obviously).
-(define^ (%module-shallow-dependencies-select type)
+(define^ (%module-shallow-dependencies-select type find-with-postfix)
   (letrec ((find-dependencies-list
             (lambda (module sphere sphere-deps omit-version?)
               (cond ((null? sphere-deps) #f)
@@ -431,7 +466,26 @@ fig.scm file"))
       (%check-module module %module-shallow-dependencies-select)
       (let ((module-sphere (%module-sphere module))
             (get-dependency-list (lambda (l) (let ((type-pair (assq type (cdr l))))
-                                          (if type-pair (cdr type-pair) '())))))
+                                          (if type-pair (cdr type-pair) '()))))
+           (add-found-with-postfix
+             (lambda (dependency-list)
+               (if find-with-postfix
+                   (let ((search-module (%make-module
+                                        sphere: (%module-sphere module)
+                                        id: (string->symbol (string-append
+                                                             (symbol->string (%module-id module))
+                                                             find-with-postfix))
+                                        version: (%module-version module))))
+                     (if (file-exists?
+                          (string-append (%module-path-src search-module)
+                                         (%module-filename-scm search-module)))
+                         ;; Add if file exists and another version is not already in the list
+                         (let recur ((lis dependency-list))
+                                (cond ((null? lis) (cons search-module dependency-list))
+                                      ((%module~=? module search-module) dependency-list)
+                                      (else (recur (cdr lis)))))
+                         dependency-list))
+                   dependency-list))))
         ;; Try first with versioned module
         (let ((versioned (find-dependencies-list module
                                                  module-sphere
@@ -441,7 +495,8 @@ fig.scm file"))
               (map (lambda (m) (if (%module? m)
                               (%module-normalize m)
                               m))
-                   (get-dependency-list versioned))
+                   (add-found-with-postfix
+                    (get-dependency-list versioned)))
               ;; ...otherwise try to find unversioned module in dependency list
               (let ((unversioned (find-dependencies-list module
                                                          module-sphere
@@ -452,28 +507,29 @@ fig.scm file"))
                     (map (lambda (m) (if (%module? m)
                                     (%module-normalize m override-version: (%module-version module))
                                     m))
-                         (get-dependency-list unversioned))
-                    '()))))))))
+                         (add-found-with-postfix
+                          (get-dependency-list unversioned)))
+                    (add-found-with-postfix '())))))))))
 
 (define^ (%module-shallow-dependencies-to-prelude module)
   (%check-module module '%module-shallow-dependencies-to-prelude)
-  ((%module-shallow-dependencies-select 'prelude) module))
+  ((%module-shallow-dependencies-select 'prelude "-prelude") module))
 
 (define^ (%module-shallow-dependencies-to-include module)
   (%check-module module '%module-shallow-dependencies-to-include)
-  ((%module-shallow-dependencies-select 'include) module))
+  ((%module-shallow-dependencies-select 'include "-macros") module))
 
 (define^ (%module-shallow-dependencies-to-load module)
   (%check-module module '%module-shallow-dependencies-to-load)
-  ((%module-shallow-dependencies-select 'load) module))
+  ((%module-shallow-dependencies-select 'load #f) module))
 
 (define^ (%module-shallow-dependencies-cc-options module)
   (%check-module module '%module-shallow-dependencies-cc-options)
-  ((%module-shallow-dependencies-select 'cc-options) module))
+  ((%module-shallow-dependencies-select 'cc-options #f) module))
 
 (define^ (%module-shallow-dependencies-ld-options module)
   (%check-module module '%module-shallow-dependencies-ld-options)
-  ((%module-shallow-dependencies-select 'ld-options) module))
+  ((%module-shallow-dependencies-select 'ld-options #f) module))
 
 ;;! Gets the full tree of dependencies, building a list in the right order
 ;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
@@ -481,27 +537,27 @@ fig.scm file"))
 ;; .parameter symbol-to-return The symbol that the function will record, returning
 ;; it after the whole dependency tree has been traversed
 ;; .parameter append The procedure used to append the returned results
-(define^ (%module-deep-dependencies-select type-to-follow type-to-return)
+(define^ (%module-deep-dependencies-select type-to-follow type-to-return find-with-postfix)
   (lambda (module)
     (let ((deps '()))
       (let recur ((module module))
-        (for-each recur ((%module-shallow-dependencies-select type-to-follow) module))
+        (for-each recur ((%module-shallow-dependencies-select type-to-follow #f) module))
         (or (assq (%module-normalize module) deps)
             (set! deps (cons (list
                               (%module-normalize module)
-                              ((%module-shallow-dependencies-select type-to-return) module))
+                              ((%module-shallow-dependencies-select type-to-return find-with-postfix) module))
                              deps))))
       (apply append (map cadr (reverse deps))))))
 
 ;;! Gets a list with all the dependencies to load in the right order
 (define^ (%module-deep-dependencies-to-load module)
   (%check-module module '%module-deep-dependencies-to-load)
-  ((%module-deep-dependencies-select 'load 'load) module))
+  ((%module-deep-dependencies-select 'load 'load #f) module))
 
 ;;! Gets a list with all the dependencies to include in the right order
 (define^ (%module-deep-dependencies-to-include module)
   (%check-module module '%module-deep-dependencies-to-include)
-  ((%module-deep-dependencies-select 'include 'include) module))
+  ((%module-deep-dependencies-select 'include 'include "-macros") module))
 
 ;;! Convert cc-options dependencies into a string
 (define^ (%process-cc-options option-items)
@@ -535,7 +591,7 @@ fig.scm file"))
 ;;! Get a string of cc-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-cc-options module)
   (%check-module module '%module-deep-dependencies-cc-options)
-  ((%module-deep-dependencies-select 'load 'cc-options) module))
+  ((%module-deep-dependencies-select 'load 'cc-options #f) module))
 
 ;;! Convert ld-options dependencies into a string
 (define^ (%process-ld-options option-items)
@@ -569,7 +625,7 @@ fig.scm file"))
 ;;! Get a string of ld-options from the full deep of dependencies
 (define^ (%module-deep-dependencies-ld-options module)
   (%check-module module '%module-deep-dependencies-ld-options)
-  ((%module-deep-dependencies-select 'load 'ld-options) module))
+  ((%module-deep-dependencies-select 'load 'ld-options #f) module))
 
 
 ;;------------------------------------------------------------------------------
@@ -602,30 +658,6 @@ fig.scm file"))
 
 ;;------------------------------------------------------------------------------
 ;;!! Including and loading
-
-;;! Is there a header for this module? If so, return the header module
-(define^ (%module-header module)
-  (%check-module module '%module-header)
-  (let ((header-module (%make-module
-                        sphere: (%module-sphere module)
-                        id: (string->symbol (string-append (symbol->string (%module-id module)) "#"))
-                        version: (%module-version module))))
-    (and (file-exists?
-          (string-append (%module-path-src header-module)
-                         (%module-filename-scm header-module)))
-         header-module)))
-
-;;! Is there a macros module for this module? If so, return the macros module
-(define^ (%module-macros module)
-  (%check-module module '%module-macros)
-  (let ((macros-module (%make-module
-                        sphere: (%module-sphere module)
-                        id: (string->symbol (string-append (symbol->string (%module-id module)) "-macros"))
-                        version: (%module-version module))))
-    (and (file-exists?
-          (string-append (%module-path-src macros-module)
-                         (%module-filename-scm macros-module)))
-         macros-module)))
 
 ;;! Include module and dependencies
 (define ##include-module-and-dependencies #f)
@@ -673,17 +705,13 @@ fig.scm file"))
             (let ((verbose (and (memq 'verbose options) #t))
                   (includes (and (memq 'includes options) #t))
                   (sphere (%module-sphere module)))
-              (let ((header-module (%module-header module))
-                    (macros-module (%module-macros module)))
+              (let ((header-module (%module-header module)))
                 (if header-module
                     (eval `(expander:include ,(string-append (%module-path-src header-module)
                                                                  (%module-filename-scm header-module)))))
                 (if includes
                     (for-each (lambda (m) (include-single-module m '(verbose)))
                               (%module-shallow-dependencies-to-include module)))
-                (if macros-module
-                    (##include-module-and-dependencies macros-module '()))
-                ;; (pp (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                 (if sphere
                     (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
                           (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))

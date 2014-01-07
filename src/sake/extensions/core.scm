@@ -162,6 +162,8 @@
                                  ,@(map (lambda (m) `(##import-include ',m))
                                         ;; Import shallow dependencies, as dependencies should already be expanded
                                         (append (%module-shallow-dependencies-to-include module)
+                                                (apply append (map %module-shallow-dependencies-to-include
+                                                                   (%module-shallow-dependencies-to-load module)))
                                                 (if header-module (list header-module) '())
                                                 (if macros-module (list macros-module) '()))))))
                           (if verbose
