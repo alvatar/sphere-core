@@ -170,8 +170,10 @@
                                 (for-each pp compilation-code)))
                           ;; Eval compilation code in current environment
                           (for-each eval compilation-code)
-                          (let* ((code (map (lambda (f) (riaxpander:desourcify (riaxpander:expand-toplevel f)))
-                                            (with-input-from-file input-file read-all)))
+                          (let* ((code (list (riaxpander:desourcify
+                                              (riaxpander:expand-toplevel
+                                               (cons '##begin
+                                                     (with-input-from-file input-file read-all))))))
                                  (intermediate-code
                                   `( ;; Compile-time cond-expand-features
                                     ,@(map (lambda (f)
