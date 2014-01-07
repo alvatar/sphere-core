@@ -1,4 +1,14 @@
-;; Most of this code was written by Per Eckerdal for the Blackhole module system
+;;; Most of this code was written by Per Eckerdal for the Blackhole module system
+;;; Copyright (c) 2013-2014, Alvaro Castro-Castilla. All rights reserved.
+;;; Argument processing for command-line programs
+
+(cond-expand
+ (optimize
+  (declare (standard-bindings) (extended-bindings) (not safe) (block)))
+ (debug
+  (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
+ (else))
+
 
 (define (die/error . args)
   (let ((err (current-error-port)))

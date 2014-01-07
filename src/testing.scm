@@ -1,6 +1,14 @@
 ;;!!! SRFI-78: Lightweight testing
 ;; <PLAINTEXT>
 ;; Copyright (c) 2005-2006 Sebastian Egner.
+;; Copyright (c) 2014 Álvaro Castro-Castilla
+
+(cond-expand
+ (optimize
+  (declare (standard-bindings) (extended-bindings) (not safe) (block)))
+ (debug
+  (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
+ (else))
 
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation files (the

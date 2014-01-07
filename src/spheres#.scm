@@ -1,5 +1,5 @@
-;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
-;;; Sphere (module system)
+;;; Copyright (c) 2012-2014, Alvaro Castro-Castilla. All rights reserved.
+;;; Spheres fundamental macros
 
 
 (define expander:include #f)

@@ -1,8 +1,12 @@
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
-(declare (standard-bindings) (extended-bindings) (mostly-fixnum) (block))
-
+(cond-expand
+ (optimize
+  (declare (standard-bindings) (extended-bindings) (not safe) (block)))
+ (debug
+  (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
+ (else))
 
 (##include "../src/ffi-header.scm")
 

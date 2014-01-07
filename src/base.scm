@@ -1,6 +1,12 @@
-;;; Copyright (c) 2013, Alvaro Castro-Castilla. All rights reserved.
+;;; Copyright (c) 2013-2014, Alvaro Castro-Castilla. All rights reserved.
 ;;; Basic functions for Scheme Spheres
 
+(cond-expand
+ (optimize
+  (declare (standard-bindings) (extended-bindings) (not safe) (block)))
+ (debug
+  (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
+ (else))
 
 ;;!! Return the type of the parameter
 ;; .parameter Any Scheme object
@@ -23,5 +29,4 @@
    ((keyword? object) 'keyword)
    ((eq? object (void)) 'void)
    (else 'unknown)))
-
 
