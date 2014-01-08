@@ -8,7 +8,7 @@
   (declare (standard-bindings) (extended-bindings) (not safe) (block)))
  (debug
   (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
- (else))
+ (else (void)))
 
 ;; Permission is hereby granted, free of charge, to any person obtaining
 ;; a copy of this software and associated documentation files (the

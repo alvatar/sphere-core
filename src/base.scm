@@ -6,7 +6,7 @@
   (declare (standard-bindings) (extended-bindings) (not safe) (block)))
  (debug
   (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
- (else))
+ (else (void)))
 
 ;;!! Return the type of the parameter
 ;; .parameter Any Scheme object

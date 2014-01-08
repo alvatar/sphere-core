@@ -7,7 +7,7 @@
   (declare (standard-bindings) (extended-bindings) (not safe) (block)))
  (debug
   (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
- (else))
+ (else (void)))
 
 
 (define (die/error . args)
