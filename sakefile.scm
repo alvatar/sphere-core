@@ -87,6 +87,7 @@
 
 (define modules
   '(base
+    functional
     ffi
     testing))
 
