@@ -89,6 +89,7 @@
   '(base
     functional
     ffi
+    lazy
     testing))
 
 (define-task compile-stage-3 ()
