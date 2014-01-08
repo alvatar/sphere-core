@@ -3,30 +3,30 @@
 
 ;;------------------------------------------------------------------------------
 
-;;!! Fundamental Macros
+;;!! Standard Macros
 
-(define-syntax do
-  (syntax-rules ()
-    ((do ((var init step ...) ...)
-         (test expr ...)
-       command ...)
-     (letrec
-         ((loop
-           (lambda (var ...)
-             (if test
-                 (begin
-                   (if #f #f)
-                   expr ...)
-                 (begin
-                   command
-                   ...
-                   (loop (do "step" var step ...)
-                         ...))))))
-       (loop init ...)))
-    ((do "step" x)
-     x)
-    ((do "step" x y)
-     y)))
+;; (define-syntax do
+;;   (syntax-rules ()
+;;     ((do ((var init step ...) ...)
+;;          (test expr ...)
+;;        command ...)
+;;      (letrec
+;;          ((loop
+;;            (lambda (var ...)
+;;              (if test
+;;                  (begin
+;;                    (if #f #f)
+;;                    expr ...)
+;;                  (begin
+;;                    command
+;;                    ...
+;;                    (loop (do "step" var step ...)
+;;                          ...))))))
+;;        (loop init ...)))
+;;     ((do "step" x)
+;;      x)
+;;     ((do "step" x y)
+;;      y)))
 
 
 
@@ -118,11 +118,11 @@
 
 
 ;;! SRFI-8: RECEIVE
-(define-syntax receive
-  (syntax-rules ()
-    ((receive formals expression body ...)
-     (call-with-values (lambda () expression)
-       (lambda formals body ...)))))
+;; (define-syntax receive
+;;   (syntax-rules ()
+;;     ((receive formals expression body ...)
+;;      (call-with-values (lambda () expression)
+;;        (lambda formals body ...)))))
 
 
 ;;! SRFI-11 Syntax for receiving multiple values
@@ -219,72 +219,6 @@
          (case-lambda "CLAUSE" ?args ?l 
                       ?clause1 ...)))))
 
-;;! SRFI-26 Notation for Specializing Parameters without Currying
-;; Sebastian.Egner@philips.com, 5-Jun-2002.
-;; adapted from the posting by Al Petrofsky <al@petrofsky.org>
-;; placed in the public domain.
-;; Modifications
-;; - Made internal syntaxes private with letrec
-;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
-(define-syntax cut
-  ;; (srfi-26-internal-cut slot-names combination . se)
-  ;;   transformer used internally
-  ;;     slot-names  : the internal names of the slots
-  ;;     combination : procedure being specialized, followed by its arguments
-  ;;     se          : slots-or-exprs, the qualifiers of the macro
-  (letrec-syntax
-      ((srfi-26-internal-cut
-        (syntax-rules (<> <...>)
-          ;; construct fixed- or variable-arity procedure:
-          ;;   (begin proc) throws an error if proc is not an <expression>
-          ((srfi-26-internal-cut (slot-name ...) (proc arg ...))
-           (lambda (slot-name ...) ((begin proc) arg ...)))
-          ((srfi-26-internal-cut (slot-name ...) (proc arg ...) <...>)
-           (lambda (slot-name ... . rest-slot) (apply proc arg ... rest-slot)))
-          ;; process one slot-or-expr
-          ((srfi-26-internal-cut (slot-name ...)   (position ...)      <>  . se)
-           (srfi-26-internal-cut (slot-name ... x) (position ... x)        . se))
-          ((srfi-26-internal-cut (slot-name ...)   (position ...)      nse . se)
-           (srfi-26-internal-cut (slot-name ...)   (position ... nse)      . se)))))
-    (syntax-rules ()
-      ((cut . slots-or-exprs)
-       (srfi-26-internal-cut () () . slots-or-exprs)))))
-
-;;! cute
-(define-syntax cute
-  ;; (srfi-26-internal-cute slot-names nse-bindings combination . se)
-  ;;   transformer used internally
-  ;;     slot-names     : the internal names of the slots
-  ;;     nse-bindings   : let-style bindings for the non-slot expressions.
-  ;;     combination    : procedure being specialized, followed by its arguments
-  ;;     se             : slots-or-exprs, the qualifiers of the macro
-  (letrec-syntax
-      ((srfi-26-internal-cute
-        (syntax-rules (<> <...>)
-          ;; If there are no slot-or-exprs to process, then:
-          ;; construct a fixed-arity procedure,
-          ((srfi-26-internal-cute
-            (slot-name ...) nse-bindings (proc arg ...))
-           (let nse-bindings (lambda (slot-name ...) (proc arg ...))))
-          ;; or a variable-arity procedure
-          ((srfi-26-internal-cute
-            (slot-name ...) nse-bindings (proc arg ...) <...>)
-           (let nse-bindings (lambda (slot-name ... . x) (apply proc arg ... x))))
-          ;; otherwise, process one slot:
-          ((srfi-26-internal-cute
-            (slot-name ...)         nse-bindings  (position ...)   <>  . se)
-           (srfi-26-internal-cute
-            (slot-name ... x)       nse-bindings  (position ... x)     . se))
-          ;; or one non-slot expression
-          ((srfi-26-internal-cute
-            slot-names              nse-bindings  (position ...)   nse . se)
-           (srfi-26-internal-cute
-            slot-names ((x nse) . nse-bindings) (position ... x)       . se)))))
-    (syntax-rules ()
-      ((cute . slots-or-exprs)
-       (srfi-26-internal-cute () () () . slots-or-exprs)))))
-
-
 ;;! SRFI-31 A special form rec for recursive evaluation
 ;; Copyright (C) Dr. Mirko Luedde (2002). All Rights Reserved.
 (define-syntax rec
@@ -335,8 +269,8 @@
 
 ;;! SRFI-71
 ;; Reference implementation of SRFI-71 (srfi-let/*/rec)
-;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
 ;; Sebastian.Egner@philips.com, 20-May-2005, PLT 208
+;; Modified by Álvaro Castro-Castilla
 ;; Macros used internally are named i:<something>.
 ;; Abbreviations for macro arguments:
 ;;   bs  - <binding spec>
