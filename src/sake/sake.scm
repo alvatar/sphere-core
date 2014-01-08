@@ -6,7 +6,7 @@
 (##namespace ("sake#"))
 (##include "~~/lib/gambit#.scm")
 (##include "sakelib.scm")
-(##include "../arguments.scm")
+(##include "arguments.scm")
 
 (define *help* #<<end-help-string
 

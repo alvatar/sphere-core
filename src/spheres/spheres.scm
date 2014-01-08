@@ -2,7 +2,7 @@
 ;;; Copyright (c) 2013 by Álvaro Castro-Castilla
 ;;; Spheres: manage packages from SchemeSpheres.org
 
-(include "../arguments.scm")
+(include "arguments.scm")
 (include "tiny.scm")
 
 
