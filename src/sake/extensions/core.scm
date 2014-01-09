@@ -122,7 +122,7 @@
                                            (%module-shallow-dependencies-to-prelude module))
                                     ;; If there is a header module set up proper namespace
                                     ,@(if header-module
-                                          `((##namespace (,(%module-namespace header-module))))
+                                          `((##namespace (,(%module-namespace module))))
                                           '())
                                     ,@(if header-module
                                           '((##include "~~lib/gambit#.scm"))
@@ -196,7 +196,7 @@
                                            (%module-shallow-dependencies-to-prelude module))
                                     ;; If there is a header module set up proper namespace
                                     ,@(if header-module
-                                          `((##namespace (,(%module-namespace header-module))))
+                                          `((##namespace (,(%module-namespace module))))
                                           '())
                                     ,@(if header-module
                                           '((##include "~~lib/gambit#.scm"))
