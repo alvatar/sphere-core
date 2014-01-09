@@ -1,17 +1,17 @@
 ;;; Copyright (c) 2013, Alvaro Castro-Castilla. All rights reserved.
 ;;; Functional programming procedures
 
-(cond-expand
- (gambit
-  (declare (standard-bindings)
-           (extended-bindings)
-           (block)
-           (mostly-generic)))
- (else))
 
-;-------------------------------------------------------------------------------
-; Functional operators
-;-------------------------------------------------------------------------------
+(cond-expand
+ (optimize
+  (declare (standard-bindings) (extended-bindings) (not safe) (block)))
+ (debug
+  (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
+ (else (void)))
+
+
+;;------------------------------------------------------------------------------
+;;!! Functional operators
 
 ;;! U-combinator
 (define U
@@ -74,9 +74,9 @@
 (define (flip func)
   (lambda (arg1 arg2) (func arg2 arg1)))
 
-;-------------------------------------------------------------------------------
-; Currying / uncurrying
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+;;!! Currying / uncurrying
 
 ;;! Explicit currying of an arbitrary function
 (define (curry fun arg1 . args)
@@ -93,9 +93,9 @@
   (if (null? arglist) f
       (apply uncurry (f (car arglist)) (cdr arglist))))
 
-;-------------------------------------------------------------------------------
-; Memoization
-;-------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+;;!! Memoization
 
 ;;! Function computation memoization specifying a key generation procedure
 (define (memoize/key-gen key-gen f)

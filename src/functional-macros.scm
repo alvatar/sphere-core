@@ -1,13 +1,16 @@
-;;; Copyright (c) 2012, Alvaro Castro-Castilla. All rights reserved.
+;;; Copyright (c) 2012-2014, Alvaro Castro-Castilla. All rights reserved.
 ;;; Functional programming procedures
 
+;;------------------------------------------------------------------------------
 ;;! SRFI-26 Notation for Specializing Parameters without Currying
 ;; Sebastian.Egner@philips.com, 5-Jun-2002.
 ;; adapted from the posting by Al Petrofsky <al@petrofsky.org>
 ;; placed in the public domain.
-;; Modifications
-;; - Made internal syntaxes private with letrec
-;; Copyright (c) Álvaro Castro-Castilla (2012). All Rights Reserved.
+
+
+;;! cut
+;; Modified by Álvaro Castro-Castilla 2012
+;; Made internal syntaxes private with letrec
 (define-syntax cut
   ;; (srfi-26-internal-cut slot-names combination . se)
   ;;   transformer used internally
