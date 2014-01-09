@@ -1,4 +1,4 @@
-(##define-macro (check-arg pred val caller)
+(define-macro (check-arg pred val caller)
   `(let ((pred ,pred)
 	 (val ,val)
 	 (caller ',caller))
@@ -16,7 +16,7 @@
 ;; This nasty hack substitutes the '() for ()
 ;; It turns out that Gambit uses () for argument lists, which is not an acceptable
 ;; syntax for most syntax-rules expanders
-(define-macro (c-lambda #!rest body)
+(define-macro (c-lambda . body)
   `(##c-lambda ,@(map (lambda (f) (if (and (pair? f)
                                       (pair? (cdr f))
                                       (eq? (cadr f) '()))
@@ -31,17 +31,17 @@
 ;;!! Define functions for usage in low-level macros (first method)
 ;; (define^ (f ... ) ... )
 
-(##define-macro (eval-in-macro-environment . exprs)
+(define-macro (eval-in-macro-environment . exprs)
   (if (pair? exprs)
       (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
             (interaction-environment))
       #f))
-(##define-macro (eval-in-macro-environment-no-result . exprs)
+(define-macro (eval-in-macro-environment-no-result . exprs)
   `(eval-in-macro-environment
     ,@exprs
     '(begin)))
 
-(##define-macro (define^ . args)
+(define-macro (define^ . args)
   (let ((pattern (car args))
         (body (cdr args)))
     `(eval-in-macro-environment-no-result
@@ -72,13 +72,13 @@
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
 
 ;;! Define for both expand time and runtime
-(##define-macro (at-expand-time-and-runtime . exprs)
+(define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
     (eval l)
     l))
 
 ;;! Define for expand time
-(##define-macro (at-expand-time . expr)
+(define-macro (at-expand-time . expr)
   (eval (cons 'begin expr)))
 
 
