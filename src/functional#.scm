@@ -1,5 +1,5 @@
-;;; Copyright (c) 2012-2013, Alvaro Castro-Castilla. All rights reserved.
-;;; Functional programming procedures
+;;; Copyright (c) 2012-2014, Alvaro Castro-Castilla. All rights reserved.
+;;; Functional module public interface
 
 (##namespace ("energy:functional#"
               U
