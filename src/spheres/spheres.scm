@@ -2,8 +2,8 @@
 ;;; Copyright (c) 2013 by Álvaro Castro-Castilla
 ;;; Spheres: manage packages from SchemeSpheres.org
 
-(include "arguments.scm")
-(include "tiny.scm")
+(include "../internal/arguments.scm")
+(include "../internal/tiny.scm")
 
 
 (define *help:general* #<<end-help-string
