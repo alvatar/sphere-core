@@ -2,38 +2,34 @@
 ;;; Base syntax extensions for Scheme Spheres
 
 ;;------------------------------------------------------------------------------
-
 ;;!! Standard Macros
 
-;; (define-syntax do
-;;   (syntax-rules ()
-;;     ((do ((var init step ...) ...)
-;;          (test expr ...)
-;;        command ...)
-;;      (letrec
-;;          ((loop
-;;            (lambda (var ...)
-;;              (if test
-;;                  (begin
-;;                    (if #f #f)
-;;                    expr ...)
-;;                  (begin
-;;                    command
-;;                    ...
-;;                    (loop (do "step" var step ...)
-;;                          ...))))))
-;;        (loop init ...)))
-;;     ((do "step" x)
-;;      x)
-;;     ((do "step" x y)
-;;      y)))
-
+(define-syntax do
+  (syntax-rules ()
+    ((do ((var init step ...) ...)
+         (test expr ...)
+       command ...)
+     (letrec
+         ((loop
+           (lambda (var ...)
+             (if test
+                 (begin
+                   (if #f #f)
+                   expr ...)
+                 (begin
+                   command
+                   ...
+                   (loop (do "step" var step ...)
+                         ...))))))
+       (loop init ...)))
+    ((do "step" x)
+     x)
+    ((do "step" x y)
+     y)))
 
 
 ;;------------------------------------------------------------------------------
-
 ;;!! SRFIs
-
 
 ;;! SRFI-2 AND-LET*: an AND with local bindings, a guarded LET* special form
 ;; Ported to syntax-rules by Álvaro Castro-Castilla
@@ -118,11 +114,11 @@
 
 
 ;;! SRFI-8: RECEIVE
-;; (define-syntax receive
-;;   (syntax-rules ()
-;;     ((receive formals expression body ...)
-;;      (call-with-values (lambda () expression)
-;;        (lambda formals body ...)))))
+(define-syntax receive
+  (syntax-rules ()
+    ((receive formals expression body ...)
+     (call-with-values (lambda () expression)
+       (lambda formals body ...)))))
 
 
 ;;! SRFI-11 Syntax for receiving multiple values
@@ -513,8 +509,7 @@
 
 
 ;;------------------------------------------------------------------------------
-
-;;!! Utility Macros
+;;!! Non-standard Macros
 
 ;;! Mutable increment
 ;; Equivalent low-level macro:

@@ -30,5 +30,6 @@ A great extension of Core's functionality can be found in [Energy](https://githu
 * [Strings](https://github.com/alvatar/sphere-strings)
 * [Math](https://github.com/alvatar/sphere-math)
 * [Crypto](https://github.com/alvatar/sphere-crypto)
+* [Codec](https://github.com/alvatar/sphere-codec)
 * [OpenGL](https://github.com/alvatar/sphere-opengl)
 * [SDL2](https://github.com/alvatar/sphere-sdl2)
