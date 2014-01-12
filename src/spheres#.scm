@@ -26,9 +26,7 @@
 
 (include "prelude.scm")
 
-
 ;;------------------------------------------------------------------------------
-
 ;;!! Sphere
 
 (define^ default-src-directory
