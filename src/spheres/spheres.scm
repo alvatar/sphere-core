@@ -109,7 +109,7 @@ end-help-string
           (set! branch val)))
      ("update"
       ,@(lambda (val)
-          (set! update (with-input-from-string val read))))
+          (set! update #t)))
      ("ignore-dependencies"
       ,@(lambda (val)
           (error "Not implemented")
