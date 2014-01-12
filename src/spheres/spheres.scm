@@ -228,7 +228,7 @@ end-help-string
                                     (recur (cdr files) path)))))))
                     (delete-directory sphere-path)
                     (list sphere-id "OK"))
-                  (list error: sphere-id "\033[00;31mERROR -- Sphere is not found in the system\033[00m"))))
+                  (list error: sphere-id "\033[00;31mERROR -- Sphere not found in the system\033[00m"))))
           args)))
     ;; End info
     (println (string-append "*** INFO -- The following Spheres have been uninstalled:"))
