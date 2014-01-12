@@ -152,7 +152,7 @@ end-help-string
                           (println (string-append "*** INFO -- Sphere " target-id " is already installed. Pulling latest changes."))
                           (if (not (zero? (shell-command
                                            (string-append "cd " (path-expand "~~spheres/") target-id " && git pull"))))
-                              (die/error "Git error: Check network connectivity, uninstall the Sphere and try again.")))
+                              (die/error "Git error: Check network connectivity. If error persists, uninstall the Sphere and try again.")))
                         (println (string-append "*** INFO -- Not updating " target-id ". Force with --update if you wish otherwise.")))
                     ;; First try with Git protocol, then Https
                     (if (not (or (zero? (shell-command
@@ -167,7 +167,7 @@ end-help-string
                                                         " "
                                                         (path-expand "~~spheres/")
                                                         target-id)))))
-                        (die/error "Git error: Check network connectivity, uninstall the Sphere and try again.")))
+                        (die/error "Git error: Check network connectivity. If error persists, uninstall the Sphere and try again.")))
                 ;; Run Sake (if mentioned in the command line or forcing with --update)
                 (if (or (member target-id args)
                         update)
