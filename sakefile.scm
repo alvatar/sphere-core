@@ -75,9 +75,7 @@
     (lambda (f)
       (pp '(let ((spheres-file "~~spheres/spheres#.scm"))
              (if (file-exists? spheres-file)
-                 (eval `(begin (include ,spheres-file)
-                               (println "-- using Scheme Spheres")
-                               (##import core: base-macros)))                 
+                 (eval `(include ,spheres-file))                 
                  (println "spheres#.scm missing -- Did you install Core Sphere?")))
           f))))
 
