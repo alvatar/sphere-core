@@ -1,14 +1,7 @@
-# Prerequisites #
-You will need the following software in your system:
-
-*   Git (obviously)
-*   [Gambit Scheme Compiler](http://gambitscheme.org)
-*   [cURL](http://curl.haxx.se/)
-
-# Installation and Quickstart #
+## Installation and Quickstart
 Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quickstart)
 
-# Functionality found in this Spheres #
+## Functionality found in this Sphere
 
 * Syntax expansion (via Riaxpander)
 * FFI utilities and generators
@@ -22,7 +15,7 @@ Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quicks
 
 A great extension of Core's functionality can be found in [Energy](https://github.com/alvatar/sphere-energy)
 
-# Currently supported Spheres #
+## Currently supported Spheres
 
 * [Fabric](https://github.com/alvatar/sphere-fabric)
 * [Energy](https://github.com/alvatar/sphere-energy)
