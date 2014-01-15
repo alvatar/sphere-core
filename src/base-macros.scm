@@ -448,6 +448,8 @@
                        ,@(if rest
                              (list '#!rest rest)
                              '()))
+                     ;; Surrounding with LET prevents an error when you use internal defines
+                     ;; just after the define*/lambda*
                      (let ()
                        ,@body))))
              ;;(pp form)

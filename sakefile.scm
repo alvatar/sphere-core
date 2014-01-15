@@ -34,6 +34,8 @@
   (make-directory "~~spheres/core/src/sake")
   (if (not (file-exists? sake-extensions-path))
       (make-directory sake-extensions-path))
+  (copy-file (string-append (current-source-directory) "sake/extensions/core-macros.scm")
+             (string-append sake-extensions-path "core-macros.scm"))
   (copy-file (string-append (current-source-directory) "sake/extensions/core.scm")
              (string-append sake-extensions-path "core.scm"))
   (copy-file (string-append (current-build-directory) "sake") "~~/bin/sake")
