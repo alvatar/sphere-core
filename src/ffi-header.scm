@@ -1,6 +1,32 @@
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
+
+
+;;------------------------------------------------------------------------------
+;;!! Macro Hacks
+
+;; This nasty hack substitutes the '() for ()
+;; It turns out that Gambit uses () for argument lists, which is not an acceptable
+;; syntax for most syntax-rules expanders
+(define-macro (c-lambda . body)
+  `(##c-lambda ,@(map (lambda (f) (if (and (pair? f)
+                                      (pair? (cdr f))
+                                      (eq? (cadr f) '()))
+                                 '()
+                                 f))
+                      body)))
+
+;; The same for c-define
+(define-macro (c-define . body)
+  `(##c-define ,@(map (lambda (f) (if (and (pair? f)
+                                      (pair? (cdr f))
+                                      (eq? (cadr f) '()))
+                                 '()
+                                 f))
+                      body)))
+
+;;------------------------------------------------------------------------------
 ;;!! Basic utilities
 
 (define^ (->string o)
