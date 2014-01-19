@@ -8,8 +8,6 @@
   (declare (safe) (debug) (debug-location) (debug-source) (debug-environments)))
  (else (void)))
 
-(##include "../src/ffi-header.scm")
-
 ;;-------------------------------------------------------------------------------
 
 ;; Gambit memory
