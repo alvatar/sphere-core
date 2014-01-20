@@ -307,15 +307,6 @@
 ;; Merges the included files recursively, as S-expressions, but respects
 ;; the input-file as text, leaving the 
 (define (sake#expand-includes input-file output-file)
-  (define (drop lis k)
-    (let iter ((lis lis) (k k))
-      (if (zero? k) lis (iter (cdr lis) (- k 1)))))
-  (define (map** f l)
-    (cond
-     ((null? l) '())
-     ((not (pair? l)) (f l))
-     (else
-      (cons (f (map** f (car l))) (f (map** f (cdr l)))))))
   (define (do-expansion form)
     (map** (lambda (e) (if (and (pair? e) (eq? (car e) 'include))
                       (begin
