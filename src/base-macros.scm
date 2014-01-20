@@ -725,6 +725,57 @@
        . body))))
 
 
+;;------------------------------------------------------------------------------
+;;!! Basic types conversion
+
+;;! symbol->keyword
+(define-syntax symbol->keyword
+  (syntax-rules ()
+    ((_ s)
+     (string->keyword (symbol->string s)))))
+
+;;! keyword->symbol
+(define-syntax keyword->symbol
+  (syntax-rules ()
+    ((_ k)
+     (string->symbol (keyword->string k)))))
+
+;;! Anything to string
+(define-syntax ->string
+  (syntax-rules ()
+    ((_ o)
+     (cond ((string? o) o)
+           ((symbol? o) (symbol->string o))
+           ((keyword? o) (keyword->string o))
+           (else (object->string o))))))
+
+;;! Anything to symbol
+(define-syntax ->symbol
+  (syntax-rules ()
+    ((_ o)
+     (string->symbol (->string o)))))
+
+;;! Anything to keyword
+(define-syntax ->keyword
+  (syntax-rules ()
+    ((_ o)
+     (string->keyword (->string o)))))
+
+;;! Build a string from list of elements (anything)
+(define-syntax string-append-anything
+  (syntax-rules ()
+    ((_ . ol)
+     (apply string-append (map (lambda (e) (->string e)) (list . ol))))))
+
+;;! Append anything into a symbol
+(define-syntax symbol-append
+  (syntax-rules ()
+    ((_ . ol)
+     (string->symbol (string-append-anything . ol)))))
+
+
+;;------------------------------------------------------------------------------
+;;!! TODO
 
 ;; Utility macro for checking arguments
 ;; Macro in compilation-prelude to make it easy to define in debug/release modes
@@ -764,58 +815,3 @@
 ;;      (define-values "gentmp" () (var ...) (var ...) expr))
 ;;     ((_ . else)
 ;;      (syntax-error "malformed define-values" (define-values . else)))))
-
-;-------------------------------------------------------------------------------
-; Low-level macros
-;-------------------------------------------------------------------------------
-
-;; (##define-macro (eval-in-macro-environment . exprs)
-;;   (if (pair? exprs)
-;;       (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
-;;             (interaction-environment))
-;;       #f))
-
-;; (##define-macro (eval-in-macro-environment-no-result . exprs)
-;;   `(eval-in-macro-environment
-;;     ,@exprs
-;;     '(begin)))
-
-;; (##define-macro (define^ . args)
-;;   (let ((pattern (car args))
-;;         (body (cdr args)))
-;;     `(eval-in-macro-environment-no-result
-;;       (##define ,pattern ,@body))))
-
-;; (##define-macro (at-expand-time-and-runtime . exprs)
-;;   (let ((l `(begin ,@exprs)))
-;;     (eval l)
-;;     l))
-
-;; (##define-macro (at-expand-time . expr)
-;;   (eval (cons 'begin expr)))
-
-;; (define^ (macro-expand expr)
-;;   expr)
-
-;;; Unhygienic anaphoric if
-;; (define-macro (uif . args)
-;;   (let ((arg1 (car args))
-;;         (rest-args (cdr args)))
-;;     (case (length rest-args)
-;;       ((1)
-;;        `(let ((?it ,arg1))
-;;           (if ?it
-;;               ,(car rest-args)
-;;               #f)))
-;;       ((2)
-;;        `(let ((?it ,arg1))
-;;           (if ?it
-;;               ,(car rest-args)
-;;               ,(cadr rest-args))))
-;;       ((3)
-;;        `(let ((?it ,(car rest-args)))
-;;           (if ,(arg1 ?it)
-;;               (cadr rest-args)
-;;               (caddr rest-args))))
-;;       (else
-;;        (error "Too many arguments passed to unhygienic anaphoric if")))))
