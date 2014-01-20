@@ -119,12 +119,6 @@
                        ,@(if header-module
                              '((##include "~~lib/gambit#.scm"))
                              '())
-                       ;; Append general compilation prelude
-                       ,@(with-input-from-file
-                             (string-append
-                              (%module-path-src '(core: prelude))
-                              (%module-filename-scm 'prelude))
-                           read-all)
                        ;; Include custom compilation preludes defined in config.scm
                        ,@(map (lambda (p)
                                 `(##include ,(string-append

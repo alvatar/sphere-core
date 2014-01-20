@@ -57,7 +57,6 @@
 ;;------------------------------------------------------------------------------
 ;;!! Stage 2: Spheres pipeline and Macro Expansion
 
-(define prelude-module-system-path "~~spheres/prelude.scm")
 (define spheres-module-system-path "~~spheres/spheres#.scm")
 (define riaxpander-module-system-path "~~spheres/core/src/riaxpander/riaxpander-gambit.scm")
 
@@ -65,8 +64,7 @@
   'compile-nothing)
 
 (define-task post-compile-stage-2 ()
-  ;; Install prelude and spheres# directly in the spheres directory
-  (copy-file "src/prelude.scm" prelude-module-system-path)
+  ;; Install spheres# directly in the spheres directory
   (copy-file "src/spheres#.scm" spheres-module-system-path)
   ;; Install Riaxpander files
   (info/color 'green "Installing macro expander")
@@ -124,11 +122,9 @@
 
 (define-task uninstall ()
   (sake#uninstall-sphere-from-system)
-  (delete-file prelude-module-system-path)
   (delete-file spheres-module-system-path)
   (delete-file (string-append (user-info-home (user-info (user-name))) "/.gambcini"))
   (delete-file (string-append sake-extensions-path "core.scm"))
   (delete-file "~~bin/sake")
   (delete-file "~~bin/spheres")
-  (delete-file "~~/#spheres")
-  (delete-file "~~/prelude.scm"))
+  (delete-file "~~/#spheres"))

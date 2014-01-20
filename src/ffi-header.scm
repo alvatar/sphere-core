@@ -1,10 +1,32 @@
-;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
+;;; Copyright (c) 2013-2014 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
 
+;;------------------------------------------------------------------------------
+;;!! Environments
+
+;;!! Define functions for usage in low-level macros (first method)
+;; (define^ (f ... ) ... )
+
+(define-macro (eval-in-macro-environment . exprs)
+  (if (pair? exprs)
+      (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
+            (interaction-environment))
+      #f))
+(define-macro (eval-in-macro-environment-no-result . exprs)
+  `(eval-in-macro-environment
+    ,@exprs
+    '(begin)))
+
+(define-macro (define^ . args)
+  (let ((pattern (car args))
+        (body (cdr args)))
+    `(eval-in-macro-environment-no-result
+      (##define ,pattern ,@body))))
+
 
 ;;------------------------------------------------------------------------------
-;;!! Macro Hacks
+;;!! Macro Hacks (TODO: find a better solution)
 
 ;; This nasty hack substitutes the '() for ()
 ;; It turns out that Gambit uses () for argument lists, which is not an acceptable
@@ -26,21 +48,47 @@
                                  f))
                       body)))
 
+
 ;;------------------------------------------------------------------------------
 ;;!! Basic utilities
 
+;;! symbol->keyword
+(define^ (symbol->keyword s)
+  (string->keyword (symbol->string s)))
+
+;;! keyword->symbol
+(define^ (keyword->symbol k)
+  (string->symbol (keyword->string k)))
+
+;;! Anything to symbol
+(define^ (->symbol o)
+  (string->symbol (object->string o)))
+
+;;! Anything to keyword
+(define^ (->keyword o)
+  (string->keyword (object->string o)))
+
+;;! Anything to string
 (define^ (->string o)
   (cond ((string? o) o)
         ((symbol? o) (symbol->string o))
         ((keyword? o) (keyword->string o))
-        (else (error (string-append "->string: unrecognized type -- " (object->string o))))))
+        (else (error (string-append "ffi#->string: undesirable type -- "
+                                    (object->string o))))))
 
+;;! Build a string from list of elements (anything)
 (define^ (generic-string-append #!rest ol)
   (apply string-append (map ->string ol)))
 
+;;! Append anything into a symbol
 (define^ (symbol-append #!rest ol)
   (string->symbol (apply generic-string-append ol)))
 
+;;! Build a symbol from a list of strings
+(define^ (sym #!rest strs)
+    (string->symbol (apply string-append strs)))
+
+;;! Generate a list of top-level forms
 (define^ (begin-top-level-forms #!rest define-blocks)
   (cons 'begin
         (let recur ((ds define-blocks))
@@ -48,9 +96,6 @@
                 ((null? (car ds)) (recur (cdr ds)))
                 (else (cons (car ds)
                             (recur (cdr ds))))))))
-
-(define^ (sym #!rest strs)
-    (string->symbol (apply string-append strs)))
 
 ;;! Turn a scheme-name into a c_name, simply changing the - to _
 (define^ (scheme-name->c-name name)
