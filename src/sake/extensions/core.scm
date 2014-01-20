@@ -303,6 +303,28 @@
          file)))
     output-path))
 
+(define (sake#expand-includes input-file output-file)
+  (define (map** f l)
+    (cond
+     ((null? l) '())
+     ((not (pair? l)) (f l))
+     (else
+      (cons (f (map** f (car l))) (f (map** f (cdr l)))))))
+  (define (do-expansion form)
+    (map** (lambda (e) (if (and (pair? e) (eq? (car e) 'include))
+                      (begin
+                        (current-directory (path-directory (path-expand (cadr e))))
+                        (do-expansion `(begin ,@(with-input-from-file (path-strip-directory (cadr e)) read-all))))
+                      e))
+           form))
+  (parameterize
+   ((current-directory (current-directory)))
+   (with-output-to-file output-file
+     (lambda ()
+       (for-each
+        (lambda (e) (pp e (current-output-port)))
+        (do-expansion (with-input-from-file input-file read-all)))))))
+
 ;;! Install o and/or C file in the lib/ directory
 (##define (sake#make-module-available m
                                       #!key
