@@ -432,10 +432,6 @@
 (##define (sake#uninstall-sphere-from-system #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))
 
-
-;;!! Utilities
-
-
 ;;! Parallel for-each, suitable mainly for parallel compilation, which spawns external
 ;; processes
 (##define (sake#parallel-for-each f l #!key (max-thread-number 2))
