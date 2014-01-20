@@ -304,7 +304,12 @@
     output-path))
 
 ;;! Substitute (include <>) by the code in the referenced file
+;; Merges the included files recursively, as S-expressions, but respects
+;; the input-file as text, leaving the 
 (define (sake#expand-includes input-file output-file)
+  (define (drop lis k)
+    (let iter ((lis lis) (k k))
+      (if (zero? k) lis (iter (cdr lis) (- k 1)))))
   (define (map** f l)
     (cond
      ((null? l) '())
@@ -318,13 +323,56 @@
                         (do-expansion `(begin ,@(with-input-from-file (path-strip-directory (cadr e)) read-all))))
                       e))
            form))
-  (parameterize
-   ((current-directory (path-directory (path-expand input-file))))
-   (with-output-to-file output-file
-     (lambda ()
-       (for-each
-        (lambda (e) (pp e (current-output-port)))
-        (do-expansion (with-input-from-file input-file read-all)))))))
+  (let* ((str-list (call-with-input-file input-file (lambda (f) (read-all f read-char))))
+         (str (list->string str-list))
+         (str-len (string-length str)))
+    (with-output-to-file
+        output-file
+      (lambda ()
+        (for-each
+         write-char
+         (let recur ((i 0)
+                     (str-rest str-list))
+           (cond ((null? str-rest)
+                  '())
+                 ((and (char=? (car str-rest) #\()
+                       (string=? "include " (substring str (+ i 1) (+ i 9)))) ; find include form
+                  (receive (continue-position filename)
+                           (let parse-filename ((j (+ i 9))
+                                                (chars '())
+                                                (status 'searching-first))
+                             (case status
+                               ((searching-first)
+                                (if (and (char=? (string-ref str j) #\")
+                                         (not (char=? (string-ref str (- j 1)) #\\))) ; make sure the " is not escaped
+                                    (parse-filename (+ j 1) chars 'reading)
+                                    (parse-filename (+ j 1) chars 'searching-first)))
+                               ((reading)
+                                (if (and (char=? (string-ref str j) #\")
+                                         (not (char=? (string-ref str (- j 1)) #\\))) ; idem
+                                    (parse-filename (+ j 1) chars 'search-next-parenthesis)
+                                    (parse-filename (+ j 1)
+                                                    (cons (string-ref str j)
+                                                          chars)
+                                                    'reading)))
+                               ((search-next-parenthesis)
+                                (if (char=? (string-ref str j) #\))
+                                    (values (+ j 1)
+                                            (list->string (reverse chars)))
+                                    (parse-filename (+ j 1) chars 'search-next-parenthesis)))))
+                           (append
+                            (parameterize
+                             ((current-directory (path-directory (path-expand input-file))))
+                             (string->list
+                              (with-output-to-string
+                                '()
+                                (lambda () (for-each (lambda (form) (pp form (current-output-port)))
+                                                (do-expansion (with-input-from-file filename read-all)))))))
+                            (recur continue-position
+                                   (drop str-rest (- continue-position i))))))
+                 (else
+                  (cons (car str-rest)
+                        (recur (+ i 1) (cdr str-rest)))))))))))
 
 ;;! Install o and/or C file in the lib/ directory
 (##define (sake#make-module-available m
