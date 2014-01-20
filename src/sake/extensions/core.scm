@@ -303,6 +303,7 @@
          file)))
     output-path))
 
+;;! Substitute (include <>) by the code in the referenced file
 (define (sake#expand-includes input-file output-file)
   (define (map** f l)
     (cond
@@ -318,7 +319,7 @@
                       e))
            form))
   (parameterize
-   ((current-directory (current-directory)))
+   ((current-directory (path-directory (path-expand input-file))))
    (with-output-to-file output-file
      (lambda ()
        (for-each
