@@ -775,23 +775,35 @@
 
 
 ;;------------------------------------------------------------------------------
-;;!! TODO
+;;!! Argument checking
 
 ;; Utility macro for checking arguments
-;; Macro in compilation-prelude to make it easy to define in debug/release modes
 ;; Original (as function)
 ;; (define (check-arg pred val caller)
 ;;   (let lp ((val val))
 ;;     (if (pred val) val (lp (error "Bad argument" val pred caller)))))
-;; (define-syntax check-arg
-;;   (syntax-rules ()
-;;     ((_ ?pred ?val ?caller)
-;;      (if (?pred ?val)
-;;          #t
-;;          (error (string-append (object->string '?pred) " check failed with value "
-;;                                (object->string ?val)
-;;                                " in: "
-;;                                (object->string '?caller)))))))
+(cond-expand
+ (debug
+  (define-syntax check-arg
+    (syntax-rules ()
+      ((_ ?pred ?val ?caller)
+       ;; This captures the variables for debugging
+       (let argument-check ((?val ?val))
+         (if (?pred ?val)
+             #t
+             (argument-check
+              (error (string-append (object->string '?pred) " check failed with value "
+                                    (object->string ?val)
+                                    " in: "
+                                    (object->string '?caller))))))))))
+ (else
+  (define-syntax check-arg
+    (syntax-rules ()
+      ((_ ?pred ?val ?caller) (void))))))
+
+
+;;------------------------------------------------------------------------------
+;;!! TODO
 
 ;;; Define values allows sharing state between functions
 ;; UNTESTED
