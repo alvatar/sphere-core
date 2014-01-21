@@ -599,10 +599,7 @@ fig.scm file"))
   (%check-module module '%module-shallow-dependencies-ld-options)
   ((%module-shallow-dependencies-select 'ld-options #f) module))
 
-;;! Gets the full tree of dependencies, building a list in order. It guarantees that
-;; dependencies are loaded when needed, but doesn't guarantee that they are loaded
-;; in recursive order (that is, dependencies might appear in the list earlier than
-;; are needed).
+;;! Gets the full tree of dependencies, building a list in the right order.
 ;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
 ;; following its subdependencies recursively
 ;; .parameter symbol-to-return The symbol that the function will record, returning
@@ -610,13 +607,15 @@ fig.scm file"))
 ;; .parameter append The procedure used to append the returned results
 (define^ (%module-deep-dependencies-select type-to-follow type-to-return find-with-postfix)
   (lambda (module)
-    (let ((visited-deps '())
+    (let ((root-module (%module-normalize module))
+          (visited-deps '())
           (built-deps '()))
-      (let recur ((module module))
+      (let recur ((module root-module))
         (for-each recur ((%module-shallow-dependencies-select type-to-follow #f) module))
         (if (eq? type-to-follow type-to-return)
             (let ((normalized-module (%module-normalize module)))
               (or (member normalized-module built-deps)
+                  (equal? normalized-module root-module)
                   (set! built-deps (append built-deps (list normalized-module)))))
             (or (member (%module-normalize module) visited-deps)
                 (begin
