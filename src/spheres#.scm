@@ -599,7 +599,10 @@ fig.scm file"))
   (%check-module module '%module-shallow-dependencies-ld-options)
   ((%module-shallow-dependencies-select 'ld-options #f) module))
 
-;;! Gets the full tree of dependencies, building a list in the right order
+;;! Gets the full tree of dependencies, building a list in order. It guarantees that
+;; dependencies are loaded when needed, but doesn't guarantee that they are loaded
+;; in recursive order (that is, dependencies might appear in the list earlier than
+;; are needed).
 ;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
 ;; following its subdependencies recursively
 ;; .parameter symbol-to-return The symbol that the function will record, returning
@@ -615,7 +618,20 @@ fig.scm file"))
                               (%module-normalize module)
                               ((%module-shallow-dependencies-select type-to-return find-with-postfix) module))
                              deps))))
-      (apply append (map cadr (reverse deps))))))
+      ;; deps contains now a list of (dep (subdeps...)), so it needs further processing.
+      (pp deps)
+      (let ((clean-deps '()))
+        (let recur ((rest deps))
+          (if (null? rest)
+              clean-deps
+              (begin
+                (for-each (lambda (d)
+                            (if (not (member d clean-deps))
+                                (set! clean-deps (cons d clean-deps))))
+                          ;; otherwise they will appear reverse thangs to the set!/cons
+                          (reverse (cadar rest)))
+                ;; Second element inside the head
+                (recur (cdr rest)))))))))
 
 ;;! Gets a list with all the dependencies to load in the right order
 (define^ (%module-deep-dependencies-to-load module)
