@@ -610,28 +610,26 @@ fig.scm file"))
 ;; .parameter append The procedure used to append the returned results
 (define^ (%module-deep-dependencies-select type-to-follow type-to-return find-with-postfix)
   (lambda (module)
-    (let ((deps '()))
+    (let ((visited-deps '())
+          (built-deps '()))
       (let recur ((module module))
         (for-each recur ((%module-shallow-dependencies-select type-to-follow #f) module))
-        (or (assq (%module-normalize module) deps)
-            (set! deps (cons (list
-                              (%module-normalize module)
-                              ((%module-shallow-dependencies-select type-to-return find-with-postfix) module))
-                             deps))))
-      ;; deps contains now a list of (dep (subdeps...)), so it needs further processing.
-      (pp deps)
-      (let ((clean-deps '()))
-        (let recur ((rest deps))
-          (if (null? rest)
-              clean-deps
-              (begin
-                (for-each (lambda (d)
-                            (if (not (member d clean-deps))
-                                (set! clean-deps (cons d clean-deps))))
-                          ;; otherwise they will appear reverse thangs to the set!/cons
-                          (reverse (cadar rest)))
-                ;; Second element inside the head
-                (recur (cdr rest)))))))))
+        (if (eq? type-to-follow type-to-return)
+            (let ((normalized-module (%module-normalize module)))
+              (or (member normalized-module built-deps)
+                  (set! built-deps (append built-deps (list normalized-module)))))
+            (or (member (%module-normalize module) visited-deps)
+                (begin
+                  (for-each
+                   (lambda (d) (if (%module? d)
+                              (let ((normalized-module (%module-normalize d)))
+                                (or (member normalized-module built-deps)
+                                    (set! built-deps (append built-deps (list normalized-module)))))
+                              (or (member d built-deps)
+                                  (set! built-deps (append built-deps (list d))))))
+                   ((%module-shallow-dependencies-select type-to-return find-with-postfix) module))
+                  (set! visited-deps (cons (%module-normalize module) visited-deps))))))
+      built-deps)))
 
 ;;! Gets a list with all the dependencies to load in the right order
 (define^ (%module-deep-dependencies-to-load module)
