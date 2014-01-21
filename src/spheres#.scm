@@ -218,6 +218,7 @@ fig.scm file"))
                                (cond ((null? l) #f)
                                      ((eq? k (car l)) #t)
                                      (else (recur (cdr l))))))))
+              ;; Half-baked cond-expand for dependency files. Shame.
               (let expand-cond-features ((deps deps))
                 (cond ((null? deps) '())
                       ((not (pair? deps)) deps)
