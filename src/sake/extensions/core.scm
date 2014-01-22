@@ -494,7 +494,7 @@
                                           (set! pending-elements (cdr pending-elements))
                                           (mutex-unlock! elements-mutex)
                                           (add-to-results! (f next))
-                                          (recur (++ n)))))))))))
+                                          (recur (fx+ n 1)))))))))))
                          thread-pool)))
         (for-each thread-join! thread-pool)
         (let read-messages ()
