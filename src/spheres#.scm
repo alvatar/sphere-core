@@ -3,26 +3,22 @@
 
 
 (define expander:include #f)
-(define (riaxpander:current?) #f)
+(define current-macro-expander #f)
+(define ##spheres-environment? #t)
 
-(if (file-exists? "~~/spheres/core/src/riaxpander/")
-    (begin
-      (eval '(##begin (##include "~~/spheres/core/src/riaxpander/utils.scm")
-                      (##include "~~/spheres/core/src/riaxpander/history.scm")
-                      (##include "~~/spheres/core/src/riaxpander/closure.scm")
-                      (##include "~~/spheres/core/src/riaxpander/denotation.scm")
-                      (##include "~~/spheres/core/src/riaxpander/environment.scm")
-                      (##include "~~/spheres/core/src/riaxpander/transform.scm")
-                      (##include "~~/spheres/core/src/riaxpander/taxonomy.scm")
-                      (##include "~~/spheres/core/src/riaxpander/classify.scm")
-                      (##include "~~/spheres/core/src/riaxpander/standard.scm")
-                      (##include "~~/spheres/core/src/riaxpander/synrules.scm")
-                      (##include "~~/spheres/core/src/riaxpander/gambit.scm")))
-      (riaxpander:install)
-      (set! expander:include riaxpander:include)
-      (set! riaxpander:include #t))
-    (println "*** Info: Riaxpander has NOT been loaded!"))
+(let ((riaxpander-o "~~spheres/riaxpander.o1")
+      (riaxpander-scm "src/riaxpander/riaxpander.scm"))
+  (if (file-exists? riaxpander-o)
+      (load riaxpander-o)
+      (if (file-exists? riaxpander-scm)
+          (begin
+            (println "*** INFO: Riaxpander is being included instead of loaded. If you are bootstrapping Spheres, this is normal.")
+            (eval `(##include ,riaxpander-scm)))
+          (error "Cannot find Macro Expander. Is Sphere Core properly installed?"))))
 
+(riaxpander:install)
+(set! current-macro-expander 'alexpander)
+(set! expander:include riaxpander:include)
 
 ;;------------------------------------------------------------------------------
 ;;!! Debug

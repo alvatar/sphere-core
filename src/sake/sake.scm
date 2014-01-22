@@ -22,21 +22,27 @@ end-help-string
 
 (define (main args)
   (define *options*
-    '((#\f 1 "file")))
+    '((#\h 0 "help")
+      (#\f 1 "file")
+      (#\X 0 "no-extensions")))
   (define (process-tasks explicit-tasks? opts args)
     (define help #f)
     (define file "sakefile.scm")
+    (define no-extensions #f)
     (handle-opts!
      opts
-     `(("file"
-        ,@(lambda (val)
-            (set! file (with-input-from-string val read))))
-       ("help"
+     `(("help"
         ,@(lambda (val)
             (println *help*)
-            (exit 0)))))
+            (exit 0)))
+       ("file"
+        ,@(lambda (val)
+            (set! file (with-input-from-string val read))))
+       ("no-extensions"
+        ,@(lambda (val)
+            (set! no-extensions #t)))))
     (if explicit-tasks? (ensure-args! args))
-    (sake file: file tasks: (map string->symbol args)))
+    (sake file: file tasks: (map string->symbol args) extensions: (not no-extensions)))
   (parse-arguments
    args
    (lambda (args-sans-opts opts)

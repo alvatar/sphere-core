@@ -1,12 +1,10 @@
-(info/color 'brown "Bootstrapping Scheme Spheres")
-(##include "src/spheres#.scm")
-(##include "src/sake/extensions/core.scm")
-
 ;;------------------------------------------------------------------------------
 ;;!! Stage 1: Sake and Spheres program
 
-(define sphere-path "~~spheres/core/")
-(define sake-extensions-path "~~spheres/sake-extensions/src/")
+(define sphere-path
+  (make-parameter "~~spheres/core/"))
+(define sake-extensions-path
+  (make-parameter "~~spheres/sake-extensions/src/"))
 
 (define-task init ()
   (sake#default-clean)
@@ -15,14 +13,14 @@
 
 (define-task compile-stage-1 (init)
   ;; Compile Sake program
-  (println "Compiling Sake...")
+  (info/color 'green "Compiling Sake...")
   (if ((newer-than? "") (string-append (current-source-directory) "sake/sake.scm"))
       (gambit-compile-file
        (string-append (current-source-directory) "sake/sake.scm")
        output: (string-append (current-build-directory) "sake")
        options: "-exe"))
   ;; Compile Spheres program
-  (println "Compiling Spheres...")
+  (info/color 'green "Compiling Spheres...")
   (gambit-compile-file
    (string-append (current-source-directory) "spheres/spheres.scm")
    output: (string-append (current-build-directory) "spheres")
@@ -30,24 +28,27 @@
 
 (define-task post-compile-stage-1 ()
   ;; Install Sake program
+  (info/color 'green "Installing Sake...")
   (delete-file "~~/bin/sake")
   (make-directory "~~spheres/core/src/sake")
-  (if (not (file-exists? sake-extensions-path))
-      (make-directory sake-extensions-path))
-  ;; Install some Sake extensions
-  (copy-file (string-append (current-source-directory) "internal/tiny.scm")
-             (string-append sake-extensions-path "tiny.scm"))
-  (copy-file (string-append (current-source-directory) "sake/extensions/core-macros.scm")
-             (string-append sake-extensions-path "core-macros.scm"))
-  (copy-file (string-append (current-source-directory) "sake/extensions/core.scm")
-             (string-append sake-extensions-path "core.scm"))
-  ;; Install Sake
+  (if (not (file-exists? (sake-extensions-path)))
+      (make-directory (sake-extensions-path)))
   (copy-file (string-append (current-build-directory) "sake") "~~/bin/sake")
   (copy-files (fileset dir: (string-append (current-source-directory) "sake")
                        test: (ends-with? ".scm")
                        recursive: #t)
               "~~spheres/core/src/sake")
+  ;; Install some Sake extensions
+  (info/color 'green "Installing Sake extensions...")
+  (copy-file (string-append (current-source-directory) "internal/tiny.scm")
+             (string-append (sake-extensions-path) "tiny.scm"))
+  (copy-file (string-append (current-source-directory) "sake/extensions/core-macros.scm")
+             (string-append (sake-extensions-path) "core-macros.scm"))
+  (copy-file (string-append (current-source-directory) "sake/extensions/core.scm")
+             (string-append (sake-extensions-path) "core.scm"))
+  
   ;; Install Spheres program
+  (info/color 'green "Installing Spheres...")
   (delete-file "~~/bin/spheres")
   (copy-file (string-append (current-build-directory) "spheres") "~~/bin/spheres"))
 
@@ -60,19 +61,20 @@
 (define spheres-module-system-path "~~spheres/spheres#.scm")
 (define riaxpander-module-system-path "~~spheres/core/src/riaxpander/riaxpander-gambit.scm")
 
-(define-task compile-stage-2 (init)
-  'compile-nothing)
+(define-task compile-stage-2 ()
+  ;; Compile Riaxpander
+  (info/color 'green "Compiling Riaxpander...")
+  (gambit-compile-file
+   (string-append (current-source-directory) "riaxpander/riaxpander.scm")
+   output: (string-append (current-build-directory) "riaxpander.o1")))
 
 (define-task post-compile-stage-2 ()
   ;; Install spheres# directly in the spheres directory
   (copy-file "src/spheres#.scm" spheres-module-system-path)
-  ;; Install Riaxpander files
+  ;; Install Riaxpander
   (info/color 'green "Installing macro expander")
-  (make-directory "~~spheres/core/src/riaxpander")
-  (copy-files (fileset dir: (string-append (current-source-directory) "riaxpander")
-                       test: (ends-with? ".scm")
-                       recursive: #t)
-              "~~spheres/core/src/riaxpander")
+  (copy-file (string-append (current-build-directory) "riaxpander.o1")
+             "~~spheres/riaxpander.o1")
   ;; Create .gambcini
   (call-with-output-file
       (string-append (user-info-home (user-info (user-name))) "/.gambcini")
@@ -124,7 +126,7 @@
   (sake#uninstall-sphere-from-system)
   (delete-file spheres-module-system-path)
   (delete-file (string-append (user-info-home (user-info (user-name))) "/.gambcini"))
-  (delete-file (string-append sake-extensions-path "core.scm"))
+  (delete-file (string-append (sake-extensions-path) "core.scm"))
   (delete-file "~~bin/sake")
   (delete-file "~~bin/spheres")
   (delete-file "~~/#spheres"))

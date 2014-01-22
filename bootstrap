@@ -2,11 +2,14 @@
 
 gsi -f -e '(begin (load "src/sake/sakelib")
                   (include "src/sake/sakelib#.scm")
+                  (include "src/spheres#.scm")
+                  (include "src/sake/extensions/core.scm")
                   (include "sakefile.scm")
                   (task-run clean)
                   (task-run stage-1)
+                  (task-run stage-2)
                   (exit))'
 
-sake stage-2
+#sake stage-2
 sake stage-3
 

@@ -84,7 +84,8 @@
 
 (define (sake #!key 
               (file "sakefile.scm")
-              (tasks '(all)))
+              (tasks '(all))
+              (extensions #t))
   (let* ((file (path-expand file))
          (dir (path-directory file)))
     (info "entering directory " dir)
@@ -94,20 +95,16 @@
                                 "current directory."
                                 dir))))
     (let* ((prelude-file "~~spheres/spheres#.scm")
-           (extensions-directory "~~spheres/sake-extensions/src/")
-           (bootstrapping? (not (and (file-exists? prelude-file)
-                                     (file-exists? extensions-directory)))))
+           (extensions-directory "~~spheres/sake-extensions/src/"))
       (eval `(begin
-               (##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
-               (##include "~~lib/gambit#.scm")
+               ;(##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))
+               ;(##include "~~lib/gambit#.scm")
                (##include "~~spheres/core/src/sake/sakelib#.scm")
-               ,(let ((sake-extensions (if bootstrapping?
-                                           '("src/sake/extensions/core.scm")
-                                           (map (lambda (f) (string-append extensions-directory f))
+               ,(if extensions
+                    (let ((sake-extensions (map (lambda (f) (string-append extensions-directory f))
                                                 (directory-files
                                                  (list path: extensions-directory
-                                                       ignore-hidden: 'dot-and-dot-dot))))))
-                  (if (not bootstrapping?)
+                                                       ignore-hidden: 'dot-and-dot-dot)))))
                       `(begin (include ,prelude-file)
                               ,@(map (lambda (e) `(include ,e)) sake-extensions))))
                (##include ,file)
