@@ -122,7 +122,8 @@
                                             (diff-lengths (- undef-str-len task-str-len)))
                                        (if (zero? diff-lengths)
                                            (string=? undef-str task-str)
-                                           (and (string=? (substring undef-str
+                                           (and (> diff-lengths 0)
+                                                (string=? (substring undef-str
                                                                      diff-lengths
                                                                      undef-str-len)
                                                           task-str)
