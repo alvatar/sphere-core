@@ -89,26 +89,24 @@
           ((riaxpander)
            (let ((compilation-code
                   `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
-                    ,@(map (lambda (m) `(##include-module-and-dependencies ',m '(verbose)))
+                    ,@(map (lambda (m) `(##include-module-and-dependencies ',m ',(if verbose '(verbose) '())))
                            ;; Import shallow dependencies, as dependencies should already be expanded
                            (append (%module-shallow-dependencies-to-include module)
-                                   (apply append (map %module-shallow-dependencies-to-include
-                                                      (%module-shallow-dependencies-to-load module)))
+                                   ;; (apply append (map %module-shallow-dependencies-to-include
+                                   ;;                    (%module-shallow-dependencies-to-load module)))
                                    (if header-module (list header-module) '())
-                                   (if macros-module (list macros-module) '()))))))
+                                   ;; (if macros-module (list macros-module) '())
+                                   )))))
              (if verbose
                  (begin
                    (info/color 'light-green "compilation environment code:")
                    (for-each pp compilation-code)))
              ;; Eval compilation code in current environment
              ;; This has been removed in favor of running the code directly in the spawned GSC instance
-             ;(for-each eval compilation-code)
-             (let* ((code (list (riaxpander:desourcify
-                                 (riaxpander:expand-toplevel
-                                  (cons '##begin
-                                        (with-input-from-file input-file read-all))))))
+             ;; (for-each eval compilation-code)
+             (let* ((code (with-input-from-file input-file read-all))
                     (intermediate-code
-                     `(;; Compile-time cond-expand-features
+                     `( ;; Compile-time cond-expand-features
                        ,@(map (lambda (f)
                                 `(define-cond-expand-feature ,f))
                               (cons 'compile-to-c cond-expand-features))
@@ -154,14 +152,18 @@
                (or (zero?
                     ;; If there is any prelude, WE DO NOT IMPORT DEPENDENCIES
                     (if (null? (%module-shallow-dependencies-to-prelude module))
-                        (gambit-eval-here
-                         `(,@compilation-code
-                           (compile-file-to-target
-                            ,intermediate-file
-                            output: ,output-file
-                            options: ',compiler-options)))
                         (begin
-                          (info "The following module compilation bypasses the Macro expander, as it uses a prelude:")
+                          (if verbose
+                              (info "Compiling via Riaxpander expansion"))
+                          (gambit-eval-here
+                           `(,@compilation-code
+                             (compile-file-to-target
+                              ,intermediate-file
+                              output: ,output-file
+                              options: ',compiler-options))))
+                        (begin
+                          (if verbose
+                              (info "The following module compilation bypasses the Macro expander, as it uses a prelude:"))
                           (gambit-eval-here
                            `((compile-file-to-target
                               ,intermediate-file
