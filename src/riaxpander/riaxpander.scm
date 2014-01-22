@@ -10,6 +10,8 @@
 
 ;; Include this file directly for Riaxpander testing
 
+(##namespace ("riaxpander#"))
+(##include "~~lib/gambit#.scm")
 
 (##include "utils.scm")
 (##include "history.scm")
@@ -22,3 +24,5 @@
 (##include "standard.scm")
 (##include "synrules.scm")
 (##include "gambit.scm")
+
+(##namespace (""))

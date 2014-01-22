@@ -1,28 +1,10 @@
 ;;; I'm not really sure what I'm doing here, but this looks vaguely
 ;;; plausible.
 
-;(##namespace
-; ("riaxpander#"
-;  riaxpander:expand
-;  riaxpander:expand-toplevel
-;  riaxpander:install
-;
-;  name?
-;  name->symbol
-;  symbol->name
-;  datum->syntax
-;  syntax->datum
-;  make-syntactic-closure
-;  make-syntactic-closures
-;  close-syntax
-;  close-syntax*
-;  ))
 
 (##declare
   (standard-bindings)
-;  (extended-bindings)
-; (block)
-)
+  (block))
 
 (define classify-error error)
 (define syntax-error error)

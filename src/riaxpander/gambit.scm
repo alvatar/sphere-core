@@ -177,7 +177,7 @@
 
 (define c#expand-source (lambda (src) src))
 
-(define (riaxpander:install)
+(define (riaxpander:install!)
   (set! riaxpander:top-level-environment (make-gambit-environment))
   (set! c#expand-source riaxpander:c-expand-toplevel)
   (set! ##expand-source riaxpander:expand-toplevel))

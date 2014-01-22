@@ -12,13 +12,13 @@
       (load riaxpander-o)
       (if (file-exists? riaxpander-scm)
           (begin
-            (println "*** INFO: Riaxpander is being included instead of loaded. If you are bootstrapping Spheres, this is normal.")
+            (println "*** INFO -- Riaxpander is being included instead of loaded. If you are bootstrapping Spheres, this is ok.")
             (eval `(##include ,riaxpander-scm)))
           (error "Cannot find Macro Expander. Is Sphere Core properly installed?"))))
 
-(riaxpander:install)
+(riaxpander#riaxpander:install!)
 (set! current-macro-expander 'alexpander)
-(set! expander:include riaxpander:include)
+(set! expander:include riaxpander#riaxpander:include)
 
 ;;------------------------------------------------------------------------------
 ;;!! Debug
