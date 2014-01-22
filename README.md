@@ -5,9 +5,10 @@ Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quicks
 
 * Syntax expansion (via Riaxpander)
 * FFI utilities and generators
-* Basic macros and procedure
+* Generic macros and procedures, conventionally used
 * Macros for building macros
 * Functional programming style helpers
+* Primitives for expressing iterative lazy algorithms
 * Assert
 * Match
 * Lightweight testing framework (SRFI-78)
