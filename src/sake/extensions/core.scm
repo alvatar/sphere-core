@@ -441,9 +441,27 @@
 (##define (sake#uninstall-sphere-from-system #!optional (sphere (%current-sphere)))
   (delete-file (%sphere-system-path sphere) recursive: #t))
 
+;;! Get the host platform
+(define (sake#host-platform)
+  (let* ((uname (open-process
+                 (list path: "uname"
+                       arguments: '("-o"))))
+         (uname-output (read-line uname)))
+    (close-port uname)
+    (cond ((string=? "GNU/Linux" uname-output) 'linux)
+          ((string=? "Darwin" uname-output) 'osx)
+          (else (err "fusion#host-platform -> can't detect current platform")))))
+
 ;;! Parallel for-each, suitable mainly for parallel compilation, which spawns external
 ;; processes
-(##define (sake#parallel-for-each f l #!key (max-thread-number 2))
+(##define (sake#parallel-for-each f l #!key
+                                  (max-thread-number
+                                   (case (sake#host-platform)
+                                     ((linux osx)
+                                      (string->number
+                                       (with-input-from-process "nproc" read-line)))
+                                     (else 2))))
+  (info "using " max-thread-number " compilation threads")
   (let ((pending-elements l)
         (elements-mutex (make-mutex))
         (results '())
@@ -460,24 +478,28 @@
                    (cons (thread-start!
                           (make-thread
                            (lambda ()
-                             (with-exception-catcher
-                              (lambda (e) (thread-send main-thread e))
-                              (lambda ()
-                                (let recur ((n 0))
-                                  (mutex-lock! elements-mutex)
-                                  (if (null? pending-elements)
-                                      (begin (mutex-unlock! elements-mutex)
-                                             'finished-thread)
-                                      (let ((next (car pending-elements)))
-                                        (set! pending-elements (cdr pending-elements))
-                                        (mutex-unlock! elements-mutex)
-                                        (add-to-results! (f next))
-                                        (recur (++ n))))))))))
+                             (let ((current-thread-element #f))
+                               (with-exception-catcher
+                                (lambda (e)
+                                  (thread-send main-thread
+                                               (cons e current-thread-element)))
+                                (lambda ()
+                                  (let recur ((n 0))
+                                    (mutex-lock! elements-mutex)
+                                    (if (null? pending-elements)
+                                        (begin (mutex-unlock! elements-mutex)
+                                               'finished-thread)
+                                        (let ((next (car pending-elements)))
+                                          (set! current-thread-element next)
+                                          (set! pending-elements (cdr pending-elements))
+                                          (mutex-unlock! elements-mutex)
+                                          (add-to-results! (f next))
+                                          (recur (++ n)))))))))))
                          thread-pool)))
         (for-each thread-join! thread-pool)
         (let read-messages ()
           (let ((m (thread-receive 0 'finished)))
             (if (not (eq? m 'finished))
-                (begin (pp m)
+                (begin (err "Exception " (car m) " running procedure on element: " (cdr m))
                        (read-messages)))))))
     (reverse results)))
