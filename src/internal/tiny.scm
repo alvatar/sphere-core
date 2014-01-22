@@ -15,6 +15,12 @@
       accum
       (foldl func (func accum (car lst)) (cdr lst))))
 
+;;! Reduce
+(define (reduce f i l)
+  (let reduce ((i i) (l l))
+    (if (null? l) i
+        (reduce (f i (car l)) (cdr l)))))
+
 ;;! Unfold
 (define (unfold func init pred)
   (if (pred init)
