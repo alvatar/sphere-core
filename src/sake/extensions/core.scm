@@ -90,7 +90,9 @@
            (let ((compiling-without-riaxpander? (not (null? (%module-shallow-dependencies-to-prelude module)))))
              (let ((compilation-environment-code
                     (if compiling-without-riaxpander?
-                        #f
+                        ;; No Riaxpander: no compilation environment
+                        '()
+                        ;; Riaxpander: Add cond-expand-code and import macros
                         `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
                           ,@(map (lambda (m) `(##include-module-and-dependencies ',m ',(if verbose '(verbose) '())))
                                  ;; Import shallow dependencies, as dependencies should already be expanded
@@ -100,9 +102,10 @@
                                          (if header-module (list header-module) '())
                                          ;; (if macros-module (list macros-module) '())
                                          ))))))
-               (if (and verbose compiling-without-riaxpander?)
-                   (info "bypassing the Macro expander, as the module uses prelude")
-                   (info "expanding macros with Riaxpander"))
+               (if verbose
+                   (if compiling-without-riaxpander?
+                       (info/color 'green "bypassing the Macro expander, as the module uses prelude")
+                       (info/color 'green "expanding macros with Riaxpander")))
                (if (and (not compiling-without-riaxpander?) verbose)
                    (begin
                      (info/color 'light-green "compilation environment code:")
@@ -117,6 +120,12 @@
                            `(,@(map (lambda (f)
                                       `(define-cond-expand-feature ,f))
                                     (cons 'compile-to-c cond-expand-features))
+                             ,@(map (lambda (p)
+                                      `(##include ,(string-append
+                                                    (%module-path-src p)
+                                                    (%module-filename-scm p))))
+                                    ;; Dependencies here are not deep, as they should be already compiled
+                                    (%module-shallow-dependencies-to-prelude module))
                              ,@input-code)
                            ;; With Riaxpander
                            `( ;; Compile-time cond-expand-features
@@ -155,27 +164,21 @@
                              ,@input-code))))
                  ;; Verbose compilation
                  (if verbose
-                     (info/color 'light-green "macro-expanded code:")
-                     (for-each pp intermediate-code))
+                     (begin (info/color 'light-green "code to be compiled:")
+                            (for-each pp intermediate-code)))
                  ;; Write code in intermediate file
                  (call-with-output-file
                      intermediate-file
                    (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
                  ;; Compile
                  (or (zero?
-                      (if compiling-without-riaxpander?
-                          (gambit-eval-here
-                           `((compile-file-to-target
-                              ,intermediate-file
-                              output: ,output-file
-                              options: ',compiler-options))
-                           flags-string: "-f")
-                          (gambit-eval-here
-                           `(,@compilation-environment-code
-                             (compile-file-to-target
-                              ,intermediate-file
-                              output: ,output-file
-                              options: ',compiler-options)))))
+                      (gambit-eval-here
+                       `(,@compilation-environment-code
+                         (compile-file-to-target
+                          ,intermediate-file
+                          output: ,output-file
+                          options: ',compiler-options))
+                       flags-string: (if compiling-without-riaxpander? "-f" "")))
                      (err "error compiling generated C file"))))))
           ((gambit)
            (error "Gambit expander workflow not implemented"))
