@@ -79,16 +79,16 @@
 
 ;;; Make directory
 
-(define (make-directory dir)
+(define (sake#make-directory dir)
   (let ((dir0 (path-strip-trailing-directory-separator dir)))
     (if (file-exists? dir0) #t
         (begin
-          (make-directory (path-directory dir0))
+          (sake#make-directory (path-directory dir0))
           (create-directory dir0)))))
 
 ;;; Improved delete-file
 
-(##define (sake#delete-file file #!key (recursive #f) (force #t))
+(define (sake#delete-file file #!key (recursive #f) (force #t))
   (let ((file (path-expand file)))
     (info "deleting " file)
     (cond
@@ -100,25 +100,25 @@
 
 ;;; Improved delete-directory
 
-(##define (sake#delete-directory dir #!key (recursive #f) (force #t))
+(define (sake#delete-directory dir #!key (recursive #t) (force #t))
   (if force (for-each ##delete-file (fileset dir: dir recursive: #f test: regular?)))
   (if recursive (for-each (lambda (dir) (sake#delete-file
                                     (path-add-trailing-directory-separator dir)
                                     recursive: recursive
                                     force: force))
-                          (fileset dir: dir recursive: #f test: directory?)))
+                          (fileset dir: dir recursive: #t test: directory?)))
   (if (null? (fileset dir: dir recursive: #t test: any?)) 
       (##delete-directory dir)
       (warn dir " is not empty")))
 
 ;;; Delete a list of files
 
-(define (delete-files files)
+(define (sake#delete-files files)
   (for-each (lambda (f) (sake#delete-file f recursive: #t)) files))
 
 ;;; Improved copy-file
 
-(##define (sake#copy-file file dest #!key (force #t))
+(define (sake#copy-file file dest #!key (force #t))
   (let ((file (path-expand file)))
     (cond
      ((directory? file)
@@ -135,7 +135,7 @@
 
 ;;; Copy a directory
 
-(##define (sake#copy-directory file dest #!key (force #t))
+(define (sake#copy-directory file dest #!key (force #t))
   (cond
    ((and force (file-exists? dest))
     (sake#delete-file dest recursive: #t force: #t)
@@ -154,7 +154,7 @@
 
 ;;; Copy a list of files and directories
 
-(##define (copy-files files dest #!key (force #t))
+(define (sake#copy-files files dest #!key (force #t))
   (for-each
    (lambda (file) 
      (sake#copy-file file
@@ -164,19 +164,20 @@
                      force: force))
    files))
 
-(define (read-file file)
+(define (sake#read-file file)
   (call-with-input-file (path-expand file)
     (lambda (in) (read-line in #f))))
 
-(define (read-files files)
-  (call-with-output-string ""
-    (lambda (out)
-      (for-each (lambda (file) (display (read-file file) out))
-                files))))
+(define (sake#read-files files)
+  (call-with-output-string
+   ""
+   (lambda (out)
+     (for-each (lambda (file) (display (sake#read-file file) out))
+               files))))
 
-(define (append-files files dest)
+(define (sake#append-files files dest)
   (call-with-output-file dest
     (lambda (out)
-      (for-each (lambda (file) (display (read-file file) out))
+      (for-each (lambda (file) (display (sake#read-file file) out))
                 files))))
 
