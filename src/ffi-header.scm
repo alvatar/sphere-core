@@ -552,32 +552,67 @@
 ;;------------------------------------------------------------------------------
 ;; Type definitions
 
-;;! char
+
+;;! void*
+(c-define-type* void)
+(c-define-type void** (pointer void*))
+
+;;! char*
 (c-define-type* char)
 
-;;! unsigned char
+;;! unsigned char*
 (c-define-type* unsigned-char)
 
-;;! short
+;;! short*
 (c-define-type* short)
 
-;;! unsigned short
+;;! unsigned short*
 (c-define-type* unsigned-short)
 
-;;! int
+;;! int*
 (c-define-type* int)
 
-;;! unsigned int
+;;! unsigned int*
 (c-define-type* unsigned-int)
 
-;;! long
+;;! long*
 (c-define-type* long)
 
-;;! unsigned long
+;;! unsigned long*
 (c-define-type* unsigned-long)
 
-;;! float
+;;! float*
 (c-define-type* float)
 
-;;! double
+;;! double*
 (c-define-type* double)
+
+;;! int8
+(c-define-type* int8)
+
+;;! unsigned-int8
+(c-define-type* unsigned-int8)
+
+;;! int16
+(c-define-type* int16)
+
+;;! unsinged-int16
+(c-define-type* unsigned-int16)
+
+;;! int32
+(c-define-type* int32)
+
+;;! unsigned-int32
+(c-define-type* unsigned-int32)
+
+;;! int64
+(c-define-type* int64)
+
+;;! unsigned-int64
+(c-define-type* unsigned-int64)
+
+;;! float32
+(c-define-type* float32)
+
+;;! float64
+(c-define-type* float64)
