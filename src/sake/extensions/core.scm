@@ -16,7 +16,7 @@
   (or (file-exists? (default-build-directory))
       (make-directory (default-build-directory)))
   (let ((module (if (string? module-or-file)
-                    (error "Handling of module as file is unimplemented")
+                    (err "Handling of module as file is unimplemented")
                     module-or-file)))
     (%check-module module 'sake#compile-to-c)
     (let* ((header-module (%module-header module))
@@ -174,14 +174,15 @@
                  (or (zero?
                       (gambit-eval-here
                        `(,@compilation-environment-code
-                         (compile-file-to-target
-                          ,intermediate-file
-                          output: ,output-file
-                          options: ',compiler-options))
+                         (or (compile-file-to-target
+                              ,intermediate-file
+                              output: ,output-file
+                              options: ',compiler-options)
+                             (exit 1)))
                        flags-string: (if compiling-without-riaxpander? "-f" "")))
                      (err "error compiling generated C file"))))))
           ((gambit)
-           (error "Gambit expander workflow not implemented"))
+           (err "Gambit expander workflow not implemented"))
           (else (err "Unknown expander"))))
       output-file)))
 
@@ -195,10 +196,10 @@
                                (delete-c #f))
   (info "compiling C file to o -- "
         c-file)
-  (or (= 0
-         (gambit-eval-here
-          `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
-      (error "error compiling C file"))
+  (or (zero?
+       (gambit-eval-here
+        `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
+      (err "error compiling C file"))
   (if delete-c
       (delete-file c-file recursive: #t)))
 
@@ -297,7 +298,7 @@
                                         ,cc-options
                                         " -L" (path-expand "~~lib") " -lgambc -lm -ldl -lutil "
                                         ,ld-options)))
-           (if (not link-file) (error "error generating link file"))
+           (if (not link-file) (err "error generating link file"))
            (if ,verbose (begin (pp link-file) (pp gcc-cli)))
            (shell-command gcc-cli)
            (if ,strip (shell-command ,(string-append "strip " output)))
@@ -418,14 +419,14 @@
     (if (file-exists? module)
         (gambit-eval-here
          `((eval '(expander:include ,module))))
-        (error "Testing file doesn't exist")))
+        (err "Testing file doesn't exist")))
    ((%module? module)
     (%check-module module 'sake#test)
     (gambit-eval-here
      `((eval '(expander:include ,(string-append "test/"
                                                 (%module-filename-scm module)))))))
    (else
-    (error "Bad testing module description: file path or module"))))
+    (err "Bad testing module description: file path or module"))))
 
 ;;! Clean all default generated files and directories
 (##define (sake#default-clean)
