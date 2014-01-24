@@ -379,7 +379,7 @@
                 ,(string-append "___result = sizeof(" c-type ");")))))
 
 ;;! Build FFI procedures for C type arrays. Only for use with basic types, not structs.
-;; (build-c-array-ffi float f32) ->
+;; (c-define-array float f32) ->
 ;; alloc-float*
 ;; float*-ref
 ;; float*-set!
@@ -548,3 +548,36 @@
 (##define-macro (ffi:objc-class-method class-name formal-types return-type method-name)
   `(%%objc-method ,class-name #t ,formal-types ,return-type ,method-name))
 
+
+;;------------------------------------------------------------------------------
+;; Type definitions
+
+;;! char
+(c-define-type* char)
+
+;;! unsigned char
+(c-define-type* unsigned-char)
+
+;;! short
+(c-define-type* short)
+
+;;! unsigned short
+(c-define-type* unsigned-short)
+
+;;! int
+(c-define-type* int)
+
+;;! unsigned int
+(c-define-type* unsigned-int)
+
+;;! long
+(c-define-type* long)
+
+;;! unsigned long
+(c-define-type* unsigned-long)
+
+;;! float
+(c-define-type* float)
+
+;;! double
+(c-define-type* double)
