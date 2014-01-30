@@ -4,6 +4,7 @@
   extension=?
   ends-with?
   newer-than?
+  newer-than/extension?
   directory?
   regular?
   any?

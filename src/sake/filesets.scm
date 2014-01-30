@@ -11,8 +11,14 @@
          (string=? (substring name (- (string-length name) (string-length end)) (string-length name))
                    end))))
 
-(##define (newer-than? ext #!key
-                       (dir (current-build-directory)))
+(define (newer-than? filename1 #!key
+                     (dir (current-build-directory)))
+  (lambda (filename2)
+    (> (time->seconds (file-last-modification-time filename2))
+       (time->seconds (file-last-modification-time filename1)))))
+
+(define (newer-than/extension? ext #!key
+                               (dir (current-build-directory)))
   (lambda (name)
     (let ((name0 (string-append 
                   dir

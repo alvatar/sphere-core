@@ -15,7 +15,7 @@
            #!key
            (files (fileset test: (f-and (extension=? ".scm") 
                                         (f-not (ends-with? "#.scm")) 
-                                        (newer-than? ".c"))
+                                        (newer-than/extension? ".c"))
                            recursive: #t))
            (output (current-build-directory))
            (options ""))
@@ -35,7 +35,7 @@
            #!key
            (files (fileset test: (f-and (extension=? ".scm") 
                                         (f-not (ends-with? "#.scm")) 
-                                        (newer-than? ".c"))
+                                        (newer-than/extension? ".c"))
                            recursive: #t))
            (output (current-build-directory))
            (options ""))

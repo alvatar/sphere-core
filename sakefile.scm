@@ -14,11 +14,10 @@
 (define-task compile-stage-1 (init)
   ;; Compile Sake program
   (info/color 'green "Compiling Sake...")
-  (if ((newer-than? "") (string-append (current-source-directory) "sake/sake.scm"))
-      (gambit-compile-file
-       (string-append (current-source-directory) "sake/sake.scm")
-       output: (string-append (current-build-directory) "sake")
-       options: "-exe"))
+  (gambit-compile-file
+   (string-append (current-source-directory) "sake/sake.scm")
+   output: (string-append (current-build-directory) "sake")
+   options: "-exe")
   ;; Compile Spheres program
   (info/color 'green "Compiling Spheres...")
   (gambit-compile-file
