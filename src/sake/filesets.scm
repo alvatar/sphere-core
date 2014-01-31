@@ -14,19 +14,20 @@
 (define (newer-than? filename1 #!key
                      (dir (current-build-directory)))
   (lambda (filename2)
-    (> (time->seconds (file-last-modification-time filename2))
-       (time->seconds (file-last-modification-time filename1)))))
+    (or (not (file-exists? filename1))
+        (> (time->seconds (file-last-modification-time filename2))
+           (time->seconds (file-last-modification-time filename1))))))
 
 (define (newer-than/extension? ext #!key
                                (dir (current-build-directory)))
-  (lambda (name)
-    (let ((name0 (string-append 
-                  dir
-                  (path-strip-extension (path-strip-directory name))
-                  ext)))
-      (or (not (file-exists? name0))
-          (>= (time->seconds (file-last-modification-time name))
-              (time->seconds (file-last-modification-time name0)))))))
+  (lambda (filename2)
+    (let ((filename1 (string-append 
+                      dir
+                      (path-strip-extension (path-strip-directory name))
+                      ext)))
+      (or (not (file-exists? filename1))
+          (>= (time->seconds (file-last-modification-time filenam2))
+              (time->seconds (file-last-modification-time filenam1)))))))
 
 (define (f-and . ts)
   (lambda (name)
