@@ -23,11 +23,11 @@
   (lambda (filename2)
     (let ((filename1 (string-append 
                       dir
-                      (path-strip-extension (path-strip-directory name))
+                      (path-strip-extension (path-strip-directory filename2))
                       ext)))
       (or (not (file-exists? filename1))
-          (>= (time->seconds (file-last-modification-time filenam2))
-              (time->seconds (file-last-modification-time filenam1)))))))
+          (>= (time->seconds (file-last-modification-time filename2))
+              (time->seconds (file-last-modification-time filename1)))))))
 
 (define (f-and . ts)
   (lambda (name)
