@@ -61,6 +61,9 @@
 
 (define compiling-expander (make-parameter #f))
 
+;;! By default do not compile macros
+(define compile-loadable-macros? (make-parameter #f))
+
 (define (riaxpander:expand-toplevel form)
   (set! new-syntax-definitions '())
   (let ((form* (riaxpander:expand form
@@ -88,11 +91,17 @@
                  ((pair? form)
                   (case (car form)
                     ((rsc-macro-transformer)
-                     (expand-rsc-macro-transformer name form))
+                     (if (compile-loadable-macros?)
+                         (expand-rsc-macro-transformer name form)
+                         #!void))
                     ((sc-macro-transformer)
-                     (expand-sc-macro-transformer name form))
+                     (if (compile-loadable-macros?)
+                         (expand-sc-macro-transformer name form)
+                         #!void))
                     ((er-macro-transformer)
-                     (expand-er-macro-transformer name form))
+                     (if (compile-loadable-macros?)
+                         (expand-er-macro-transformer name form)
+                         #!void))
                     (else
                      (warning "non-standard syntax transformer" name form)
                      `(syntactic-bind! riaxpander:top-level-environment ',name ,form))))
