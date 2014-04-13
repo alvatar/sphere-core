@@ -339,7 +339,7 @@
                            x (cons 'cond-expand clauses)))
            (define (test feature-requirement)
              (cond ((symbol? feature-requirement)
-                    (not (not (memq feature-requirement ##cond-expand-features))))
+                    (not (not (memq feature-requirement (##cond-expand-features)))))
                    ((not (pair? feature-requirement))
                     (err feature-requirement))
                    (else
