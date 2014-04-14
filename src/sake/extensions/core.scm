@@ -250,6 +250,7 @@
                         (%process-cc-options (apply append (map %module-deep-dependencies-cc-options modules)))))
         (ld-options (or override-ld-options
                         (%process-ld-options (apply append (map %module-deep-dependencies-ld-options modules))))))
+
     (info "compiling modules to exe: ")
     (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
               modules)
@@ -262,15 +263,18 @@
                            (append (map (lambda (mdep)
                                           (info "    * " (object->string mdep) "")
                                           ;; First try with the default path
-                                          (let ((default-path (string-append
-                                                               (%module-path-lib mdep)
-                                                               (%module-filename-c mdep))))
-                                            (if (file-exists? default-path)
+                                          (let ((scm-path (string-append
+                                                            (%module-path-src mdep)
+                                                            (%module-filename-scm mdep)))
+                                                (default-path (string-append
+                                                                (%module-path-lib mdep)
+                                                                (%module-filename-c mdep))))
+                                            (if (not ((newer-than? default-path) scm-path))
                                                 default-path
                                                 (let ((local-path (string-append
                                                                    (current-build-directory)
                                                                    (%module-filename-c mdep))))
-                                                  (if (file-exists? local-path)
+                                                  (if (not ((newer-than? local-path) scm-path))
                                                       local-path
                                                       (begin
                                                         (info "Compiling deferred dependency "
