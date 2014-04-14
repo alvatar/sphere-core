@@ -74,7 +74,7 @@
   (info/color 'green "Installing macro expander")
   (copy-file (string-append (current-build-directory) "riaxpander.o1")
              "~~spheres/riaxpander.o1")
-  ;; Create .gambcini
+  ;; Create .gambcini (necessary for the sudo environment as well)
   (call-with-output-file
       (string-append (user-info-home (user-info (user-name))) "/.gambcini")
     (lambda (f)
