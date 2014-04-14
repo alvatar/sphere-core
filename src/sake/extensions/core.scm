@@ -458,7 +458,7 @@
                 (string=? "linux" (substring sys 0 5)))
            'linux)
           ((and (> (string-length sys) 5)
-                (string=? "darwin" (substring sys 0 5)))
+                (string=? "darwin" (substring sys 0 6)))
            'osx)
           (else (err "sake#host-platform -> can't detect current platform")))))
 
@@ -467,9 +467,18 @@
 (##define (sake#parallel-for-each f l #!key
                                   (max-thread-number
                                    (case (sake#host-platform)
-                                     ((linux osx)
+                                     ((linux)
                                       (string->number
-                                       (with-input-from-process "nproc" read-line)))
+                                       (with-input-from-process "nproc"
+                                                                read-line)))
+                                     ((osx)
+                                      (string->number
+                                       (with-input-from-port
+                                           (open-process
+                                            (list path: "sysctl"
+                                                  arguments:
+                                                  '("-n" "hw.logicalcpu")))
+                                         read-line)))
                                      (else 2))))
   (info "using " max-thread-number " compilation threads")
   (let ((pending-elements l)
