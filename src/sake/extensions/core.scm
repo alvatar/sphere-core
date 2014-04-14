@@ -453,14 +453,14 @@
 
 ;;! Get the host platform
 (define (sake#host-platform)
-  (let* ((uname (open-process
-                 (list path: "uname"
-                       arguments: '("-o"))))
-         (uname-output (read-line uname)))
-    (close-port uname)
-    (cond ((string=? "GNU/Linux" uname-output) 'linux)
-          ((string=? "Darwin" uname-output) 'osx)
-          (else (err "fusion#host-platform -> can't detect current platform")))))
+  (let ((sys (symbol->string (caddr (system-type)))))
+    (cond ((and (> (string-length sys) 4)
+                (string=? "linux" (substring sys 0 5)))
+           'linux)
+          ((and (> (string-length sys) 5)
+                (string=? "darwin" (substring sys 0 5)))
+           'osx)
+          (else (err "sake#host-platform -> can't detect current platform")))))
 
 ;;! Parallel for-each, suitable mainly for parallel compilation, which spawns external
 ;; processes
