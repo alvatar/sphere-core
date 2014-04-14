@@ -10,6 +10,6 @@ gsi -f -e '(begin (load "src/sake/sakelib")
                   (task-run stage-2)
                   (exit))'
 
-#sake stage-2
+#ssake stage-2
 ssake stage-3
 
