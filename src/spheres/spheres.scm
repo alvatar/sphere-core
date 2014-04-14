@@ -175,7 +175,7 @@ end-help-string
                                      (string-append
                                       "cd " (path-expand "~~spheres/") target-id
                                       (if branch (string-append " && git checkout " branch))
-                                      " && sake"))))
+                                      " && ssake"))))
                         (die/error "Error running Sake. Please contact the Sphere maintainer."))
                     (println (string-append "*** INFO -- Not compiling " target-id ". Force with --update if you wish otherwise."))))
                (else (recur (cdr i))))))

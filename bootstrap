@@ -11,5 +11,5 @@ gsi -f -e '(begin (load "src/sake/sakelib")
                   (exit))'
 
 #sake stage-2
-build/sake stage-3
+ssake stage-3
 

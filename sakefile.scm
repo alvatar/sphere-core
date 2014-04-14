@@ -16,27 +16,30 @@
   (info/color 'green "Compiling Sake...")
   (gambit-compile-file
    (string-append (current-source-directory) "sake/sake.scm")
-   output: (string-append (current-build-directory) "sake")
+   output: (string-append (current-build-directory) "ssake")
    options: "-exe")
   ;; Compile Spheres program
   (info/color 'green "Compiling Spheres...")
   (gambit-compile-file
    (string-append (current-source-directory) "spheres/spheres.scm")
-   output: (string-append (current-build-directory) "spheres")
+   output: (string-append (current-build-directory) "sspheres")
    options: "-exe"))
 
 (define-task post-compile-stage-1 ()
   ;; Install Sake program
   (info/color 'green "Installing Sake...")
-  (delete-file "~~/bin/sake")
+  (delete-file "~~/bin/ssake")
   (make-directory "~~spheres/core/src/sake")
   (if (not (file-exists? (sake-extensions-path)))
       (make-directory (sake-extensions-path)))
-  (copy-file (string-append (current-build-directory) "sake") "~~/bin/sake")
+  (copy-file (string-append (current-build-directory) "ssake") "~~/bin/ssake")
   (copy-files (fileset dir: (string-append (current-source-directory) "sake")
                        test: (ends-with? ".scm")
                        recursive: #t)
               "~~spheres/core/src/sake")
+  ;; Create symbolic link in /usr/bin
+  (delete-file "/usr/bin/ssake")
+  (create-symbolic-link "~~/bin/ssake" "/usr/bin/ssake")
   ;; Install some Sake extensions
   (info/color 'green "Installing Sake extensions...")
   (copy-file (string-append (current-source-directory) "internal/tiny.scm")
@@ -48,8 +51,11 @@
   
   ;; Install Spheres program
   (info/color 'green "Installing Spheres...")
-  (delete-file "~~/bin/spheres")
-  (copy-file (string-append (current-build-directory) "spheres") "~~/bin/spheres"))
+  (delete-file "~~/bin/sspheres")
+  (copy-file (string-append (current-build-directory) "sspheres") "~~/bin/sspheres")
+  ;; Create symbolic link in /usr/bin
+  (delete-file "/usr/bin/sspheres")
+  (create-symbolic-link "~~/bin/sspheres" "/usr/bin/sspheres"))
 
 (define-task stage-1 (compile-stage-1 post-compile-stage-1)
   'stage-1)
@@ -126,6 +132,8 @@
   (delete-file spheres-module-system-path)
   (delete-file (string-append (user-info-home (user-info (user-name))) "/.gambcini"))
   (delete-file (string-append (sake-extensions-path) "core.scm"))
-  (delete-file "~~bin/sake")
-  (delete-file "~~bin/spheres")
+  (delete-file "~~bin/ssake")
+  (delete-file "/usr/bin/ssake")
+  (delete-file "~~bin/sspheres")
+  (delete-file "/usr/bin/sspheres")
   (delete-file "~~/#spheres"))
