@@ -1,33 +1,25 @@
-;; TODO: make assertion type hierarchy:
+;;!!! Assertion procedures
+;; .author Álvaro Castro Castilla
+;; All rights reserved, 2014
 
-;; (define &condition (make-rtd '&condition '#()))
-;; (define &compound (make-rtd '&compound '#((immutable conditions)) &condition))
-;; (define &serious (make-rtd '&serious '#() &condition))
-;; (define &violation (make-rtd '&violation '#() &serious))
-;; (define &assertion (make-rtd '&assertion '#() &violation))
-;; (define &who (make-rtd '&who '#((immutable who)) &condition))
-;; (define &message (make-rtd '&message '#((immutable message)) &condition))
-;; (define &irritants (make-rtd '&irritants '#((immutable irritants)) &condition))
-
-;; (define make-who-condition (rtd-constructor &who))
-;; (define make-message-condition (rtd-constructor &message))
-;; (define make-irritants-condition (rtd-constructor &irritants))
-;; (define make-syntax-violation (rtd-constructor &syntax))
-;; (define make-assertion-violation (rtd-constructor &assertion))
-
+;; Typed assertions:
+;; 
+;; (define-type condition extender: define-type-of-condition)
+;; (define-type-of-condition compound (contitions read-only:))
+;; (define-type-of-condition serious extender: define-type-of-serious)
+;; (define-type-of-serious violation extender: define-type-of-violation)
+;; (define-type-of-violation assertion constructor: make-assertion-violation)
+;; (define-type-of-condition who constructor: make-who-condition (who read-only:))
+;; (define-type-of-condition message constructor: make-message-condition (message read-only:))
+;; (define-type-of-condition irritants constructor: make-irritants-condition (irritants read-only:))
 ;; (define condition
-;;   (let ((constructor (rtd-constructor &compound)))
-;;     (lambda conditions
-;; 	(constructor (apply append (map simple-conditions conditions)))))) 
-
+;;   (lambda conditions
+;;     (make-compound (apply append (map simple-conditions conditions))))) 
 ;; (define simple-conditions
-;;   (let ((compound? (rtd-predicate &compound))
-;; 	(conditions (rtd-accessor &compound 'conditions)))
-;;     (lambda (condition)
-;;       (cond
-;; 	((compound? condition) (conditions condition))
-;; 	(else (list condition))))))
-
+;;   (lambda (condition)
+;;     (cond
+;;      ((compound? condition) (compound-conditions condition))
+;;      (else (list condition)))))
 ;; (define (assertion-violation who message . irritants)
 ;;   (raise 
 ;;     (if who
@@ -39,15 +31,16 @@
 ;; 	       (make-irritants-condition irritants)
 ;; 	       (make-assertion-violation)))))
 
+;; List-based assertion
+(define (assertion-violation who message . irritants)
+  (raise
+   (if who
+       `(assertion-violation in: ,who message: ,message irritants: ,@irritants)
+       `(assertion-violation message: ,message irritants: ,@irritants))))
+
 (define (assertion-errors-display . args)
   (for-each (lambda (x)
               (if (procedure? x)
                   (x)
                   (display x (current-error-port))))
             args))
-
-(define (assertion-violation who message . irritants)
-  (raise
-   (if who
-       `(who message ,@irritants)
-       `(message ,@irritants))))
