@@ -134,7 +134,7 @@ end-help-string
   (let* ((curl-process (open-process
                         (list
                          path: "curl"
-                         arguments: '("https://raw.github.com/alvatar/spheres/master/universe.scm"))))
+                         arguments: '("https://raw.githubusercontent.com/alvatar/spheres/master/universe.scm"))))
          (index (read-all curl-process))
          (results '()))
     (close-port curl-process)
