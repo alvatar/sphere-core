@@ -24,12 +24,12 @@
 ;;   (raise 
 ;;     (if who
 ;;     (condition (make-who-condition who) 
-;; 	       (make-message-condition message) 
-;; 	       (make-irritants-condition irritants)
-;; 	       (make-assertion-violation))
+;;         (make-message-condition message) 
+;;         (make-irritants-condition irritants)
+;;         (make-assertion-violation))
 ;;     (condition (make-message-condition message) 
-;; 	       (make-irritants-condition irritants)
-;; 	       (make-assertion-violation)))))
+;;         (make-irritants-condition irritants)
+;;         (make-assertion-violation)))))
 
 ;; List-based assertion
 (define (assertion-violation who message . irritants)
