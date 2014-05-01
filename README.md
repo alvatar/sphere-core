@@ -16,7 +16,7 @@ Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quicks
 * Assert
 * Match
 * Lightweight testing framework (SRFI-78)
-* Sake and Spheres programs
+* Ssake and Sspheres programs
 
 A great extension of Core's functionality can be found in [Energy](https://github.com/alvatar/sphere-energy)
 
