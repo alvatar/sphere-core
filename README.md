@@ -7,7 +7,7 @@ Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quicks
 
 ## Functionality found in this Sphere
 
-* Syntax expansion (via Riaxpander)
+* Syntax expansion
 * FFI utilities and generators
 * Generic macros and procedures, conventionally used
 * Macros for building macros
@@ -31,4 +31,5 @@ A great extension of Core's functionality can be found in [Energy](https://githu
 * [Codec](https://github.com/alvatar/sphere-codec)
 * [OpenGL](https://github.com/alvatar/sphere-opengl)
 * [SDL2](https://github.com/alvatar/sphere-sdl2)
+* [Cairo](https://github.com/alvatar/sphere-cairo)
 
