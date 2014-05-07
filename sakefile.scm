@@ -74,9 +74,9 @@
   ;;  output: (string-append (current-build-directory) "riaxpander.o1"))
 
   ;; Compile syntax-case
-  (info/color 'green "Bootstrapping the syntax expander code")
   (if (not (file-exists? (string-append (current-source-directory) "scsc/syntax-case.scm")))
-      (shell-command (string-append "cd " (current-source-directory) "/scsc && gsi boot.scm")))
+      (begin (info/color 'green "Bootstrapping the syntax expander code")
+             (shell-command (string-append "cd " (current-source-directory) "/scsc && gsi boot.scm"))))
   (let recur ()
     (info/color 'green "Compiling the syntax expander may take long in your system, but the resulting code is much faster.")
     (println "Do you want to compile the syntax expander? Yes/No")
