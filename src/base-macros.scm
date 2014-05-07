@@ -1,31 +1,47 @@
 ;;; Copyright (c) 2012-2014, Alvaro Castro-Castilla. All rights reserved.
 ;;; Base syntax extensions for Scheme Spheres
 
-;;------------------------------------------------------------------------------
-;;!! Standard Macros
 
-(define-syntax do
-  (syntax-rules ()
-    ((do ((var init step ...) ...)
-         (test expr ...)
-       command ...)
-     (letrec
-         ((loop
-           (lambda (var ...)
-             (if test
-                 (begin
-                   (if #f #f)
-                   expr ...)
-                 (begin
-                   command
-                   ...
-                   (loop (do "step" var step ...)
-                         ...))))))
-       (loop init ...)))
-    ((do "step" x)
-     x)
-    ((do "step" x y)
-     y)))
+
+;;! DEFINE-MACRO in terms of syntax-case
+(define-syntax (define-macro x)
+  (syntax-case x ()
+    ((_ (name . args) . body)
+     #'(define-macro name (lambda args . body)))
+    ((_ name transformer)
+     #'(define-syntax (name y)
+	 (syntax-case y ()
+	   ((k . args)
+	    (datum->syntax
+	     #'k
+	     (apply transformer (syntax->datum #'args)))))))) )
+
+
+;;------------------------------------------------------------------------------
+;;!! R5RS standard Macros
+
+;; (define-syntax do
+;;   (syntax-rules ()
+;;     ((do ((var init step ...) ...)
+;;          (test expr ...)
+;;        command ...)
+;;      (letrec
+;;          ((loop
+;;            (lambda (var ...)
+;;              (if test
+;;                  (begin
+;;                    (if #f #f)
+;;                    expr ...)
+;;                  (begin
+;;                    command
+;;                    ...
+;;                    (loop (do "step" var step ...)
+;;                          ...))))))
+;;        (loop init ...)))
+;;     ((do "step" x)
+;;      x)
+;;     ((do "step" x y)
+;;      y)))
 
 
 ;;------------------------------------------------------------------------------
@@ -224,43 +240,42 @@
      (letrec ((?name ?expression)) ?name))))
 
 ;;! SRFI-61 A more general cond clause
+(define-syntax %%cond/maybe-more
+  (syntax-rules ()
+    ((_ test consequent)
+     (if test
+         consequent))
+    ((_ test consequent clause ...)
+     (if test
+         consequent
+         (cond clause ...)))))
 (define-syntax cond
-  (letrec-syntax
-      ((cond/maybe-more
-        (syntax-rules ()
-          ((cond/maybe-more test consequent)
-           (if test
-               consequent))
-          ((cond/maybe-more test consequent clause ...)
-           (if test
-               consequent
-               (cond clause ...))))))
-    (syntax-rules (=> else)
-      ((_ (else else1 else2 ...))
-       ;; the (if #t (begin ...)) wrapper ensures that there may be no
-       ;; internal definitions in the body of the clause.  R5RS mandates
-       ;; this in text (by referring to each subform of the clauses as
-       ;; <expression>) but not in its reference implementation of cond,
-       ;; which just expands to (begin ...) with no (if #t ...) wrapper.
-       (if #t (begin else1 else2 ...)))
-      ((_ (test => receiver) more-clause ...)
-       (let ((t test))
-         (cond/maybe-more t
+  (syntax-rules (=> else)
+    ((_ (else else1 else2 ...))
+     ;; the (if #t (begin ...)) wrapper ensures that there may be no
+     ;; internal definitions in the body of the clause.  R5RS mandates
+     ;; this in text (by referring to each subform of the clauses as
+     ;; <expression>) but not in its reference implementation of cond,
+     ;; which just expands to (begin ...) with no (if #t ...) wrapper.
+     (if #t (begin else1 else2 ...)))
+    ((_ (test => receiver) more-clause ...)
+     (let ((t test))
+       (%%cond/maybe-more t
                           (receiver t)
                           more-clause ...)))
-      ((_ (generator guard => receiver) more-clause ...)
-       (call-with-values (lambda () generator)
-         (lambda t
-           (cond/maybe-more (apply guard    t)
+    ((_ (generator guard => receiver) more-clause ...)
+     (call-with-values (lambda () generator)
+       (lambda t
+         (%%cond/maybe-more (apply guard    t)
                             (apply receiver t)
                             more-clause ...))))
-      ((_ (test) more-clause ...)
-       (let ((t test))
-         (cond/maybe-more t t more-clause ...)))
-      ((_ (test body1 body2 ...) more-clause ...)
-       (cond/maybe-more test
+    ((_ (test) more-clause ...)
+     (let ((t test))
+       (%%cond/maybe-more t t more-clause ...)))
+    ((_ (test body1 body2 ...) more-clause ...)
+     (%%cond/maybe-more test
                         (begin body1 body2 ...)
-                        more-clause ...)))))
+                        more-clause ...))))
 
 ;;! SRFI-87 => in case clauses
 ;; Included in Alexpander for native availability
@@ -299,174 +314,166 @@
          (case key clause clauses ...)))))
 
 
-;;------------------------------------------------------------------------------
-
 ;;!! Optional positional and named parameters in SchemeSpheres
 
 ;;! Macro expander for lambda*.
 ;; .author Álvaro Castro-Castilla, based on SRFI-89 by Marc Feeley
-(define-syntax lambda*
-  (rsc-macro-transformer
-   (lambda (form env)
-     (let ((formals (cadr form))
-           (body (cddr form)))
-       (define (keyword->symbol k)
-         (string->symbol (keyword->string k)))
-       (define (variable? x) (symbol? x))
-       (define (required-positional? x)
-         (variable? x))
-       (define (optional-positional? x)
-         (and (pair? x)
-              (pair? (cdr x))
-              (null? (cddr x))
-              (variable? (car x))))
-       (define (named-with-default? x)
-         (and (pair? x)
-              (pair? (cdr x))
-              (null? (cddr x))
-              (keyword? (car x))))
-       (define (named-without-default? x)
-         (and (pair? x)
-              (null? (cdr x))
-              (keyword? (car x))))
-       (define (named? x)
-         (or (named-with-default? x)
-             (named-without-default? x)))
-       (define (parse-formals formals)
-         (define (duplicates? lst)
-           (cond ((null? lst)
-                  #f)
-                 ((memq (car lst) (cdr lst))
-                  #t)
-                 (else
-                  (duplicates? (cdr lst)))))
-         (define (parse-positional-section lst cont)
-           (let loop1 ((lst lst) (rev-reqs '()))
-             (if (and (pair? lst)
-                      (required-positional? (car lst)))
-                 (loop1 (cdr lst) (cons (car lst) rev-reqs))
-                 (let loop2 ((lst lst) (rev-opts '()))
-                   (if (and (pair? lst)
-                            (optional-positional? (car lst)))
-                       (loop2 (cdr lst) (cons (car lst) rev-opts))
-                       (cont lst (cons (reverse rev-reqs) (reverse rev-opts))))))))
-         (define (parse-named-section lst cont)
-           (let loop ((lst lst) (rev-named '()))
-             (if (and (pair? lst)
-                      (named? (car lst)))
-                 (loop (cdr lst) (cons (car lst) rev-named))
-                 (cont lst (reverse rev-named)))))
-         (define (parse-rest lst
-                             positional-before-named?
-                             positional-reqs/opts
-                             named)
-           (if (null? lst)
-               (parse-end positional-before-named?
+(define-macro lambda*
+  (lambda (formals . body)
+    (define (keyword->symbol k)
+      (string->symbol (keyword->string k)))
+    (define (variable? x) (symbol? x))
+    (define (required-positional? x)
+      (variable? x))
+    (define (optional-positional? x)
+      (and (pair? x)
+           (pair? (cdr x))
+           (null? (cddr x))
+           (variable? (car x))))
+    (define (named-with-default? x)
+      (and (pair? x)
+           (pair? (cdr x))
+           (null? (cddr x))
+           (keyword? (car x))))
+    (define (named-without-default? x)
+      (and (pair? x)
+           (null? (cdr x))
+           (keyword? (car x))))
+    (define (named? x)
+      (or (named-with-default? x)
+          (named-without-default? x)))
+    (define (parse-formals formals)
+      (define (duplicates? lst)
+        (cond ((null? lst)
+               #f)
+              ((memq (car lst) (cdr lst))
+               #t)
+              (else
+               (duplicates? (cdr lst)))))
+      (define (parse-positional-section lst cont)
+        (let loop1 ((lst lst) (rev-reqs '()))
+          (if (and (pair? lst)
+                   (required-positional? (car lst)))
+              (loop1 (cdr lst) (cons (car lst) rev-reqs))
+              (let loop2 ((lst lst) (rev-opts '()))
+                (if (and (pair? lst)
+                         (optional-positional? (car lst)))
+                    (loop2 (cdr lst) (cons (car lst) rev-opts))
+                    (cont lst (cons (reverse rev-reqs) (reverse rev-opts))))))))
+      (define (parse-named-section lst cont)
+        (let loop ((lst lst) (rev-named '()))
+          (if (and (pair? lst)
+                   (named? (car lst)))
+              (loop (cdr lst) (cons (car lst) rev-named))
+              (cont lst (reverse rev-named)))))
+      (define (parse-rest lst
+                          positional-before-named?
                           positional-reqs/opts
-                          named
-                          #f)
-               (if (variable? lst)
-                   (parse-end positional-before-named?
-                              positional-reqs/opts
-                              named
-                              lst)
-                   (error "syntax error in formal parameter list"))))
-         (define (parse-end positional-before-named?
-                            positional-reqs/opts
-                            named
-                            rest)
-           (let ((positional-reqs (car positional-reqs/opts))
-                 (positional-opts (cdr positional-reqs/opts)))
-             (let ((vars
-                    (append positional-reqs
-                            (map car positional-opts)
-                            (map car named)
-                            (if rest (list rest) '())))
-                   (keys
-                    (map car named)))
-               (cond ((duplicates? vars)
-                      (error "duplicate variable in formal parameter list"))
-                     ((duplicates? keys)
-                      (error "duplicate keyword in formal parameter list"))
-                     (else
-                      (list positional-before-named?
-                            positional-reqs
-                            positional-opts
-                            named
-                            rest))))))
-
-         (define (parse lst)
-           (if (and (pair? lst)
-                    (named? (car lst)))
-               (parse-named-section
-                lst
-                (lambda (lst named)
-                  (parse-positional-section
-                   lst
-                   (lambda (lst positional-reqs/opts)
-                     (parse-rest lst
-                                 #f
-                                 positional-reqs/opts
-                                 named)))))
-               (parse-positional-section
-                lst
-                (lambda (lst positional-reqs/opts)
-                  (parse-named-section
-                   lst
-                   (lambda (lst named)
-                     (parse-rest lst
-                                 #t
-                                 positional-reqs/opts
-                                 named)))))))
-         (parse formals))
-       (define (expand-lambda* formals body)
-         (define (range lo hi)
-           (if (< lo hi)
-               (cons lo (range (+ lo 1) hi))
-               '()))
-         (define (expand positional-before-named?
+                          named)
+        (if (null? lst)
+            (parse-end positional-before-named?
+                       positional-reqs/opts
+                       named
+                       #f)
+            (if (variable? lst)
+                (parse-end positional-before-named?
+                           positional-reqs/opts
+                           named
+                           lst)
+                (error "syntax error in formal parameter list"))))
+      (define (parse-end positional-before-named?
+                         positional-reqs/opts
+                         named
+                         rest)
+        (let ((positional-reqs (car positional-reqs/opts))
+              (positional-opts (cdr positional-reqs/opts)))
+          (let ((vars
+                 (append positional-reqs
+                         (map car positional-opts)
+                         (map car named)
+                         (if rest (list rest) '())))
+                (keys
+                 (map car named)))
+            (cond ((duplicates? vars)
+                   (error "duplicate variable in formal parameter list"))
+                  ((duplicates? keys)
+                   (error "duplicate keyword in formal parameter list"))
+                  (else
+                   (list positional-before-named?
                          positional-reqs
                          positional-opts
                          named
-                         rest)
-           (let ((form
-                  `(##lambda (,@positional-reqs
-                       ,@(if (null? positional-opts)
-                             '()
-                             (cons '#!optional positional-opts))
-                       ,@(if (null? named)
-                             '()
-                             (cons '#!key (map
-                                           (lambda (x)
-                                             (cond ((named-with-default? x)
-                                                    (cons (keyword->symbol (car x))
-                                                          (cdr x)))
-                                                   ((named-without-default? x)
-                                                    (keyword->symbol (car x)))
-                                                   (else "error generating named parameters")))
-                                           named)))
-                       ,@(if rest
-                             (list '#!rest rest)
-                             '()))
-                     ;; Surrounding with LET prevents an error when you use internal defines
-                     ;; just after the define*/lambda*
-                     (let ()
-                       ,@body))))
-             ;;(pp form)
-             form))
-         (apply expand (parse-formals formals)))
-       (expand-lambda* formals body)))))
+                         rest))))))
+
+      (define (parse lst)
+        (if (and (pair? lst)
+                 (named? (car lst)))
+            (parse-named-section
+             lst
+             (lambda (lst named)
+               (parse-positional-section
+                lst
+                (lambda (lst positional-reqs/opts)
+                  (parse-rest lst
+                              #f
+                              positional-reqs/opts
+                              named)))))
+            (parse-positional-section
+             lst
+             (lambda (lst positional-reqs/opts)
+               (parse-named-section
+                lst
+                (lambda (lst named)
+                  (parse-rest lst
+                              #t
+                              positional-reqs/opts
+                              named)))))))
+      (parse formals))
+    (define (expand-lambda* formals body)
+      (define (range lo hi)
+        (if (< lo hi)
+            (cons lo (range (+ lo 1) hi))
+            '()))
+      (define (expand positional-before-named?
+                      positional-reqs
+                      positional-opts
+                      named
+                      rest)
+        (let ((form
+               `(##lambda (,@positional-reqs
+                           ,@(if (null? positional-opts)
+                                 '()
+                                 (cons '#!optional positional-opts))
+                           ,@(if (null? named)
+                                 '()
+                                 (cons '#!key (map
+                                               (lambda (x)
+                                                 (cond ((named-with-default? x)
+                                                        (cons (keyword->symbol (car x))
+                                                              (cdr x)))
+                                                       ((named-without-default? x)
+                                                        (keyword->symbol (car x)))
+                                                       (else "error generating named parameters")))
+                                               named)))
+                           ,@(if rest
+                                 (list '#!rest rest)
+                                 '()))
+                  ;; Surrounding with LET prevents an error when you use internal defines
+                  ;; just after the define*/lambda*
+                  (let ()
+                    ,@body))))
+          ;;(pp form)
+          form))
+      (apply expand (parse-formals formals)))
+    (expand-lambda* formals body)))
 
 ;;!! Macro expander for define*.
-(define-syntax define*
-  (rsc-macro-transformer
-   (lambda (form env)
-     (let ((pattern (cadr form))
-           (body (cddr form)))
-       (if (pair? pattern)
-           `(##define ,(car pattern)
-              (lambda* ,(cdr pattern) ,@body))
-           `(##define ,pattern ,@body))))))
+(define-macro define*
+  (lambda (pattern . body)
+    (if (pair? pattern)
+        `(define ,(car pattern)
+           (lambda* ,(cdr pattern) ,@body))
+        `(define ,pattern ,@body))))
 
 
 ;;------------------------------------------------------------------------------
@@ -551,58 +558,58 @@
 ;; (easy to fix... add two rules to the four argument part of %subst)
 ;; .author pelpel
 ;; origin: http://c2.com/cgi/wiki?DefineSyntax
-(define-syntax aif!!
-  (letrec-syntax
-      ((%reverse
-        (syntax-rules ()
-          ((_ () <result>) <result>)
-          ((_ (<hd> . <tl>) <result>)
-           (%reverse <tl> (<hd> . <result>)))))
-       (%subst  
-        (syntax-rules ()
-          ;; 1. Three argument form: substitute <new> for all occurrences of <old>
-          ;; in <form> 
-          ((_ <new> <old> <form>)
-           (letrec-syntax
-               ((f (syntax-rules (<old>)
-                     ;; (1) Substitution complete, reverse the result.
-                     ((_ () <result>) (%reverse <result> ()))
-                     ;; (2) recurse into sublists (deferred)
-                     ((_ ((<hd> . <tl>) . <rest>) <res>)
-                      (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
-                     ;; (3) These two rules does (substitute <new> <old> ls)
-                     ((_ (<old> . <tl>) <res>)
-                      (f <tl> (<new> . <res>)))
-                     ((_ (<hd> . <tl>) <res>)
-                      (f <tl> (<hd> . <res>))))))
-             (f <form> ())))
-          ;; 2. Four argument form: substitute <new> for all occurrences of <old> in
-          ;; <form> but those inside of sublists (<but> ...).  Useful for defining
-          ;; macros that can be nested.
-          ((_ <new> <old> <form> <but>)
-           (letrec-syntax
-               ((f (syntax-rules (<old> <but>)
-                     ((_ () <result>) (%reverse <result> ()))
-                     ;; (4) ignore (<but> ...)
-                     ((_ ((<but> . <tl>) . <rest>) <res>)
-                      (f <rest> ((<but> . <tl>) . <res>)))
-                     ((_ ((<hd> . <tl>) . <rest>) <res>)
-                      (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
-                     ((_ (<old> . <tl>) <res>)
-                      (f <tl> (<new> . <res>)))
-                     ((_ (<hd> . <tl>) <res>)
-                      (f <tl> (<hd> . <res>))))))
-             (f <form> ()))))))
-    (syntax-rules ()
-      ((_ <condition> <consequent>)
-       (let ((temp <condition>))
-         (if temp
-             (%subst temp it <consequent> aif))))
-      ((_ <condition> <consequent> <alternative>)
-       (let ((temp <condition>))
-         (if temp
-             (%subst temp it <consequent> aif)
-             <alternative>))))))
+;; (define-syntax aif!!
+;;   (letrec-syntax
+;;       ((%reverse
+;;         (syntax-rules ()
+;;           ((_ () <result>) <result>)
+;;           ((_ (<hd> . <tl>) <result>)
+;;            (%reverse <tl> (<hd> . <result>)))))
+;;        (%subst  
+;;         (syntax-rules ()
+;;           ;; 1. Three argument form: substitute <new> for all occurrences of <old>
+;;           ;; in <form> 
+;;           ((_ <new> <old> <form>)
+;;            (letrec-syntax
+;;                ((f (syntax-rules (<old>)
+;;                      ;; (1) Substitution complete, reverse the result.
+;;                      ((_ () <result>) (%reverse <result> ()))
+;;                      ;; (2) recurse into sublists (deferred)
+;;                      ((_ ((<hd> . <tl>) . <rest>) <res>)
+;;                       (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
+;;                      ;; (3) These two rules does (substitute <new> <old> ls)
+;;                      ((_ (<old> . <tl>) <res>)
+;;                       (f <tl> (<new> . <res>)))
+;;                      ((_ (<hd> . <tl>) <res>)
+;;                       (f <tl> (<hd> . <res>))))))
+;;              (f <form> ())))
+;;           ;; 2. Four argument form: substitute <new> for all occurrences of <old> in
+;;           ;; <form> but those inside of sublists (<but> ...).  Useful for defining
+;;           ;; macros that can be nested.
+;;           ((_ <new> <old> <form> <but>)
+;;            (letrec-syntax
+;;                ((f (syntax-rules (<old> <but>)
+;;                      ((_ () <result>) (%reverse <result> ()))
+;;                      ;; (4) ignore (<but> ...)
+;;                      ((_ ((<but> . <tl>) . <rest>) <res>)
+;;                       (f <rest> ((<but> . <tl>) . <res>)))
+;;                      ((_ ((<hd> . <tl>) . <rest>) <res>)
+;;                       (f <rest> ((f (<hd> . <tl>) ()) . <res>)))
+;;                      ((_ (<old> . <tl>) <res>)
+;;                       (f <tl> (<new> . <res>)))
+;;                      ((_ (<hd> . <tl>) <res>)
+;;                       (f <tl> (<hd> . <res>))))))
+;;              (f <form> ()))))))
+;;     (syntax-rules ()
+;;       ((_ <condition> <consequent>)
+;;        (let ((temp <condition>))
+;;          (if temp
+;;              (%subst temp it <consequent> aif))))
+;;       ((_ <condition> <consequent> <alternative>)
+;;        (let ((temp <condition>))
+;;          (if temp
+;;              (%subst temp it <consequent> aif)
+;;              <alternative>))))))
 
 
 ;;! when

@@ -1,38 +1,42 @@
-;;; Copyright (c) 2012-2014, Alvaro Castro-Castilla. All rights reserved.
-;;; Spheres fundamental macros
+;;!!! Spheres configuration and installation prelude
+;; .author Álvaro Castro-Castilla, Copyright (c) 2012-2014 All rights reserved.
 
 
 (define expander:include #f)
 (define current-macro-expander #f)
 (define ##spheres-environment? #t)
 
-(let ((riaxpander-o "~~spheres/riaxpander.o1")
-      (riaxpander-scm "src/riaxpander/riaxpander.scm"))
-  (if (file-exists? riaxpander-o)
-      (load riaxpander-o)
-      (if (file-exists? riaxpander-scm)
+
+;; (let ((riaxpander-o "~~spheres/riaxpander.o1")
+;;       (riaxpander-scm "src/riaxpander/riaxpander.scm"))
+;;   (if (file-exists? riaxpander-o)
+;;       (load riaxpander-o)
+;;       (if (file-exists? riaxpander-scm)
+;;           (begin
+;;             (println "*** INFO -- Riaxpander is being included instead of loaded. If you are bootstrapping Spheres, this is ok.")
+;;             (eval `(##include ,riaxpander-scm)))
+;;           (error "Cannot find Macro Expander. Is Sphere Core properly installed?"))))
+;; (riaxpander#riaxpander:install!)
+;; (set! current-macro-expander 'alexpander)
+;; (set! expander:include riaxpander#riaxpander:include)
+
+(let ((syntax-case-o "~~spheres/syntax-case.o1")
+      (syntax-case-scm "src/scsc/syntax-case.scm"))
+  (if (file-exists? syntax-case-o)
+      (begin (println "*** INFO -- loading syntax-case")
+             (load syntax-case-o))
+      (if (file-exists? syntax-case-scm)
           (begin
-            (println "*** INFO -- Riaxpander is being included instead of loaded. If you are bootstrapping Spheres, this is ok.")
-            (eval `(##include ,riaxpander-scm)))
-          (error "Cannot find Macro Expander. Is Sphere Core properly installed?"))))
+            (println "*** INFO -- syntax-case expander is being loaded from sources")
+            (parameterize ((current-directory (getenv "scsc_home" "~~spheres/"))
+                           (current-readtable (readtable-sharing-allowed?-set (current-readtable) 'serialize)))
+                          (load syntax-case-scm)))
+          (error "Cannot find macro expander. Is Sphere Core properly installed?"))))
 
-(riaxpander#riaxpander:install!)
-(set! current-macro-expander 'alexpander)
-(set! expander:include riaxpander#riaxpander:include)
-
-;;------------------------------------------------------------------------------
-;;!! Debug
-
-;; (define-macro (check-arg pred val caller)
-;;   `(let ((pred ,pred)
-;; 	 (val ,val)
-;; 	 (caller ',caller))
-;;      (if (pred val)
-;; 	 val
-;;          (error (string-append (object->string ',pred) " check failed with value "
-;;                                (object->string val)
-;;                                " in: "
-;;                                (object->string ',caller))))))
+(set! current-macro-expander 'syntax-case)
+(set! expander:include
+      (lambda (file)
+        (eval `(include ,file))))
 
 ;;------------------------------------------------------------------------------
 ;;!! Macro utils
@@ -40,17 +44,17 @@
 ;;!! Define functions for usage in low-level macros (first method)
 ;; (define^ (f ... ) ... )
 
-(define-macro (eval-in-macro-environment . exprs)
+(##define-macro (eval-in-macro-environment . exprs)
   (if (pair? exprs)
       (eval (if (null? (cdr exprs)) (car exprs) (cons 'begin exprs))
             (interaction-environment))
       #f))
-(define-macro (eval-in-macro-environment-no-result . exprs)
+(##define-macro (eval-in-macro-environment-no-result . exprs)
   `(eval-in-macro-environment
     ,@exprs
     '(begin)))
 
-(define-macro (define^ . args)
+(##define-macro (define^ . args)
   (let ((pattern (car args))
         (body (cdr args)))
     `(eval-in-macro-environment-no-result
@@ -81,13 +85,13 @@
 ;; https://mercure.iro.umontreal.ca/pipermail/gambit-list/2009-August/003781.html
 
 ;;! Define for both expand time and runtime
-(define-macro (at-expand-time-and-runtime . exprs)
+(##define-macro (at-expand-time-and-runtime . exprs)
   (let ((l `(begin ,@exprs)))
     (eval l)
     l))
 
 ;;! Define for expand time
-(define-macro (at-expand-time . expr)
+(##define-macro (at-expand-time . expr)
   (eval (cons 'begin expr)))
 
 
@@ -226,7 +230,7 @@ fig.scm file"))
                                ((not (pair? (car conditions)))
                                 (error "incorrect cond-expand syntax"))
                                ((and (symbol? (caar conditions))
-                                     (any-eq? (caar conditions) ##cond-expand-features))
+                                     (any-eq? (caar conditions) (##cond-expand-features)))
                                 (cons 'cond-expanded (cdar conditions)))
                                ((and (symbol? (caar conditions))
                                      (eq? (caar conditions) 'else))
@@ -821,7 +825,7 @@ fig.scm file"))
                           (load-single-module module options))))))))))
 
 ;;! import-include macro
-(##define-macro (##import-include . module)
+(##define-macro (##spheres-include . module)
   (cond
    ((string? (car module))
     ;; If filename given, just include it (doesn't register as loaded module)
@@ -830,7 +834,7 @@ fig.scm file"))
    ((and (pair? (car module))
          (eq? 'quote (caar module)))
     (let ((module (cadar module)))
-      (%check-module module '##import-include)
+      (%check-module module '##spheres-include)
       `(##include-module-and-dependencies ',module '(verbose))))
    ;; oterwise act normally
    (else
@@ -846,7 +850,7 @@ fig.scm file"))
                                     (string-shrink! str (- (string-length str) 1))
                                     (string->keyword str))))
                             (cdr module)))))
-      (%check-module module '##import-include)
+      (%check-module module '##spheres-include)
       `(##include-module-and-dependencies ',module '(verbose))))))
 
 ;;; Load only module dependencies, do not load the module
@@ -858,7 +862,7 @@ fig.scm file"))
 ;;     (##load-module-and-dependencies module '(omit-root verbose includes))))
 
 ;;! import macro, loads dependencies
-(##define-macro (##import . module)
+(##define-macro (##spheres-load . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
                      ;; If it defines the sphere, process the sphere name to make it a keyword
@@ -872,5 +876,5 @@ fig.scm file"))
                                    (string-shrink! str (- str-len 1))                                   
                                    (string->keyword str))))
                            (cdr module)))))
-    (%check-module module '##import)
+    (%check-module module '##spheres-load)
     `(##load-module-and-dependencies ',module '(verbose includes))))

@@ -10,7 +10,7 @@
                              (cond-expand-features '())
                              (compiler-options '())
                              (version compiler-options)
-                             (expander 'riaxpander)
+                             (expander 'syntax-case)
                              (output #f)
                              (verbose #f))
   (or (file-exists? (default-build-directory))
@@ -39,12 +39,12 @@
             (if (null? version) "" (string-append " version: " (object->string version))))
       (let* ((generate-cond-expand-code
               (lambda (features)
-                `((define-syntax syntax-error
+                `((define-syntax syntax-rules-error
                     (syntax-rules ()
                       ((_) (0))))
                   (define-syntax cond-expand
                     (syntax-rules (and or not else ,@features)
-                      ((cond-expand) (syntax-error "Unfulfilled cond-expand"))
+                      ((cond-expand) (syntax-rules-error "Unfulfilled cond-expand"))
                       ((cond-expand (else body ...))
                        (begin body ...))
                       ((cond-expand ((and) body ...) more-clauses ...)
@@ -181,6 +181,79 @@
                              (exit 1)))
                        flags-string: (if compiling-without-riaxpander? "-f" "")))
                      (err "error compiling generated C file"))))))
+          ((syntax-case)
+           (let ((compilation-environment-code
+                  `(,@(generate-cond-expand-code (cons 'compile-to-c cond-expand-features))
+                    ,@(map (lambda (m) `(##include-module-and-dependencies ',m ',(if verbose '(verbose) '())))
+                           ;; Import shallow dependencies, as dependencies should already be expanded
+                           (append (%module-shallow-dependencies-to-include module)
+                                   ;; (apply append (map %module-shallow-dependencies-to-include
+                                   ;;                    (%module-shallow-dependencies-to-load module)))
+                                   (if header-module (list header-module) '())
+                                   ;; (if macros-module (list macros-module) '())
+                                   )))))
+             (if verbose
+                 (begin
+                   (info/color 'light-green "compilation environment code:")
+                   (for-each pp compilation-environment-code)))
+             ;; Eval compilation code in current environment
+             ;; This has been removed in favor of running the code directly in the spawned GSC instance
+             ;; (for-each eval compilation-environment-code)
+             (let* ((input-code (with-input-from-file input-file read-all))
+                    (intermediate-code
+                     `( ;; Compile-time cond-expand-features
+                       ,@(map (lambda (f)
+                                `(define-cond-expand-feature ,f))
+                              (cons 'compile-to-c cond-expand-features))
+                       ;; If there is a header module set up proper namespace
+                       ,@(if header-module
+                             `((##namespace (,(%module-namespace module))))
+                             '())
+                       ,@(if header-module
+                             '((##include "~~lib/gambit#.scm"))
+                             '())
+                       ;; Include custom compilation preludes defined in config.scm
+                       ,@(map (lambda (p)
+                                `(##include ,(string-append
+                                              (%module-path-src p)
+                                              (%module-filename-scm p))))
+                              ;; Dependencies here are not deep, as they should be already compiled
+                              (%module-shallow-dependencies-to-prelude module))
+                       ;; Include load dependencies' headers if they have
+                       ,@(filter-map
+                          (lambda (m) (let ((module-header (%module-header m)))
+                                   (and module-header
+                                        `(##include ,(string-append
+                                                      (%module-path-src module-header)
+                                                      (%module-filename-scm module-header))))))
+                          ;; Dependencies here are not deep, as they should be already compiled
+                          (%module-shallow-dependencies-to-load module))
+                       ;; Include header module if we have one
+                       ,@(if header-module
+                             `((##include ,(string-append
+                                            (%module-path-src header-module)
+                                            (%module-filename-scm header-module))))
+                             '())
+                       ,@input-code)))
+               ;; Verbose compilation
+               (if verbose
+                   (begin (info/color 'light-green "code to be compiled:")
+                          (for-each pp intermediate-code)))
+               ;; Write code in intermediate file
+               (call-with-output-file
+                   intermediate-file
+                 (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
+               ;; Compile
+               (or (zero?
+                    (gambit-eval-here
+                     `(,@compilation-environment-code
+                       (or (compile-file-to-target
+                            ,intermediate-file
+                            output: ,output-file
+                            options: ',compiler-options)
+                           (exit 1)))
+                     flags-string: ""))
+                   (err "error compiling generated C file")))))
           ((gambit)
            (err "Gambit expander workflow not implemented"))
           (else (err "Unknown expander"))))

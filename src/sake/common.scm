@@ -94,7 +94,7 @@
                             (if (string=? dir (current-directory))
                                 "current directory."
                                 dir))))
-    (let* ((prelude-file "~~spheres/spheres#.scm")
+    (let* ((prelude-file "~~spheres/spheres.scm")
            (extensions-directory "~~spheres/sake-extensions/src/"))
       (eval `(begin
                ;(##namespace (,(string-append (symbol->string (gensym 'sakefile)) "#")))

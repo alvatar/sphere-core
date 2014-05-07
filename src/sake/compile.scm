@@ -92,10 +92,10 @@
 
 
 (define load-spheres-code
-  (let ((spheres-file "~~spheres/spheres#.scm"))
+  (let ((spheres-file "~~spheres/spheres.scm"))
     `(if (file-exists? ,spheres-file)
          (eval '(include ,spheres-file))
-         ;(println "spheres#.scm missing -- Did you install Core Sphere?")
+         ;(println "spheres.scm missing -- Did you install Core Sphere?")
          )))
 
 
@@ -115,15 +115,16 @@
                      (recur (+ n 1)))
                    transformed))))))
     (let* ((code-string (quotes->semiquotes
-                        (object->string (cons 'begin
-                                              (if load-spheres
-                                                  (cons load-spheres-code
-                                                        code)
-                                                  code)))))
+                         (object->string (cons 'begin
+                                               (if load-spheres
+                                                   (cons load-spheres-code
+                                                         code)
+                                                   code)))))
            (command-string
             (string-append (gambit-compiler) " " flags-string " -e '" code-string "'")))
       (and verbose
-           (begin (info "sake eval: ") (pp code)))
+           (begin (info "gambit-eval-here input code: ") (pp code)
+                  (info "gambit-eval-here string: ") (print code-string)))
       (shell-command command-string))))
 
 ;; (##define (gambit-eval code-string)

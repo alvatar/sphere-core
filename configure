@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+echo ';; SchemeSpheres configuration file for Gambit
+(let ((spheres-file "~~spheres/spheres.scm"))
+  (if (file-exists? spheres-file)
+      (eval `(include ,spheres-file))
+      (println "spheres#.scm missing -- Did you install Core Sphere?")))' > ~/.gambcini && echo "Gambit configured for user $USER.
+Now run 'sudo ./bootstrap' to install SchemeSpheres in the system."
