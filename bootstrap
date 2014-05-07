@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 gsi -f -e '(begin (load "src/sake/sakelib")
                   (include "src/sake/sakelib#.scm")

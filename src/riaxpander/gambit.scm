@@ -91,17 +91,11 @@
                  ((pair? form)
                   (case (car form)
                     ((rsc-macro-transformer)
-                     (if (compile-loadable-macros?)
-                         (expand-rsc-macro-transformer name form)
-                         #!void))
+                     (expand-rsc-macro-transformer name form))
                     ((sc-macro-transformer)
-                     (if (compile-loadable-macros?)
-                         (expand-sc-macro-transformer name form)
-                         #!void))
+                     (expand-sc-macro-transformer name form))
                     ((er-macro-transformer)
-                     (if (compile-loadable-macros?)
-                         (expand-er-macro-transformer name form)
-                         #!void))
+                     (expand-er-macro-transformer name form))
                     (else
                      (warning "non-standard syntax transformer" name form)
                      `(syntactic-bind! riaxpander:top-level-environment ',name ,form))))
@@ -261,8 +255,9 @@
                                 (syntactic-closure/form name)))
              (else #f)))
      (lambda (environment name denotation)   ;bind!
-       (set! new-syntax-definitions
-             (cons name new-syntax-definitions))
+       (if (compile-loadable-macros?)
+           (set! new-syntax-definitions
+                 (cons name new-syntax-definitions)))
 
        (set-global-bindings! environment
                              (cons (cons name denotation)
@@ -344,7 +339,7 @@
                            x (cons 'cond-expand clauses)))
            (define (test feature-requirement)
              (cond ((symbol? feature-requirement)
-                    (not (not (memq feature-requirement ##cond-expand-features))))
+                    (not (not (memq feature-requirement (##cond-expand-features)))))
                    ((not (pair? feature-requirement))
                     (err feature-requirement))
                    (else

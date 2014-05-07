@@ -1,3 +1,5 @@
+
+
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
@@ -213,7 +215,7 @@
 
 ;;!! C memory
 
-(c-declare "#include <malloc.h>")
+(c-declare "#include <stdlib.h>")
 
 (define calloc
   (c-lambda (unsigned-int unsigned-int) (pointer void) "calloc"))

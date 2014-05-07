@@ -43,6 +43,15 @@
 ;;     ((do "step" x y)
 ;;      y)))
 
+;;! Equivalent to let, with a late set! binding
+;; Similar to letrec, except the init expressions are bound to their variables in order.
+;; letrec* thus relaxes the letrec restriction, in that later init expressions may refer to the
+;; values of previously bound variables.
+(define-syntax letrec*
+  (syntax-rules ()
+    ((_ ((?binding ?val) ...) ?body1 ?body2 ...)
+     (let ((?binding #!unbound) ...)
+       (begin (set! ?binding ?val) ... ?body1 ?body2 ...)))))
 
 ;;------------------------------------------------------------------------------
 ;;!! SRFIs
