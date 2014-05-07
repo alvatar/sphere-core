@@ -136,9 +136,8 @@
 
 (define-task compile-stage-3 ()
   (for-each (lambda (m)
-              ;;(sake#compile-module m cond-expand-features: '(debug) version: '(debug))
-              ;;(sake#compile-module m cond-expand-features: '(optimize))
-              (sake#compile-module m cond-expand-features: '()))
+              (sake#compile-module m cond-expand-features: '(debug) version: '(debug))
+              (sake#compile-module m cond-expand-features: '(optimize)))
             modules))
 
 (define-task post-compile-stage-3 ()
