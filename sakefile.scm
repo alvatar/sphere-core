@@ -74,6 +74,9 @@
   ;;  output: (string-append (current-build-directory) "riaxpander.o1"))
 
   ;; Compile syntax-case
+  (info/color 'green "Bootstrapping the syntax expander code")
+  (if (not (file-exists? (string-append (current-source-directory) "scsc/syntax-case.scm")))
+      (shell-command (string-append "cd " (current-source-directory) "/scsc && gsi boot.scm")))
   (let recur ()
     (info/color 'green "Compiling the syntax expander may take long in your system, but the resulting code is much faster.")
     (println "Do you want to compile the syntax expander? Yes/No")
@@ -134,7 +137,8 @@
 (define-task compile-stage-3 ()
   (for-each (lambda (m)
               ;;(sake#compile-module m cond-expand-features: '(debug) version: '(debug))
-              (sake#compile-module m cond-expand-features: '(optimize)))
+              ;;(sake#compile-module m cond-expand-features: '(optimize))
+              (sake#compile-module m cond-expand-features: '()))
             modules))
 
 (define-task post-compile-stage-3 ()

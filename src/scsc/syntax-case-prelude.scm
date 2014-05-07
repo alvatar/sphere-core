@@ -368,6 +368,7 @@ gensym
         (unmark! (vector-ref vect i)))))
     
   (cond ((and (vector? src)
+              (not (zero? (vector-length src)))
               (equal? (vector-ref src 0) visit-marker))
          (vector-set! src 0 ##source1-marker)
          (unmark! (##source-code src)))

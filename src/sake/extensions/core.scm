@@ -267,12 +267,13 @@
                                (cc-options "")
                                (ld-options "")
                                (delete-c #f))
-  (info "compiling C file to o -- "
-        c-file)
-  (or (zero?
-       (gambit-eval-here
-        `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
-      (err "error compiling C file"))
+  (if ((newer-than? output) c-file)
+      (begin
+        (info "compiling C file to o -- " c-file)
+        (or (zero?
+             (gambit-eval-here
+              `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
+            (err "error compiling C file"))))
   (if delete-c
       (delete-file c-file recursive: #t)))
 
@@ -289,13 +290,23 @@
                                override-ld-options
                                verbose
                                delete-c)
-  (let ((c-file (sake#compile-to-c module
-                                   cond-expand-features: cond-expand-features
-                                   compiler-options: compiler-options
-                                   version: version
-                                   expander: expander
-                                   output: c-output-file
-                                   verbose: verbose)))
+  (let ((scm-path (string-append
+                   (%module-path-src module)
+                   (%module-filename-scm module)))
+        (default-path (string-append
+                       (%module-path-lib module)
+                       (%module-filename-c module)))
+        (c-file #f))
+    (if (not ((newer-than? default-path) scm-path))
+        (set! c-file default-path)
+        (set! c-file (sake#compile-to-c module
+                                   
+                                        cond-expand-features: cond-expand-features
+                                        compiler-options: compiler-options
+                                        version: version
+                                        expander: expander
+                                        output: c-output-file
+                                        verbose: verbose)))
     (sake#compile-c-to-o c-file
                          output:
                          (or o-output-file (path-strip-extension c-file))
@@ -335,15 +346,18 @@
                            (append (map (lambda (mdep)
                                           (info "    * " (object->string mdep) "")
                                           ;; First try with the default path
-                                          (let ((default-path (string-append
+                                          (let ((scm-path (string-append
+                                                           (%module-path-src mdep)
+                                                           (%module-filename-scm mdep)))
+                                                (default-path (string-append
                                                                (%module-path-lib mdep)
                                                                (%module-filename-c mdep))))
-                                            (if (file-exists? default-path)
+                                            (if (not ((newer-than? default-path) scm-path))
                                                 default-path
                                                 (let ((local-path (string-append
                                                                    (current-build-directory)
                                                                    (%module-filename-c mdep))))
-                                                  (if (file-exists? local-path)
+                                                  (if (not ((newer-than? local-path) scm-path))
                                                       local-path
                                                       (begin
                                                         (info "Compiling deferred dependency "
