@@ -133,12 +133,12 @@
 
 (define-task compile-stage-3 ()
   (for-each (lambda (m)
-              (sake#compile-module m cond-expand-features: '(debug) version: '(debug))
+              ;;(sake#compile-module m cond-expand-features: '(debug) version: '(debug))
               (sake#compile-module m cond-expand-features: '(optimize)))
             modules))
 
 (define-task post-compile-stage-3 ()
-  (for-each (lambda (m) (sake#make-module-available m versions: '(() (debug)))) modules))
+  (for-each (lambda (m) (sake#make-module-available m versions: '(() #;(debug)))) modules))
 
 (define-task stage-3 (compile-stage-3 post-compile-stage-3)
   (sake#install-sphere-to-system))

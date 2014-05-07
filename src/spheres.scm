@@ -21,17 +21,20 @@
 ;; (set! expander:include riaxpander#riaxpander:include)
 
 (let ((syntax-case-o "~~spheres/syntax-case.o1")
-      (syntax-case-scm "src/scsc/syntax-case.scm"))
-  (if (file-exists? syntax-case-o)
-      (begin (println "*** INFO -- loading syntax-case")
-             (load syntax-case-o))
-      (if (file-exists? syntax-case-scm)
-          (begin
-            (println "*** INFO -- syntax-case expander is being loaded from sources")
-            (parameterize ((current-directory (getenv "scsc_home" "~~spheres/"))
-                           (current-readtable (readtable-sharing-allowed?-set (current-readtable) 'serialize)))
-                          (load syntax-case-scm)))
-          (error "Cannot find macro expander. Is Sphere Core properly installed?"))))
+      (syntax-case-scm "~~spheres/syntax-case.scm"))
+  (cond
+   ((file-exists? syntax-case-o)
+    (println "*** INFO -- loading syntax expander")
+    (load syntax-case-o))
+   ((file-exists? syntax-case-scm)
+    (println "*** INFO -- loading syntax expander from source")
+    (parameterize ((current-directory (getenv "scsc_home" "~~spheres/"))
+                   (current-readtable (readtable-sharing-allowed?-set (current-readtable) 'serialize)))
+                  (load syntax-case-scm)))
+   ((file-exists? "src/scsc/syntax-case.scm")
+    (println "*** INFO -- Bootstrapping: syntax expander omitted"))
+   (else
+    (error "Cannot find macro expander. Is Sphere Core properly installed?"))))
 
 (set! current-macro-expander 'syntax-case)
 (set! expander:include
