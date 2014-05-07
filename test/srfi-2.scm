@@ -1,5 +1,5 @@
-(##import core: testing)
-(##import-include core: base-macros)
+(##spheres-load core: testing)
+(##spheres-include core: base-macros)
 
 (check-set-mode! 'summary)
 
