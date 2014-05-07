@@ -25,21 +25,23 @@
   (cond
    ((file-exists? syntax-case-o)
     (println "*** INFO -- loading syntax expander")
-    (load syntax-case-o))
+    (load syntax-case-o)
+    (set! current-macro-expander 'syntax-case))
    ((file-exists? syntax-case-scm)
     (println "*** INFO -- loading syntax expander from source")
     (parameterize ((current-directory (getenv "scsc_home" "~~spheres/"))
                    (current-readtable (readtable-sharing-allowed?-set (current-readtable) 'serialize)))
-                  (load syntax-case-scm)))
+                  (load syntax-case-scm))
+    (set! current-macro-expander 'syntax-case))
    ((file-exists? "src/scsc/syntax-case.scm")
     (println "*** INFO -- Bootstrapping: syntax expander omitted"))
    (else
     (error "Cannot find macro expander. Is Sphere Core properly installed?"))))
 
-(set! current-macro-expander 'syntax-case)
-(set! expander:include
-      (lambda (file)
-        (eval `(include ,file))))
+(if current-macro-expander
+    (set! expander:include
+          (lambda (file)
+            (for-each eval (with-input-from-file file read-all)))))
 
 ;;------------------------------------------------------------------------------
 ;;!! Macro utils
@@ -771,19 +773,8 @@ fig.scm file"))
                         (if verbose
                             (display (string-append "-- source included -- " (object->string module) "\n")))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
-                        (expander:include (%module-filename-scm module))))))))))
-  (set!
-   ##include-module-and-dependencies
-   (lambda (root-module options)
-     (let ((force-include (and (memq 'force options) #f)))
-       (let recur ((module root-module))
-         (if (or force-include
-                 (not (member (%module-normalize module override-version: '()) *included-modules*)))
-             (begin (for-each recur (%module-shallow-dependencies-to-include module))
-                    (include-single-module module '(verbose #t))))))))
-  (set!
-   ##load-module-and-dependencies
-   (let ((load-single-module
+                        (expander:include (%module-filename-scm module)))))))))
+       (load-single-module
           (lambda (module options)
             (%check-module module '##load-module-and-dependencies#load-single-module)
             (let ((verbose (and (memq 'verbose options) #t))
@@ -791,8 +782,8 @@ fig.scm file"))
                   (sphere (%module-sphere module)))
               (let ((header-module (%module-header module)))
                 (if header-module
-                    (eval `(expander:include ,(string-append (%module-path-src header-module)
-                                                                 (%module-filename-scm header-module)))))
+                    (expander:include (string-append (%module-path-src header-module)
+                                                     (%module-filename-scm header-module))))
                 (if includes
                     (for-each (lambda (m) (include-single-module m '(verbose)))
                               (%module-shallow-dependencies-to-include module)))
@@ -806,7 +797,7 @@ fig.scm file"))
                                         ;(pp file-o)
                              file-o)
                             ((file-exists? file-scm)
-                             (expander:include file-scm)
+                             (load file-scm)
                              (if verbose
                                  (display (string-append "-- source loaded -- " (object->string module) "\n")))
                              file-scm)
@@ -818,21 +809,32 @@ fig.scm file"))
                     (begin (if verbose
                                (display (string-append "-- object loaded -- " (object->string module) "\n")))
                            (load (%module-filename-scm module)))))))))
-     (lambda (root-module options)
-       ;; Get options, as #t or #f
-       (let ((omit-root (and (memq 'omit-root options) #t)))
-         (let recur ((module root-module))
-           (if (not (member (%module-normalize module override-version: '()) *loaded-modules*))
-               (begin (for-each recur (%module-shallow-dependencies-to-load module))
-                      (or (and omit-root (equal? root-module module))
-                          (load-single-module module options))))))))))
+  (set!
+   ##include-module-and-dependencies
+   (lambda (root-module options)
+     (let ((force-include (and (memq 'force options) #f)))
+       (let recur ((module root-module))
+         (if (or force-include
+                 (not (member (%module-normalize module override-version: '()) *included-modules*)))
+             (begin (for-each recur (%module-shallow-dependencies-to-include module))
+                    (include-single-module module '(verbose #t))))))))
+  (set!
+   ##load-module-and-dependencies
+   (lambda (root-module options)
+     ;; Get options, as #t or #f
+     (let ((omit-root (and (memq 'omit-root options) #t)))
+       (let recur ((module root-module))
+         (if (not (member (%module-normalize module override-version: '()) *loaded-modules*))
+             (begin (for-each recur (%module-shallow-dependencies-to-load module))
+                    (or (and omit-root (equal? root-module module))
+                        (load-single-module module options)))))))))
 
 ;;! import-include macro
-(##define-macro (##spheres-include . module)
+(define-macro (##spheres-include . module)
   (cond
    ((string? (car module))
     ;; If filename given, just include it (doesn't register as loaded module)
-    (eval `(expander:include ,(car module))))
+    (expander:include (car module)))
    ;; It comes quoted (it's a monster)
    ((and (pair? (car module))
          (eq? 'quote (caar module)))
@@ -865,7 +867,7 @@ fig.scm file"))
 ;;     (##load-module-and-dependencies module '(omit-root verbose includes))))
 
 ;;! import macro, loads dependencies
-(##define-macro (##spheres-load . module)
+(define-macro (##spheres-load . module)
   (let* ((module (if (null? (cdr module))
                      (car module)
                      ;; If it defines the sphere, process the sphere name to make it a keyword

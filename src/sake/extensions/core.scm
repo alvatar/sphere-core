@@ -477,9 +477,7 @@
 
 ;;! Test all files in test/
 (##define (sake#test-all)
-  (for-each (lambda (f)
-              (gambit-eval-here
-               `((eval '(expander:include ,f)))))
+  (for-each sake#test
             (fileset dir: "test/"
                      test: (f-and (extension=? ".scm")
                                   (f-not (ends-with? "#.scm")))
@@ -490,14 +488,16 @@
   (cond
    ((string? module)
     (if (file-exists? module)
-        (gambit-eval-here
-         `((eval '(expander:include ,module))))
+        (if (not (zero? (gambit-eval-here
+                         `((##spheres-include ,module)))))
+            (err "Internal error running tests. Child process exited abnormally."))
         (err "Testing file doesn't exist")))
    ((%module? module)
     (%check-module module 'sake#test)
-    (gambit-eval-here
-     `((eval '(expander:include ,(string-append "test/"
-                                                (%module-filename-scm module)))))))
+    (if (not (zero? (gambit-eval-here
+                     `((##spheres-include ,(string-append "test/"
+                                                          (%module-filename-scm module)))))))
+        (err "Internal error running tests. Child process exited abnormally.")))
    (else
     (err "Bad testing module description: file path or module"))))
 
