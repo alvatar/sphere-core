@@ -886,7 +886,7 @@
 
 
 ;;------------------------------------------------------------------------------
-;;!! TODO
+;;!! TODO: R7RS definition
 
 ;;; Define values allows sharing state between functions
 ;; UNTESTED
