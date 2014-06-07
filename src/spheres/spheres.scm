@@ -1,4 +1,4 @@
->;;; #!/usr/bin/env gsi-script
+;;; #!/usr/bin/env gsi-script
 ;;; Copyright (c) 2013-2014 by Álvaro Castro-Castilla
 ;;; Spheres: manage packages from SchemeSpheres.org
 
