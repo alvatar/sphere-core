@@ -611,6 +611,6 @@
         (let read-messages ()
           (let ((m (thread-receive 0 'finished)))
             (if (not (eq? m 'finished))
-                (begin (err "Exception " (car m) " running procedure on element: " (cdr m))
+                (begin (err "parallel-for-each exception " (car m) " running procedure on element: " (cdr m))
                        (read-messages)))))))
     (reverse results)))
