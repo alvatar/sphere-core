@@ -533,9 +533,10 @@
   (copy-files '("config.scm" "sakefile.scm")
               (%sphere-system-path sphere))
   (for-each (lambda (dir)
-              (make-directory (string-append (%sphere-system-path sphere) dir))
-              (copy-files (fileset dir: dir recursive: #f)
-                          (string-append (%sphere-system-path sphere) dir)))
+              (if (file-exists? dir)
+                  (begin (make-directory (string-append (%sphere-system-path sphere) dir))
+                         (copy-files (fileset dir: dir recursive: #f)
+                                     (string-append (%sphere-system-path sphere) dir)))))
             `(,(default-src-directory) ,(default-lib-directory) ,@extra-directories)))
 
 ;;! Uninstall all the files from the system installation
