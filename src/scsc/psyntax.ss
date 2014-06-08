@@ -723,8 +723,8 @@
 
 (define-syntax build-primref
   (syntax-rules ()
-    ((_ ae name) name)
-    ((_ ae level name) name)))
+    ((_ ae name) (build-source ae name))
+    ((_ ae level name) (build-source ae name))))
 
 (define-syntax build-data
   (syntax-rules ()
@@ -798,7 +798,7 @@
 
 (define-syntax build-lexical-var
   (syntax-rules ()
-    ((_ ae id) (gensym id))))
+    ((_ ae id) (build-source ae (gensym id)))))
 
 (define-syntax lexical-var? gensym?)
 
@@ -1787,7 +1787,7 @@
                              (build-cte-install bound-id
                                (build-data no-source (make-binding 'meta-variable valsym))
                                (top-ribcage-key top-ribcage))
-                             (build-global-definition ae valsym (chi rhs r r w #t))))))
+                             (build-global-definition ae (build-source ae valsym) (chi rhs r r w #t))))))
                     ; make sure compile-time definitions occur before we
                     ; expand the run-time code
                      (let ((x (ct-eval/residualize2 ctem
@@ -1801,8 +1801,7 @@
                            x
                            (rt-eval/residualize rtem
                              (lambda ()
-                               (build-global-definition ae valsym (chi rhs r r w #f)))))))))
-             ))))
+                               (build-global-definition ae (build-source ae valsym) (chi rhs r r w #f)))))))))))))
         (($module-form)
          (let ((ribcage (make-empty-ribcage)))
            (let-values (((orig id exports forms)
@@ -2909,8 +2908,7 @@
                                 #f)))
               (else
                (ids/emitter (cons (cond (template (datum->syntax template (car ids)))
-                                        (ae (build-source ae (car ids)))
-                                        (else (build-source no-source (car ids)))) formals)
+                                        (else (car ids))) formals)
                             (cdr ids) emitter ae #f)))))
 
     (define emit-formals
@@ -2920,7 +2918,8 @@
             (case emitter
               ((optional/rest) vars)
               ((rnrs keyword) formals))))
-        (cond ((null? formals) (reverse formals*))
+        (cond ((null? formals)
+               (reverse formals*))
 
                ((syntax? formals)
                 (emit-formals formals* (syntax->datum formals) vars emitter ae formals))
@@ -2941,17 +2940,20 @@
                 (emit-formals (cons (build-source ae (car formals)) formals*) (cdr formals) vars emitter ae template))
               
                ((pair? (car formals))
-                (emit-formals (cons (cons (car (case emitter
-                                                 ((keyword) (car (formal)))
-                                                 ((optional/rest) (formal))))
-                                          (unannotate (chi (cdr (car formals)) r mr w m?)))
+                (emit-formals (cons (list (unannotate (car (case emitter
+                                                  ((keyword) (car (formal)))
+                                                  ((optional/rest)
+                                                   (formal)))))
+                                          (unannotate (chi (cadr (car formals)) r mr (if (syntax? c)
+                                                                                         (syntax-wrap c)
+                                                                                         w) m?)))
                                     formals*) (cdr formals) (cdr vars) emitter ae template))
 
                ((id? (car formals))
                 (emit-formals (cons (car (formal)) formals*) (cdr (syntax->datum formals)) (cdr vars) emitter ae template))
 
                (else (error `(unexpected-formal ,(car formals)))))))
-
+    
       (syntax-case c ()
         (((id ...) e1 e2 ...)
          (let ((formals (syntax (id ...))))
@@ -2960,14 +2962,20 @@
              (if (not (valid-bound-ids? ids))
                  (syntax-error e "invalid parameter list in")
                  (let ((labels (gen-labels ids))
-                       (new-vars (map (lambda (id) (build-source id (gen-var id))) ids)))
-                   (debug-when dsssl (pp (vector 'labels labels 'new-vars new-vars 'bw w (make-binding-wrap ids labels w))))
+                       (new-vars (map gen-var ids)))
                    (values
                     emitter
                     (and (eq? emitter 'keyword)
                          (gen-var 'dsssl-args))
-                    (build-source formals new-vars)
-                    (emit-formals '() formals new-vars emitter #f #f)
+                    (if (or (pair? new-vars)
+                            (null? new-vars))
+                        (build-source no-source new-vars)
+                        new-vars)
+                    (let ((f (emit-formals '() formals new-vars emitter #f #f)))
+                      (debug-when dsssl (vector 'emit-formals f))
+                      (if (annotation? f)
+                          f
+                          (build-source no-source f)))
                     (map syntax->datum ids)
                     (chi-body (syntax (e1 e2 ...))
                               e
@@ -2981,7 +2989,7 @@
              (if (not (valid-bound-ids? old-ids))
                  (syntax-error e "invalid parameter list in")
                  (let ((labels (gen-labels old-ids))
-                       (new-vars (map (lambda (id) (build-source id (gen-var id))) old-ids)))
+                       (new-vars (map gen-var old-ids)))
                    (values
                     emitter
                     (and (eq? emitter 'keyword)
@@ -2989,11 +2997,13 @@
                     (let ((vars (if (eq? emitter 'rnrs)
                                     (reverse* new-vars)
                                     (reverse new-vars))))
-                      (if (or (pair? vars)
-                              (null? vars))
-                          (build-source old-ids vars)
-                          vars))
-                    (emit-formals '() formals (reverse* new-vars) emitter #f #f)
+                      (if (annotation? vars)
+                          vars
+                          (build-source no-source vars)))
+                    (let ((dsssl-formals (emit-formals '() formals (reverse* new-vars) emitter #f #f)))
+                      (if (annotation? dsssl-formals)
+                          dsssl-formals
+                          (build-source no-source dsssl-formals)))
                     (reverse (map syntax->datum old-ids))
                     (chi-body (syntax (e1 e2 ...))
                               e
@@ -3384,7 +3394,7 @@
                          ((ref) (build-lexical-reference 'value no-source (cadr x)))
                          ((primitive) (build-primref no-source (cadr x)))
                          ((quote) (build-data no-source (cadr x)))
-                         ((lambda) (build-lambda no-source (cadr x) (regen (caddr x))))
+                         ((lambda) (build-lambda no-source (build-source no-source (cadr x)) (regen (caddr x))))
                          ((map) (let ((ls (map regen (cdr x))))
                                   (build-application no-source
                                                      (if (fx= (length ls) 2)
@@ -3520,7 +3530,7 @@
                          (let ((labels (gen-labels ids)) (new-vars (map gen-var ids)))
                            (build-application no-source
                                               (build-primref no-source 'apply)
-                                              (list (build-lambda no-source new-vars
+                                              (list (build-lambda no-source (build-source no-source new-vars)
                                                                   (chi exp
                                                                        (extend-env*
                                                                         labels
@@ -3547,7 +3557,7 @@
                            (let ((y (gen-var 'tmp)))
                                         ; fat finger binding and references to temp variable y
                              (build-application no-source
-                                                (build-lambda no-source (list y)
+                                                (build-lambda no-source (build-source no-source (list y))
                                                               (let-syntax ((y (identifier-syntax
                                                                                (build-lexical-reference 'value no-source y))))
                                                                 (build-conditional no-source
@@ -3582,7 +3592,7 @@
                                   (let ((label (gen-label))
                                         (var (gen-var (syntax pat))))
                                     (build-application no-source
-                                                       (build-lambda no-source (list var)
+                                                       (build-lambda no-source (build-source no-source (list var))
                                                                      (chi (syntax exp)
                                                                           (extend-env label (make-binding 'syntax `(,var . 0)) r)
                                                                           mr
@@ -3606,7 +3616,7 @@
                               (let ((x (gen-var 'tmp)))
                                         ; fat finger binding and references to temp variable x
                                 (build-application ae
-                                                   (build-lambda no-source (list x)
+                                                   (build-lambda no-source (build-source no-source (list x))
                                                                  (gen-syntax-case x
                                                                                   (syntax (key ...)) (syntax (m ...))
                                                                                   r mr m?))
@@ -4484,11 +4494,48 @@
   (global-extend
    'macro 'include
    (lambda (x)
+     (define read-file
+       (lambda (port k)
+         #; (pp (vector 'input-syntax-object x))
+         (vector-ref (##read-all-as-a-begin-expr-from-port
+                      port (##current-readtable)
+                      ##wrap-datum
+                      #;
+                      (lambda (readenv x)
+                        (datum->syntax k (##make-source x (##readenv->locat readenv))))
+                      ##unwrap-datum
+                      ;; (lambda (re x)
+                      ;;   (##source-code (syntax->datum x)))
+                      #f #t) 1)))
      (syntax-case x ()
-       ((include filename)
-        (let ((filename (syntax->datum (syntax filename))))
-          ($include-file-hook filename))
-        (datum->syntax (syntax include) (##include-file-as-a-begin-expr (syntax-expression x)))))))
+       ((k filename)
+        (let* ((this-include-expr (syntax-expression (syntax k)))
+               (this-include-expr-locat (and (##source? this-include-expr)
+                                             (##source-locat this-include-expr)))
+               (this-include-expr-filename (and this-include-expr-locat
+                                                (vector-ref this-include-expr-locat 0)))
+               (directory (or (and (string? this-include-expr-filename)
+                                   (path-directory this-include-expr-filename))
+                              (current-directory)))
+               (filename (path-normalize (path-expand (syntax->datum (syntax filename)) directory))))
+          ($include-file-hook filename)
+          #;
+          (pp (vector 'output (datum->syntax (syntax k) (call-with-input-file filename
+                                                          (lambda (port)
+                                                            (read-file port (syntax k)))))))
+
+          #;
+          (with-syntax (((exp ...) (call-with-input-file filename
+          (lambda (port)
+          (read-file port (syntax k))))))
+          (syntax (exp ...)))
+          
+
+
+          (datum->syntax (syntax k)
+                         (call-with-input-file filename
+                           (lambda (port)
+                             (read-file port (syntax k))))))))))
 
    (global-extend
     'macro 'case

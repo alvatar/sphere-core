@@ -21,7 +21,9 @@ Installation
 ------------
 
 To install, clone this repsitory and run `boot.scm` to bootstrap
-`syntax-case.scm` from its `psyntax.ss` source.
+`syntax-case.scm` from its `psyntax.ss` source. Once bootstrapping is
+complete, use `scsc.scm` to load the bootstrapped syntax expander for
+general use.
 
 ```bash
 bash-3.2$ git clone http://github.com/matthastie/scsc
@@ -35,15 +37,17 @@ bash-3.2$ cd scsc
 bash-3.2$ gsi boot
 ```
 
-The `gsi boot` command creates `syntax-case.scm`. To use the psyntax
-syntax expander with Gambit, load `syntax-case.scm` into your Gambit
-interaction environment.
+The `gsi boot` command creates a `syntax-case.scm` file that contains
+the compiled psyntax implementation.
+
+To use the psyntax expander, use `scsc.scm`, which configures the
+Gambit reader before loading `syntax-case.scm`.
 
 ```scheme
 bash-3.2$ gsc
 Gambit v4.7.1
-> (load "syntax-case")
-"/private/tmp/scsc/syntax-case.scm"
+> (load "scsc")
+"/Volumes/Data/scratch/scheme/control/system/scsc/scsc.scm"
 > (module M (alpha (beta b))
     (module ((alpha a) b)
       (define-syntax alpha (identifier-syntax a))
@@ -58,7 +62,7 @@ b
 ```
 
 To use the git module loader, load `module.scm` into your Gambit
-interaction environment after loading `syntax-case.scm`.
+interaction environment after loading `scsc.scm`.
 
 Modules
 -------

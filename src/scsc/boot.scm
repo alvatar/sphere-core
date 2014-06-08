@@ -22,17 +22,19 @@
 
 (define make-read-expander
   (lambda (expander desourcify)
+    (define include-expr-ref 1)
     (lambda (input)
       ;; begin is prepended to simulate top-level expansion. this
       ;; practice bypasses the "invalid context for definition" error
       ;; that otherwise occurs without its presence.
-      (let ((expansion (expander (let ((src (##source-code (##read-all-as-a-begin-expr-from-port
+      (let ((expansion (expander (let ((src (vector-ref (##read-all-as-a-begin-expr-from-port
                                                             input
                                                             (##current-readtable)
                                                             ##wrap-datum
                                                             ##unwrap-datum
                                                             #f
-                                                            #t))))
+                                                            #t)
+                                                        include-expr-ref)))
                                    (if desourcify
                                        (##desourcify src)
                                        src)))))
