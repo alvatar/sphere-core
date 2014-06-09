@@ -1,5 +1,3 @@
-
-
 ;;; Copyright (c) 2013 by Álvaro Castro Castilla. All Rights Reserved.
 ;;; Foreign Function Interface functionality
 
@@ -260,15 +258,12 @@
 
 (c-declare "#include <stdint.h>")
 
-;;! size_t
-(c-define-sizeof size-t c-type: "size_t")
-
 ;;! char
 (c-define-sizeof char)
 (c-define-array char
                 scheme-vector: s8)
 
-;;! unsigned char
+;; ;;! unsigned char
 (c-define-sizeof unsigned-char c-type: "unsigned char")
 (c-define-array unsigned-char
                 c-type: "unsigned char"

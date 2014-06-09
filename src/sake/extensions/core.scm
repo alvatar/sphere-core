@@ -13,6 +13,8 @@
                              (expander 'syntax-case)
                              (output #f)
                              (verbose #f))
+  (if (not (eq? 'syntax-case expander))
+      (err "The only supported expander is 'syntax-case"))
   (or (file-exists? (default-build-directory))
       (make-directory (default-build-directory)))
   (let ((module (if (string? module-or-file)
@@ -212,11 +214,9 @@
                        ,@(if header-module
                              '((##include "~~lib/gambit#.scm"))
                              '())
-                       ;; Include custom compilation preludes defined in config.scm
+                       ;; EXPAND custom compilation preludes defined in config.scm
                        ,@(map (lambda (p)
-                                `(##include ,(string-append
-                                              (%module-path-src p)
-                                              (%module-filename-scm p))))
+                                `(include ,(string-append (%module-path-src p) (%module-filename-scm p))))
                               ;; Dependencies here are not deep, as they should be already compiled
                               (%module-shallow-dependencies-to-prelude module))
                        ;; Include load dependencies' headers if they have
@@ -244,9 +244,11 @@
                    intermediate-file
                  (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
                ;; Compile
+               (info/color 'light-green "syntax-case expansion:")
                (or (zero?
                     (gambit-eval-here
                      `(,@compilation-environment-code
+                       (syntax-case-debug ,verbose)
                        (or (compile-file-to-target
                             ,intermediate-file
                             output: ,output-file
@@ -283,7 +285,7 @@
                                (cond-expand-features '())
                                (compiler-options '())
                                (version compiler-options)
-                               (expander 'riaxpander)
+                               (expander 'syntax-case)
                                c-output-file
                                o-output-file
                                override-cc-options
@@ -300,7 +302,6 @@
     (if (not ((newer-than? default-path) scm-path))
         (set! c-file default-path)
         (set! c-file (sake#compile-to-c module
-                                   
                                         cond-expand-features: cond-expand-features
                                         compiler-options: compiler-options
                                         version: version

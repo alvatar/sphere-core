@@ -1,8 +1,5 @@
 (sphere: "core")
 (dependencies:
- (ffi
-  (prelude
-   (= ffi-header)))
- (assert-macros
+ (ffi-macros
   (include
-   (= syntax-macros))))
+   (= base-macros))))

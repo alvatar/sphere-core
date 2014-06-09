@@ -1,0 +1,113 @@
+;;; Copyright (c) 2013-2014 by Álvaro Castro Castilla. All Rights Reserved.
+;;; Foreign Function Interface functionality
+
+;;------------------------------------------------------------------------------
+
+;;!! C Types
+
+
+(c-define-type size-t unsigned-int) ;; This should be more than enough, keep in mind
+
+
+;;------------------------------------------------------------------------------
+;; Type definitions
+
+
+;; ;;! void*
+(c-define-type* void)
+(c-define-type void** (pointer void*))
+
+;;! char*
+(c-define-type* char)
+(c-define-type char** (pointer char*))
+
+;;! unsigned char*
+(c-define-type* unsigned-char)
+(c-define-type unsigned-char** (pointer unsigned-char*))
+
+;;! short*
+(c-define-type* short)
+(c-define-type short** (pointer short*))
+
+;;! unsigned short*
+(c-define-type* unsigned-short)
+(c-define-type unsigned-short** (pointer unsigned-short*))
+
+;;! int*
+(c-define-type* int)
+(c-define-type int** (pointer int*))
+
+;;! unsigned int*
+(c-define-type* unsigned-int)
+(c-define-type unsigned-int** (pointer unsigned-int*))
+
+;;! long*
+(c-define-type* long)
+(c-define-type long** (pointer long*))
+
+;;! unsigned long*
+(c-define-type* unsigned-long)
+(c-define-type unsigned-long** (pointer unsigned-long*))
+
+;;! float*
+(c-define-type* float)
+(c-define-type float** (pointer float*))
+
+;;! double*
+(c-define-type* double)
+(c-define-type double** (pointer double*))
+
+;;! int8
+(c-define-type* int8)
+(c-define-type int8** (pointer int8*))
+
+;;! unsigned-int8
+(c-define-type* unsigned-int8)
+(c-define-type unsigned-int8** (pointer unsigned-int8*))
+
+;;! int16
+(c-define-type* int16)
+(c-define-type int16** (pointer int16*))
+
+;;! unsinged-int16
+(c-define-type* unsigned-int16)
+(c-define-type unsigned-int16** (pointer unsigned-int16*))
+
+;;! int32
+(c-define-type* int32)
+(c-define-type int32** (pointer int32*))
+
+;;! unsigned-int32
+(c-define-type* unsigned-int32)
+(c-define-type unsigned-int32** (pointer unsigned-int32*))
+
+;;! int64
+(c-define-type* int64)
+(c-define-type int64** (pointer int64*))
+
+;;! unsigned-int64
+(c-define-type* unsigned-int64)
+(c-define-type unsigned-int64** (pointer unsigned-int64*))
+
+;;! float32
+(c-define-type* float32)
+(c-define-type float32** (pointer float32*))
+
+;;! float64
+(c-define-type* float64)
+(c-define-type float64** (pointer float64*))
+
+;;------------------------------------------------------------------------------
+
+;;!! C Types: readers/writers generation
+
+(define u8vector-subtype (##subtype (u8vector)))
+(define s8vector-subtype (##subtype (s8vector)))
+(define u16vector-subtype (##subtype (u16vector)))
+(define s16vector-subtype (##subtype (s16vector)))
+(define u32vector-subtype (##subtype (u32vector)))
+(define s32vector-subtype (##subtype (s32vector)))
+(define u64vector-subtype (##subtype (u64vector)))
+(define s64vector-subtype (##subtype (s64vector)))
+(define f32vector-subtype (##subtype (f32vector)))
+(define f64vector-subtype (##subtype (f64vector)))
