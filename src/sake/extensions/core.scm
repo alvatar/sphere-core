@@ -266,15 +266,24 @@
 (##define (sake#compile-c-to-o c-file
                                #!key
                                (output (path-strip-extension c-file))
+                               (env-options '())
                                (cc-options "")
                                (ld-options "")
-                               (delete-c #f))
+                               (delete-c #f)
+                               verbose)
   (if ((newer-than? output) c-file)
-      (begin
+      (let* ((env-code
+              (if (null? env-options)
+                  #!void
+                  (begin (map (lambda (e) `(setenv ,(car e) ,(cadr e))) env-options))))
+             (compile-code
+              `(,@env-code
+                (compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
         (info "compiling C file to o -- " c-file)
+        (if verbose (begin (info/color 'green "Spawning a Gambit instance with this code: ")
+                           (pp compile-code)))
         (or (zero?
-             (gambit-eval-here
-              `((compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
+             (gambit-eval-here compile-code))
             (err "error compiling C file"))))
   (if delete-c
       (delete-file c-file recursive: #t)))
@@ -288,6 +297,7 @@
                                (expander 'syntax-case)
                                c-output-file
                                o-output-file
+                               override-env-options
                                override-cc-options
                                override-ld-options
                                verbose
@@ -311,13 +321,17 @@
     (sake#compile-c-to-o c-file
                          output:
                          (or o-output-file (path-strip-extension c-file))
+                         env-options:
+                         (or override-env-options
+                             (%module-shallow-dependencies-env-options module))
                          cc-options:
                          (or override-cc-options
                              (%process-cc-options (%module-shallow-dependencies-cc-options module)))
                          ld-options:
                          (or override-ld-options
                              (%process-ld-options (%module-shallow-dependencies-ld-options module)))
-                         delete-c: delete-c)))
+                         delete-c: delete-c
+                         verbose: verbose)))
 
 ;;! Compile to exe
 (##define (sake#compile-to-exe exe-name

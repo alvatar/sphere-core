@@ -604,6 +604,10 @@ fig.scm file"))
   (%check-module module '%module-shallow-dependencies-ld-options)
   ((%module-shallow-dependencies-select 'ld-options #f) module))
 
+(define^ (%module-shallow-dependencies-env-options module)
+  (%check-module module '%module-shallow-dependencies-env-options)
+  ((%module-shallow-dependencies-select 'env-options #f) module))
+
 ;;! Gets the full tree of dependencies, building a list in the right order.
 ;; .parameter symbol-to-follow They symbol that will look for in the dependencies,
 ;; following its subdependencies recursively
