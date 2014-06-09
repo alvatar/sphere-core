@@ -244,7 +244,7 @@
                    intermediate-file
                  (lambda (f) (for-each (lambda (expr) (pp expr f)) intermediate-code)))
                ;; Compile
-               (info/color 'light-green "syntax-case expansion:")
+               (if verbose (info/color 'light-green "syntax-case expansion:"))
                (or (zero?
                     (gambit-eval-here
                      `(,@compilation-environment-code
