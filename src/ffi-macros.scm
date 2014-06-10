@@ -64,7 +64,7 @@
 ;;------------------------------------------------------------------------------
 ;;!! Macro utils
 
-(define (get-key-arg args key default)
+(define (%%get-key-arg args key default)
     (if (null? args)
         default
         (let ((found (memq key args)))
@@ -74,7 +74,7 @@
               default))))
 
 ;; Build a string from list of elements (anything)
-(define (generic-string-append . ol)
+(define (%%generic-string-append . ol)
   (define (->string o)
     (cond ((string? o) o)
           ((symbol? o) (symbol->string o))
@@ -84,11 +84,11 @@
   (apply string-append (map ->string ol)))
 
 ;; Append anything into a symbol
-(define (generic-symbol-append . ol)
-  (string->symbol (apply generic-string-append ol)))
+(define (%%generic-symbol-append . ol)
+  (string->symbol (apply %%generic-string-append ol)))
 
 ;; Turn a scheme-name into a c_name, simply changing the - to _
-(define (scheme-name->c-name name)
+(define (%%scheme-name->c-name name)
   (let* ((name-str (cond ((string? name) name)
                          ((symbol? name) (symbol->string name))
                          (else (object->string name))))
@@ -102,7 +102,7 @@
           new-name))))
 
 ;; Generate a list of top-level forms
-(define (begin-top-level-forms #!rest define-blocks)
+(define (%%begin-top-level-forms #!rest define-blocks)
   (cons 'begin
         (let recur ((ds define-blocks))
           (cond ((null? ds) '())
@@ -146,7 +146,7 @@
 ;;! Build a size-of value equivalent to the C operator
 ;; c-build-sizeof float -> sizeof-float
 (define-macro (c-define-sizeof scheme-type . rest)
-  (let ((c-type (get-key-arg rest c-type: (symbol->string scheme-type))))
+  (let ((c-type (%%get-key-arg rest c-type: (symbol->string scheme-type))))
     `(define ,(string->symbol (string-append (symbol->string scheme-type) "-size"))
        ((c-lambda () size-t
                   ,(string-append "___result = sizeof(" c-type ");"))))))
@@ -159,19 +159,19 @@
 ;; *->float*
 ;; f32vector->float*
 (define-macro (c-define-array scheme-type . rest)
-  (let ((c-type (get-key-arg rest c-type: scheme-type))
-        (scheme-vector (get-key-arg rest scheme-vector: #f)))
+  (let ((c-type (%%get-key-arg rest c-type: scheme-type))
+        (scheme-vector (%%get-key-arg rest scheme-vector: #f)))
     (if (not scheme-vector) (error "c-define-array macro :: scheme-vector: argument is mandatory"))
-    (let ((release-type-str (string-append  "___release_" (scheme-name->c-name scheme-type)))
+    (let ((release-type-str (string-append  "___release_" (%%scheme-name->c-name scheme-type)))
           (type scheme-type)
           (type*
-           (generic-symbol-append scheme-type "*"))
+           (%%generic-symbol-append scheme-type "*"))
           (type*/nonnull
-           (generic-symbol-append scheme-type "*/nonnull"))
+           (%%generic-symbol-append scheme-type "*/nonnull"))
           (type*/release-rc
-           (generic-symbol-append scheme-type "*/release-rc")))
+           (%%generic-symbol-append scheme-type "*/release-rc")))
       (let ((expansion
-             (begin-top-level-forms
+             (%%begin-top-level-forms
               `(c-declare
                 ,(string-append
                   "static ___SCMOBJ " release-type-str "( void* ptr )\n"
@@ -182,36 +182,36 @@
                   "  return ___FIX(___NO_ERR);\n"
                   "}\n"))
               ;; Alloc managed by Gambit's GC
-              `(define ,(generic-symbol-append 'alloc- scheme-type '*/unmanaged)
+              `(define ,(%%generic-symbol-append 'alloc- scheme-type '*/unmanaged)
                  (c-lambda (size-t)
                            ,type*/nonnull
-                           ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+                           ,(%%generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
               ;; Alloc unmanaged by Gambit's GC
-              `(define ,(generic-symbol-append 'alloc- scheme-type '*)
+              `(define ,(%%generic-symbol-append 'alloc- scheme-type '*)
                  (c-lambda (size-t)
                            ,type*/release-rc
-                           ;; ,(generic-string-append "___result_voidstar = ___EXT(___alloc_rc)(___arg1*sizeof(" c-type "));")
-                           ,(generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
-              `(define ,(generic-symbol-append scheme-type '*-ref)
+                           ;; ,(%%generic-string-append "___result_voidstar = ___EXT(___alloc_rc)(___arg1*sizeof(" c-type "));")
+                           ,(%%generic-string-append "___result_voidstar = malloc(___arg1*sizeof(" c-type "));")))
+              `(define ,(%%generic-symbol-append scheme-type '*-ref)
                  (c-lambda (,type*/nonnull size-t)
                            ,scheme-type
                            "___result = ___arg1[___arg2];"))
-              `(define ,(generic-symbol-append scheme-type '*-set!)
+              `(define ,(%%generic-symbol-append scheme-type '*-set!)
                  (c-lambda (,type*/nonnull size-t ,scheme-type)
                            void
                            "___arg1[___arg2] = ___arg3;"))
-              `(define ,(generic-symbol-append '*-> scheme-type)
+              `(define ,(%%generic-symbol-append '*-> scheme-type)
                  (c-lambda (,type*/nonnull)
                            ,scheme-type
                            "___result = *___arg1;"))
               (if scheme-vector
-                  `(define (,(generic-symbol-append scheme-vector 'vector-> scheme-type '*) vec)
-                     (let* ((length (,(generic-symbol-append scheme-vector 'vector-length) vec))
-                            (buf (,(generic-symbol-append 'alloc- scheme-type '*) length)))
+                  `(define (,(%%generic-symbol-append scheme-vector 'vector-> scheme-type '*) vec)
+                     (let* ((length (,(%%generic-symbol-append scheme-vector 'vector-length) vec))
+                            (buf (,(%%generic-symbol-append 'alloc- scheme-type '*) length)))
                        (let loop ((i 0))
                          (if (fx< i length)
                              (begin
-                               (,(generic-symbol-append scheme-type '*-set!) buf i (,(generic-symbol-append scheme-vector 'vector-ref) vec i))
+                               (,(%%generic-symbol-append scheme-type '*-set!) buf i (,(%%generic-symbol-append scheme-vector 'vector-ref) vec i))
                                (loop (fx+ i 1)))
                              buf))))
                   '()))))
@@ -264,12 +264,12 @@
                               (car type/struct/union)
                               #f))
          (type-str (symbol->string type))
-         (release-type-str (string-append "___release_" (scheme-name->c-name type-str)))
-         (type* (generic-symbol-append type-str "*"))
-         (type*/nonnull (generic-symbol-append type-str "*/nonnull"))
-         (type*/release-rc (generic-symbol-append type-str "*/release-rc")))
+         (release-type-str (string-append "___release_" (%%scheme-name->c-name type-str)))
+         (type* (%%generic-symbol-append type-str "*"))
+         (type*/nonnull (%%generic-symbol-append type-str "*/nonnull"))
+         (type*/release-rc (%%generic-symbol-append type-str "*/release-rc")))
     (let ((expansion
-           (begin-top-level-forms
+           (%%begin-top-level-forms
             (if struct-or-union
                 `(c-define-type ,type (,struct-or-union ,type-str))
                 '())
@@ -294,9 +294,9 @@
                          type-str))
          (struct-type*-str (string-append struct-type-str "*"))
          (release-type-str (string-append "___release_" type-str))
-         (type* (generic-symbol-append type-str "*"))
-         (type*/nonnull (generic-symbol-append type-str "*/nonnull"))
-         (type*/release-rc (generic-symbol-append type-str "*/release-rc")))
+         (type* (%%generic-symbol-append type-str "*"))
+         (type*/nonnull (%%generic-symbol-append type-str "*/nonnull"))
+         (type*/release-rc (%%generic-symbol-append type-str "*/release-rc")))
     (define (field-getter-setter field-spec)
       (let* ((field (car field-spec))
              (field-str (symbol->string field))
@@ -311,40 +311,40 @@
               (if (table-ref c-define-struct-table elem-type #f)
                   ;; array element is a struct =>
                   ;; only generate a getter returning struct address
-                  `((define ,(generic-symbol-append type-str "-" field-str "-ref")
+                  `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
                       (c-lambda (,type*/nonnull int)
-                                ,(generic-symbol-append elem-type-str "*/nonnull")
+                                ,(%%generic-symbol-append elem-type-str "*/nonnull")
                                 ,(string-append "___result_voidstar = &___arg1->" field-str "[___arg2];"))))
 
                   ;; array element is not a struct =>
                   ;; generate a getter and a setter
-                  `((define ,(generic-symbol-append type-str "-" field-str "-ref")
+                  `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
                       (c-lambda (,type*/nonnull int)
                                 ,elem-type
                                 ,(string-append "___result = ___arg1->" field-str "[___arg2];")))
-                    (define ,(generic-symbol-append type-str "-" field-str "-set!")
+                    (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
                       (c-lambda (,type*/nonnull int ,elem-type)
                                 void
                                 ,(string-append "___arg1->" field-str "[___arg2] = ___arg3;"))))))
             ;; Field is not an array
             (if (table-ref c-define-struct-table field-type #f)
                 ;; Field is a struct (and not an array)
-                `((define ,(generic-symbol-append type-str "-" field-str)
+                `((define ,(%%generic-symbol-append type-str "-" field-str)
                     (c-lambda (,type*/nonnull)
-                              ,(generic-symbol-append field-type "*/nonnull")
+                              ,(%%generic-symbol-append field-type "*/nonnull")
                               ,(string-append "___result_voidstar = &___arg1->" field-str ";")))
 
-                  (define ,(generic-symbol-append type-str "-" field-str "-set!")
+                  (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
                     (c-lambda (,type*/nonnull ,field-type)
                               void
                               ,(string-append "___arg1->" field-str " = ___arg2;"))))
                 ;; Field is not a struct (and not an array)
-                `((define ,(generic-symbol-append type-str "-" field-str)
+                `((define ,(%%generic-symbol-append type-str "-" field-str)
                     (c-lambda (,type*/nonnull)
                               ,field-type
                               ,(string-append "___result = ___arg1->" field-str ";")))
 
-                  (define ,(generic-symbol-append type-str "-" field-str "-set!")
+                  (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
                     (c-lambda (,type*/nonnull ,field-type)
                               void
                               ,(string-append "___arg1->" field-str " = ___arg2;"))))))))
@@ -361,12 +361,12 @@
                  "  return ___FIX(___NO_ERR);\n"
                  "}\n"))
               ;; Define type allocator procedure.
-              (define ,(generic-symbol-append "alloc-" type-str)
+              (define ,(%%generic-symbol-append "alloc-" type-str)
                 (c-lambda ()
                           ,type*/release-rc
                           ,(string-append "___result_voidstar = ___EXT(___alloc_rc)( sizeof( " struct-type-str " ) );")))
               ;; Dereference
-              (define ,(generic-symbol-append "*->" type-str)
+              (define ,(%%generic-symbol-append "*->" type-str)
                 (c-lambda (,type*/nonnull)
                           ,type
                           ,(string-append "___result_voidstar = (" type-str "*)___arg1;")))
