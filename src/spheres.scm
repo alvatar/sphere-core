@@ -33,7 +33,7 @@
                    (current-readtable (readtable-sharing-allowed?-set (current-readtable) 'serialize)))
                   (load syntax-case-scm))
     (set! current-macro-expander 'syntax-case))
-   ((file-exists? "src/scsc/syntax-case.scm")
+   ((file-exists? "src/scsc/scsc.scm")
     (println "*** INFO -- Bootstrapping: syntax expander omitted"))
    (else
     (error "Cannot find macro expander. Is Sphere Core properly installed?"))))
