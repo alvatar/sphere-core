@@ -586,7 +586,7 @@ fig.scm file"))
 
 (define^ (%module-shallow-dependencies-to-prelude module)
   (%check-module module '%module-shallow-dependencies-to-prelude)
-  ((%module-shallow-dependencies-select 'prelude "-prelude") module))
+  ((%module-shallow-dependencies-select 'prelude #f) module))
 
 (define^ (%module-shallow-dependencies-to-include module)
   (%check-module module '%module-shallow-dependencies-to-include)
