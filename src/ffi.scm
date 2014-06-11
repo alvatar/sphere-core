@@ -78,6 +78,19 @@
 ;;             (d (read-f64 port)))
 ;;        (pp (list a b c d)))))
 
+;;!! C Types: readers/writers generation
+
+(define u8vector-subtype (##subtype (u8vector)))
+(define s8vector-subtype (##subtype (s8vector)))
+(define u16vector-subtype (##subtype (u16vector)))
+(define s16vector-subtype (##subtype (s16vector)))
+(define u32vector-subtype (##subtype (u32vector)))
+(define s32vector-subtype (##subtype (s32vector)))
+(define u64vector-subtype (##subtype (u64vector)))
+(define s64vector-subtype (##subtype (s64vector)))
+(define f32vector-subtype (##subtype (f32vector)))
+(define f64vector-subtype (##subtype (f64vector)))
+
 ;;! u8vector reader/writer
 ;; Already defined in Gambit
 
