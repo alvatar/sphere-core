@@ -3981,7 +3981,10 @@
                              (annotation? (syntax-expression object)))
                         (syntax-expression object))
                        (else #f))))
-      (apply ##raise-expression-parsing-exception `(psyntax-error ,locat ,@messages ',(strip object empty-wrap))))))
+      ;;(apply ##raise-expression-parsing-exception `(psyntax-error ,locat ,@messages ',(strip object empty-wrap)))
+      ;; More reliable until fixed, as indicated by Matt Hastie
+      (error `(psyntax-error ,locat ,@messages ',(strip object empty-wrap)))
+      )))
 
 ;;; syntax-dispatch expects an expression and a pattern.  If the expression
 ;;; matches the pattern a list of the matching expressions for each

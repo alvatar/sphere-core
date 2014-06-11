@@ -76,7 +76,7 @@
   ;; Compile syntax-case
   (if (not (file-exists? (string-append (current-source-directory) "scsc/syntax-case.scm")))
       (begin (info/color 'green "Bootstrapping the syntax expander code")
-             (shell-command (string-append "cd " (current-source-directory) "/scsc && gsi boot.scm"))))
+             (shell-command (string-append "cd " (current-source-directory) "/scsc && gsi -f boot.scm"))))
   (let recur ()
     (info/color 'green "Compiling the syntax expander may take long in your system, but the resulting code is much faster.")
     (println "Do you want to compile the syntax expander? Yes/No")
