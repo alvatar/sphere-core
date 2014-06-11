@@ -1,7 +1,7 @@
 ;;!! Macros for building complex hygienic macros
 
 ;;! Syntax error
-(define-syntax syntax-error
+(define-syntax syntax-case-error
   (syntax-rules ()
     ((_) (0))))
 
