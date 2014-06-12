@@ -820,16 +820,22 @@
 
 (define-syntax no-source (identifier-syntax #f))
 
+(define resolve-annotation
+  (lambda (object)
+    (cond ((and (syntax? object)
+                (annotation? (syntax-expression object)))
+           (syntax-expression object))
+          ((annotation? object) object)
+          (else (build-source no-source object)))))
+
 (define-syntax arg-check
   (syntax-rules ()
     ((_ pred? e who)
      (let ((x e))
 ;***        (if (not (pred? x)) (error-hook who "invalid argument" x))))))
        (if (not (pred? x))
-           (error (string-append "(in "
-                                 (symbol->string who)
-                                 ") invalid argument")
-                  x))))))
+           (##raise-expression-parsing-exception
+            'invalid-argument (resolve-annotation x) (strip x empty-wrap) 'in who))))))
 
 ;;; compile-time environments
 
@@ -2952,7 +2958,7 @@
                ((id? (car formals))
                 (emit-formals (cons (car (formal)) formals*) (cdr (syntax->datum formals)) (cdr vars) emitter ae template))
 
-               (else (error `(unexpected-formal ,(car formals)))))))
+               (else (syntax-error (car formals) "unexpected formal")))))
     
       (syntax-case c ()
         (((id ...) e1 e2 ...)
@@ -3970,21 +3976,15 @@
           (arg-check nonsymbol-id? y 'literal-identifier=?)
           (literal-id=? x y)))
 
-(set! syntax-error
-  (lambda (object . messages)
-    (for-each (lambda (x) (arg-check string? x 'syntax-error)) messages)
-    (let ((messages (if (null? messages)
-                        '(invalid syntax)
-                        messages))
-          (locat (cond ((annotation? object))
-                       ((and (syntax? object)
-                             (annotation? (syntax-expression object)))
-                        (syntax-expression object))
-                       (else #f))))
-      ;;(apply ##raise-expression-parsing-exception `(psyntax-error ,locat ,@messages ',(strip object empty-wrap)))
-      ;; More reliable until fixed, as indicated by Matt Hastie
-      (error `(psyntax-error ,locat ,@messages ',(strip object empty-wrap)))
-      )))
+  (set! syntax-error
+        (lambda (object . messages)
+          (for-each (lambda (x) (arg-check string? x 'syntax-error)) messages)
+          (let ((messages (if (null? messages)
+                              '(invalid syntax)
+                              messages))
+                (source (resolve-annotation object)))
+            (apply ##raise-expression-parsing-exception
+                   `(psyntax-error ,source ,@messages ',(strip object empty-wrap))))))
 
 ;;; syntax-dispatch expects an expression and a pattern.  If the expression
 ;;; matches the pattern a list of the matching expressions for each

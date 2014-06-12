@@ -383,7 +383,8 @@ gensym
 ;;;============================================================================
 
 (set! ##expression-parsing-exception-names
-      (cons '(psyntax-error . "Syntax expansion failure:")
+      (append '((psyntax-error . "Syntax expansion failure:")
+                (invalid-argument . "Invalid argument:"))
             ##expression-parsing-exception-names))
 
 ;;;============================================================================
