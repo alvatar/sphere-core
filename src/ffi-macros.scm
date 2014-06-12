@@ -286,12 +286,13 @@
 ;; Helper for define-c-struct and define-c-union
 (define (%%c-define-struct-or-union struct-or-union type fields)
   (let* ((type-str (symbol->string type))
-         (struct-type-str
-          (string-append (case struct-or-union
-                           ((struct) "struct ")
-                           ((union) "union ")
-                           (else (error "%%c-define-struct-or-union: first parameter must be 'struct or 'union")))
-                         type-str))
+         (struct-type-str (string-append
+                           (case struct-or-union
+                             ((struct) "struct ")
+                             ((union) "union ")
+                             (else
+                              (error "%%c-define-struct-or-union: first parameter must be 'struct or 'union")))
+                           type-str))
          (struct-type*-str (string-append struct-type-str "*"))
          (release-type-str (string-append "___release_" type-str))
          (type* (%%generic-symbol-append type-str "*"))
@@ -300,55 +301,52 @@
     (define (field-getter-setter field-spec)
       (let* ((field (car field-spec))
              (field-str (symbol->string field))
-             (field-type (cadr field-spec)))
-        (if (and (pair? field-type)
-                 (eq? (car field-type) 'array))
-            ;; Field is an array
-            (let* ((elem-type
-                    (cadr field-type))
-                   (elem-type-str
-                    (symbol->string elem-type)))
-              (if (table-ref c-define-struct-table elem-type #f)
-                  ;; array element is a struct =>
-                  ;; only generate a getter returning struct address
-                  `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
-                      (c-lambda (,type*/nonnull int)
-                                ,(%%generic-symbol-append elem-type-str "*/nonnull")
-                                ,(string-append "___result_voidstar = &___arg1->" field-str "[___arg2];"))))
+             (field-description (cadr field-spec)))
+        (if (pair? field-description)
+            ;; Field is either a 'struct', an 'array' or an 'array of structs'
+            (let* ((field-tag (car field-description))
+                   (field-type (cadr field-description))
+                   (field-type-str (symbol->string field-type)))
+              (case field-tag
+                ;; Struct
+                ((struct)
+                 `((define ,(%%generic-symbol-append type-str "-" field-str)
+                     (c-lambda (,type*/nonnull)
+                               ,(%%generic-symbol-append field-type-str "*/nonnull")
+                               ,(string-append "___result_voidstar = &___arg1->" field-str ";")))
 
-                  ;; array element is not a struct =>
-                  ;; generate a getter and a setter
-                  `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
-                      (c-lambda (,type*/nonnull int)
-                                ,elem-type
-                                ,(string-append "___result = ___arg1->" field-str "[___arg2];")))
-                    (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
-                      (c-lambda (,type*/nonnull int ,elem-type)
-                                void
-                                ,(string-append "___arg1->" field-str "[___arg2] = ___arg3;"))))))
-            ;; Field is not an array
-            (if (table-ref c-define-struct-table field-type #f)
-                ;; Field is a struct (and not an array)
-                `((define ,(%%generic-symbol-append type-str "-" field-str)
-                    (c-lambda (,type*/nonnull)
-                              ,(%%generic-symbol-append field-type "*/nonnull")
-                              ,(string-append "___result_voidstar = &___arg1->" field-str ";")))
+                   (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
+                     (c-lambda (,type*/nonnull ,field-type)
+                               void
+                               ,(string-append "___arg1->" field-str " = ___arg2;")))))
+                ;; Array of fundamental type
+                ((array)
+                 ;; generate a getter and a setter
+                 `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
+                     (c-lambda (,type*/nonnull int)
+                               ,field-type
+                               ,(string-append "___result = ___arg1->" field-str "[___arg2];")))
+                   (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
+                     (c-lambda (,type*/nonnull int ,field-type)
+                               void
+                               ,(string-append "___arg1->" field-str "[___arg2] = ___arg3;")))))
+                ;; Array of structs
+                ((struct-array)
+                 ;; only generate a getter returning struct address
+                 `((define ,(%%generic-symbol-append type-str "-" field-str "-ref")
+                     (c-lambda (,type*/nonnull int)
+                               ,(%%generic-symbol-append field-type-str "*/nonnull")
+                               ,(string-append "___result_voidstar = &___arg1->" field-str "[___arg2];")))))))
+            ;; Field is fundamental type
+            `((define ,(%%generic-symbol-append type-str "-" field-str)
+                (c-lambda (,type*/nonnull)
+                          ,field-description
+                          ,(string-append "___result = ___arg1->" field-str ";")))
 
-                  (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
-                    (c-lambda (,type*/nonnull ,field-type)
-                              void
-                              ,(string-append "___arg1->" field-str " = ___arg2;"))))
-                ;; Field is not a struct (and not an array)
-                `((define ,(%%generic-symbol-append type-str "-" field-str)
-                    (c-lambda (,type*/nonnull)
-                              ,field-type
-                              ,(string-append "___result = ___arg1->" field-str ";")))
-
-                  (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
-                    (c-lambda (,type*/nonnull ,field-type)
-                              void
-                              ,(string-append "___arg1->" field-str " = ___arg2;"))))))))
-    (table-set! c-define-struct-table type #t) ;; remember it is a struct
+              (define ,(%%generic-symbol-append type-str "-" field-str "-set!")
+                (c-lambda (,type*/nonnull ,field-description)
+                          void
+                          ,(string-append "___arg1->" field-str " = ___arg2;")))))))
     (let ((expansion
            `(begin
               ;; Define the release function which is called when the
@@ -388,14 +386,6 @@
 ;; interface to C structures.
 (define-macro (c-define-union type . fields)
   (%%c-define-struct-or-union 'union type fields))
-
-
-;; (define-macro (c-define-struct-initialize!)
-;;   ;; Define c-define-struct-table at macro expansion time.
-;;   (eval '(define c-define-struct-table (make-table)))
-;;   `(begin))
-;; (c-define-struct-initialize!)
-(define c-define-struct-table (make-table))
 
 
 ;;------------------------------------------------------------------------------
