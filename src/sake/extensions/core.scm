@@ -15,8 +15,8 @@
                              (verbose #f))
   (if (not (eq? 'syntax-case expander))
       (err "The only supported expander is 'syntax-case"))
-  (or (file-exists? (default-build-directory))
-      (make-directory (default-build-directory)))
+  (or (file-exists? (current-build-directory))
+      (make-directory (current-build-directory)))
   (let ((module (if (string? module-or-file)
                     (err "Handling of module as file is unimplemented")
                     module-or-file)))
@@ -25,9 +25,9 @@
            (macros-module (%module-macros module))
            (version (if (null? version) (%module-version module) version))
            (input-file (string-append (%sphere-path (%module-sphere module))
-                                      (default-src-directory)
+                                      (current-source-directory)
                                       (%module-filename-scm module)))
-           (intermediate-file (string-append (default-build-directory)
+           (intermediate-file (string-append (current-build-directory)
                                              "_%_"
                                              (%module-flat-name module)
                                              (default-scm-extension)))
@@ -267,6 +267,7 @@
                                #!key
                                (output (path-strip-extension c-file))
                                (env-options '())
+                               (options '())
                                (cc-options "")
                                (ld-options "")
                                (delete-c #f)
@@ -278,7 +279,7 @@
                   (begin (map (lambda (e) `(setenv ,(car e) ,(cadr e))) env-options))))
              (compile-code
               `(,@env-code
-                (compile-file ,c-file output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
+                (compile-file ,c-file options: ',options output: ,output cc-options: ,cc-options ld-options: ,ld-options))))
         (info "compiling C file to o -- " c-file)
         (if verbose (begin (info/color 'green "Spawning a Gambit instance with this code: ")
                            (pp compile-code)))
@@ -286,7 +287,8 @@
              (gambit-eval-here compile-code))
             (err "error compiling C file"))))
   (if delete-c
-      (delete-file c-file recursive: #t)))
+      (delete-file c-file recursive: #t))
+  output)
 
 ;;! Compile to o in one step, through a C intermediary file
 (##define (sake#compile-module module
@@ -342,9 +344,12 @@
                                (compiler-options '())
                                override-cc-options
                                override-ld-options
-                               (output (string-append (current-build-directory) exe-name))
+                               (output (string-append (current-bin-directory) exe-name))
                                (strip #t)
                                (verbose #f))
+  ;; Make sure work directories are ready
+  (unless (file-exists? (current-build-directory)) (make-directory (current-build-directory)))
+  (unless (file-exists? (current-bin-directory)) (make-directory (current-bin-directory)))
   (let ((cc-options (or override-cc-options
                         (%process-cc-options (apply append (map %module-deep-dependencies-cc-options modules)))))
         (ld-options (or override-ld-options
@@ -496,16 +501,16 @@
                                       (versions '(()))
                                       (omit-o #f)
                                       (omit-c #f))
-  (or (file-exists? (default-lib-directory))
-      (make-directory (default-lib-directory)))
+  (or (file-exists? (current-lib-directory))
+      (make-directory (current-lib-directory)))
   (for-each
    (lambda (version)
      (or omit-o
-         (copy-file (string-append (default-build-directory) (%module-filename-o m version: version))
-                    (string-append (default-lib-directory) (%module-filename-o m version: version))))
+         (copy-file (string-append (current-build-directory) (%module-filename-o m version: version))
+                    (string-append (current-lib-directory) (%module-filename-o m version: version))))
      (or omit-c
-         (copy-file (string-append (default-build-directory) (%module-filename-c m version: version))
-                    (string-append (default-lib-directory) (%module-filename-c m version: version)))))
+         (copy-file (string-append (current-build-directory) (%module-filename-c m version: version))
+                    (string-append (current-lib-directory) (%module-filename-c m version: version)))))
    versions))
 
 ;;! Test all files in test/
@@ -537,7 +542,8 @@
 ;;! Clean all default generated files and directories
 (##define (sake#default-clean)
   (delete-file (current-build-directory) recursive: #t)
-  (delete-file (default-lib-directory) recursive: #t))
+  (delete-file (current-lib-directory) recursive: #t)
+  (delete-file (current-bin-directory) recursive: #t))
 
 ;;! Install all the files in lib/ in the system directory for the library
 (##define (sake#install-sphere-to-system #!key
@@ -552,7 +558,7 @@
                   (begin (make-directory (string-append (%sphere-system-path sphere) dir))
                          (copy-files (fileset dir: dir recursive: #f)
                                      (string-append (%sphere-system-path sphere) dir)))))
-            `(,(default-src-directory) ,(default-lib-directory) ,@extra-directories)))
+            `(,(current-source-directory) ,(current-lib-directory) ,@extra-directories)))
 
 ;;! Uninstall all the files from the system installation
 (##define (sake#uninstall-sphere-from-system #!optional (sphere (%current-sphere)))

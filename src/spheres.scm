@@ -112,6 +112,9 @@
 (define^ default-lib-directory
   (make-parameter "lib/"))
 
+(define^ default-bin-directory
+  (make-parameter "bin/"))
+
 (define^ default-scm-extension
   (make-parameter ".scm"))
 

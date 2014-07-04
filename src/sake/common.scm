@@ -13,6 +13,9 @@
 (define current-lib-directory
   (make-parameter (string-append (current-directory) "lib/")))
 
+(define current-bin-directory
+  (make-parameter (string-append (current-directory) "bin/")))
+
 (define current-project-name
   (make-parameter
    (path-strip-directory
@@ -73,10 +76,7 @@
 ; Util
 ;-------------------------------------------------------------------------------
 
-(define (reduce f i l)
-  (let reduce ((i i) (l l))
-    (if (null? l) i
-        (reduce (f i (car l)) (cdr l)))))
+(##include "../internal/tiny.scm")
 
 ;-------------------------------------------------------------------------------
 ; Main

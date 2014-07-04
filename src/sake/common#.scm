@@ -3,6 +3,7 @@
   current-build-directory
   current-source-directory
   current-lib-directory
+  current-bin-directory
   current-project-name
   current-module-name
   log

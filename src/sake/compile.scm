@@ -2,6 +2,8 @@
 
 (define c-compiler (make-parameter "gcc"))
 
+(define linker (make-parameter "ld"))
+
 (##define (gambit-compile-file
            name 
            #!key 
@@ -23,25 +25,37 @@
    (lambda (name) (gambit-compile-file name output: output options: options))
    files))
 
-(##define (c-compile-file
-           name 
-           #!key 
-           (output (current-build-directory)) 
-           (options ""))
-  (shell-command
-   (string-append (c-compiler) " -o" output " " options " " name)))
+;; (##define (c-compile-file
+;;            name 
+;;            #!key 
+;;            (output (current-build-directory)) 
+;;            (options ""))
+;;   (shell-command
+;;    (string-append (c-compiler) " -o " output " " options " " name)))
 
-(##define (c-compile-files
+;; (##define (c-compile-files
+;;            #!key
+;;            (files (fileset test: (f-and (extension=? ".scm") 
+;;                                         (f-not (ends-with? "#.scm")) 
+;;                                         (newer-than/extension? ".c"))
+;;                            recursive: #t))
+;;            (output (current-build-directory))
+;;            (options ""))
+;;   (for-each
+;;    (lambda (name) (c-compile-file output: output options: options))
+;;    files))
+
+(##define (link-files
            #!key
-           (files (fileset test: (f-and (extension=? ".scm") 
-                                        (f-not (ends-with? "#.scm")) 
-                                        (newer-than/extension? ".c"))
-                           recursive: #t))
+           (files (fileset test: (extension=? ".c") recursive: #t))
            (output (current-build-directory))
-           (options ""))
-  (for-each
-   (lambda (name) (c-compile-file output: output options: options))
-   files))
+           (options "")
+           (verbose #f))
+  (let ((command-string (string-append (linker) " " options " " (string-join files) " -o " output)))
+    (if verbose
+        (begin (info "linking:")
+               (println command-string)))
+    (shell-command command-string)))
 
 (##define (include-files
            #!key

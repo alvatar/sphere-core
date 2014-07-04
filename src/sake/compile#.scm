@@ -6,6 +6,7 @@
   gambit-compile-files
   c-compile-file
   c-compile-files
+  link-files
   include-files
   gambit-eval
   gambit-eval-here
