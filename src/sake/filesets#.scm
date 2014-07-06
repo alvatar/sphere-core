@@ -5,6 +5,8 @@
   ends-with?
   newer-than?
   newer-than/extension?
+  path-relative
+  path-add-trailing-directory-separator
   directory?
   regular?
   any?

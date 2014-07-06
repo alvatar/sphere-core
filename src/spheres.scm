@@ -103,27 +103,25 @@
 ;;------------------------------------------------------------------------------
 ;;!! Spheres
 
-(define^ default-src-directory
-  (make-parameter "src/"))
 
+;;!! Default paths and extensions.
+;; They should be used for refencing Spheres files in a general way, but not within
+;; Sake tasks. In those situations (current-*-directory) versions should be used instead
+
+(define^ default-source-directory
+  (make-parameter "src/"))
 (define^ default-build-directory
   (make-parameter "build/"))
-
 (define^ default-lib-directory
   (make-parameter "lib/"))
-
 (define^ default-bin-directory
   (make-parameter "bin/"))
-
 (define^ default-scm-extension
   (make-parameter ".scm"))
-
 (define^ default-o-extension
   (make-parameter ".o1"))
-
 (define^ default-c-extension
   (make-parameter ".o1.c"))
-
 (define^ config-file
   (make-parameter "config.scm"))
 
@@ -393,7 +391,7 @@ fig.scm file"))
 
 (define^ (%module-path-src module)
   (or (%module? module) (%module-error module))
-  (string-append (%module-path module) (default-src-directory)))
+  (string-append (%module-path module) (default-source-directory)))
 
 (define^ (%module-path-lib module)
   (or (%module? module) (%module-error module))
@@ -796,7 +794,7 @@ fig.scm file"))
                               (%module-shallow-dependencies-to-include module)))
                 (if sphere
                     (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
-                          (file-scm (string-append (%sphere-path sphere) (default-src-directory) (%module-filename-scm module))))
+                          (file-scm (string-append (%sphere-path sphere) (default-source-directory) (%module-filename-scm module))))
                       (cond ((file-exists? file-o)
                              (if verbose
                                  (display (string-append "-- object loaded -- " (object->string module) "\n")))

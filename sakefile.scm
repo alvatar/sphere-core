@@ -9,20 +9,21 @@
 (define-task init ()
   (sake#default-clean)
   (make-directory (current-build-directory))
-  (make-directory (current-lib-directory)))
+  (make-directory (current-lib-directory))
+  (make-directory (current-bin-directory)))
 
 (define-task compile-stage-1 (init)
   ;; Compile Sake program
   (info/color 'green "Compiling Sake...")
   (gambit-compile-file
    (string-append (current-source-directory) "sake/sake.scm")
-   output: (string-append (current-build-directory) "ssake")
+   output: (string-append (current-bin-directory) "ssake")
    options: "-exe")
   ;; Compile Spheres program
   (info/color 'green "Compiling Spheres...")
   (gambit-compile-file
    (string-append (current-source-directory) "spheres/spheres.scm")
-   output: (string-append (current-build-directory) "sspheres")
+   output: (string-append (current-bin-directory) "sspheres")
    options: "-exe"))
 
 (define-task post-compile-stage-1 ()
@@ -32,7 +33,7 @@
   (make-directory "~~spheres/core/src/sake")
   (if (not (file-exists? (sake-extensions-path)))
       (make-directory (sake-extensions-path)))
-  (copy-file (string-append (current-build-directory) "ssake") "~~/bin/ssake")
+  (copy-file (string-append (current-bin-directory) "ssake") "~~/bin/ssake")
   (copy-files (fileset dir: (string-append (current-source-directory) "sake")
                        test: (ends-with? ".scm")
                        recursive: #t)
@@ -45,14 +46,14 @@
   (copy-file (string-append (current-source-directory) "internal/tiny.scm")
              (string-append (sake-extensions-path) "tiny.scm"))
   (copy-file (string-append (current-source-directory) "sake/extensions/core-macros.scm")
-             (string-append (sake-extensions-path) "core-macros.scm"))
+             (string-append (sake-extensions-path) "aaaa_core-macros.scm"))
   (copy-file (string-append (current-source-directory) "sake/extensions/core.scm")
              (string-append (sake-extensions-path) "core.scm"))
   
   ;; Install Spheres program
   (info/color 'green "Installing Spheres...")
   (delete-file "~~/bin/sspheres")
-  (copy-file (string-append (current-build-directory) "sspheres") "~~/bin/sspheres")
+  (copy-file (string-append (current-bin-directory) "sspheres") "~~/bin/sspheres")
   ;; Create symbolic link in /usr/bin
   (delete-file "/usr/bin/sspheres")
   (create-symbolic-link "~~/bin/sspheres" "/usr/bin/sspheres"))

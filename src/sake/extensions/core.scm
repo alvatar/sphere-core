@@ -25,7 +25,7 @@
            (macros-module (%module-macros module))
            (version (if (null? version) (%module-version module) version))
            (input-file (string-append (%sphere-path (%module-sphere module))
-                                      (current-source-directory)
+                                      (default-source-directory)
                                       (%module-filename-scm module)))
            (intermediate-file (string-append (current-build-directory)
                                              "_%_"
@@ -558,7 +558,9 @@
                   (begin (make-directory (string-append (%sphere-system-path sphere) dir))
                          (copy-files (fileset dir: dir recursive: #f)
                                      (string-append (%sphere-system-path sphere) dir)))))
-            `(,(current-source-directory) ,(current-lib-directory) ,@extra-directories)))
+            `(,(path-relative (current-source-directory))
+              ,(path-relative (current-lib-directory))
+              ,@extra-directories)))
 
 ;;! Uninstall all the files from the system installation
 (##define (sake#uninstall-sphere-from-system #!optional (sphere (%current-sphere)))

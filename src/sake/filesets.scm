@@ -78,6 +78,9 @@
 (define (path-add-trailing-directory-separator dir)
   (string-append (path-strip-trailing-directory-separator dir) "/"))
 
+(define (path-relative dir)
+  (path-normalize dir 'shortest (current-directory)))
+
 (define (directory? name)
   (eq? (file-type name) 'directory))
 
