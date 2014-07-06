@@ -421,8 +421,8 @@
                         modules
                         #!key
                         (directory (current-build-directory))
-                        (verbose #f)
-                        (version '()))
+                        (version '())
+                        (verbose #f))
   (info/color 'green (string-append "generating flat link file: " link-file))
   (let* ((output-file (string-append directory link-file))
          (code
@@ -440,8 +440,8 @@
                                modules
                                #!key
                                (directory (current-build-directory))
-                               (verbose #f)
-                               (version '()))
+                               (version '())
+                               (verbose #f))
   (info/color 'green (string-append "generating an incremental link file: " link-file))
   (let* ((output-file (string-append directory link-file))
          (code
