@@ -33,6 +33,20 @@
          '()
          lst))
 
+;;! Any
+(define (any pred lst)
+  (let recur ((rest lst))
+    (cond ((null? rest) #f)
+          ((pred (car rest)) #t)
+          (else (recur (cdr rest))))))
+
+;;! Every
+(define (every pred lst)
+  (let recur ((rest lst))
+    (cond ((null? rest) #t)
+          ((pred (car rest)) (recur (cdr rest)))
+          (else #f))))
+
 ;;! Drop
 (define (drop lis k)
     (let iter ((lis lis) (k k))
