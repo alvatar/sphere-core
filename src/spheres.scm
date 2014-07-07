@@ -210,59 +210,75 @@ fig.scm file"))
 
 ;;! Get dependencies of sphere's modules
 (define^ (%sphere-dependencies sphere)
-  (define map*
-    (lambda (f l)
-      (cond ((null? l) '())
-            ((not (pair? l)) (f l))
-            (else (cons (map* f (car l)) (map* f (cdr l)))))))
+  (define (flatten-tag tag lst)
+    (let recur ((lst (if (and (not (null? lst)) (eq? (car lst) tag))
+                         (cdr lst)
+                         lst)))
+      (cond
+       ((null? lst)
+        '())
+       ((and (pair? (car lst)) (eq? tag (caar lst)))
+        (append (recur (cdar lst)) (recur (cdr lst))))
+       ((pair? (car lst))
+        (cons (recur (car lst)) (recur (cdr lst))))
+       (else
+        (cons (car lst) (recur (cdr lst)))))))
   (and
    (%sphere-exists? sphere)
    (let ((expand-cond-features
-          (lambda (deps)
-            (let ((any-eq? (lambda (k l)
-                             (let recur ((l l))
-                               (cond ((null? l) #f)
-                                     ((eq? k (car l)) #t)
-                                     (else (recur (cdr l))))))))
-              ;; Half-baked cond-expand for dependency files. Shame.
-              (let expand-cond-features ((deps deps))
-                (cond ((null? deps) '())
-                      ((not (pair? deps)) deps)
-                      ((eq? 'cond-expand (car deps))
-                       ;; cond-expand found
-                       (let find-condition ((conditions (cdr deps)))
-                         (cond ((null? conditions)
-                                (error "cond-expand in dependencies not met"))
-                               ((not (pair? (car conditions)))
-                                (error "incorrect cond-expand syntax"))
-                               ((and (symbol? (caar conditions))
-                                     (any-eq? (caar conditions) (##cond-expand-features)))
-                                (cons 'cond-expanded (cdar conditions)))
-                               ((and (symbol? (caar conditions))
-                                     (eq? (caar conditions) 'else))
-                                (cons 'cond-expanded (cdar conditions)))
-                               ((and (pair? (caar conditions))
-                                     (eq? (caaar conditions) 'or))
-                                (error "OR clauses in dependencies not implemented yet"))
-                               ((and (pair? (caar conditions))
-                                     (eq? (caaar conditions) 'and))
-                                (error "AND clauses in dependencies not implemented yet"))
-                               ((and (pair? (caar conditions))
-                                     (eq? (caaar conditions) 'not))
-                                (error "NOT clauses in dependencies not implemented yet"))
-                               ((and (pair? (caar conditions)))
-                                (error "incorrect cond-expand syntax: must use OR, AND, NOT lists or single symbols"))
-                               (else
-                                (find-condition (cdr conditions))))))
-                      (else (let ((head (expand-cond-features (car deps)))
-                                  (tail (expand-cond-features (cdr deps))))
-                              ;; Find a cleaner algorithm!
-                              ;; What does now is tag expanded expressions for appending them instead of cons'ing
-                              (if (and (pair? head) (eq? (car head) 'cond-expanded))
-                                  (append (cdr head) tail)
-                                  (cons head tail)))))))))
+          (lambda (form)
+            (define expand-clauses
+              (lambda clauses
+                (define (feature-present? id)
+                  (memq id (##cond-expand-features)))
+                (define (eval-feature-req? feature-req)
+                  (define (eval-and-clause? req-list)
+                    (or (null? req-list)
+                        (and (eval-feature-req? (car req-list))
+                             (eval-and-clause? (cdr req-list)))))
+                  (define (eval-or-clause? req-list)
+                    (and (not (null? req-list))
+                         (or (eval-feature-req? (car req-list))
+                             (eval-or-clause? (cdr req-list)))))
+                  (define (eval-not-clause? req)
+                    (not (eval-feature-req? req)))
+                  (cond
+                   ((not (pair? feature-req))
+                    (feature-present? feature-req))
+                   ((eq? 'and (car feature-req))
+                    (eval-and-clause? (cdr feature-req)))
+                   ((eq? 'or (car feature-req))
+                    (eval-or-clause? (cdr feature-req)))
+                   ((eq? 'not (car feature-req))
+                    (apply eval-not-clause? (cdr feature-req)))
+                   (else (error "Invalid <feature requirement>"))))
+                (define (do-cond-expand clauses)
+                  (cond
+                   ((null? clauses)  (error "Unfulfilled cond-expand"))
+                   ((not (pair? (car clauses)))
+                    (error "Invalid <cond-expand clause>"))
+                   ((eq? 'else (caar clauses))
+                    (or (null? (cdr clauses))
+                        (error "else clause is not the final one"))
+                    (cons '##begin (cdar clauses)))
+                   ((eval-feature-req? (caar clauses))
+                    (cons '##begin (cdar clauses)))
+                   (else (do-cond-expand (cdr clauses)))))
+                (do-cond-expand clauses)))
+            (let recur ((form form))
+              (cond ((null? form) '())
+                    ((and (pair? form) (eq? 'cond-expand (car form)))
+                     (apply expand-clauses (cdr form)))
+                    ((not (pair? form)) form)
+                    (else (cons (recur (car form)) (recur (cdr form))))))))
          (expand-wildcards
           (lambda (deps)
+            (define map*
+              (lambda (f l)
+                (cond ((null? l) '())
+                      ((not (pair? l)) (f l))
+                      (else (cons (map* f (car l)) (map* f (cdr l)))))))
+
             (map* (lambda (e)
                     (if (eq? e '=)
                         (string->keyword (symbol->string sphere))
@@ -284,10 +300,9 @@ fig.scm file"))
        (if deps-pair
            (normalize-modules
             (expand-wildcards
-             (expand-cond-features
-              (cdr deps-pair))))
+             (flatten-tag '##begin
+                          (expand-cond-features (cdr deps-pair)))))
            '())))))
-
 
 ;;------------------------------------------------------------------------------
 ;;!! Module (unchecked functions)
@@ -306,18 +321,18 @@ fig.scm file"))
 
 ;;! Module structure: (sphere: module-id [version: '(list-of-version-features)])
 (define^ %module-reduced-form? symbol?)
-(define^ (%module-normal-form? module)
-  (and (list? module)
-       (or (keyword? (car module))
-           (and (symbol? (car module)) ; In case we don't have keywords (syntax-case)
-                (equal? #\: (let ((str (symbol->string (car module))))
-                              (string-ref str (- (string-length str) 1)))))
-           (eq? '= (car module))) ; Wildcard = represents the "this" sphere
-       (not (null? (cdr module)))
-       (symbol? (cadr module))
-       (or (null? (cddr module))
-           (and (eq? version: (caddr module))
-                (list? (cadddr module))))))
+  (define^ (%module-normal-form? module)
+    (and (list? module)
+         (or (keyword? (car module))
+             (and (symbol? (car module)) ; In case we don't have keywords (syntax-case)
+                  (equal? #\: (let ((str (symbol->string (car module))))
+                                (string-ref str (- (string-length str) 1)))))
+             (eq? '= (car module))) ; Wildcard = represents the "this" sphere
+         (not (null? (cdr module)))
+         (symbol? (cadr module))
+         (or (null? (cddr module))
+             (and (eq? version: (caddr module))
+                  (list? (cadddr module))))))
 
 ;;! Normalize module to the normal form, allowing comparison of modules with different formats
 (define^ (%module-normalize module
@@ -541,23 +556,23 @@ fig.scm file"))
       (let ((module-sphere (%module-sphere module))
             (get-dependency-list (lambda (l) (let ((type-pair (assq type (cdr l))))
                                           (if type-pair (cdr type-pair) '()))))
-           (add-found-with-postfix
+            (add-found-with-postfix
              (lambda (dependency-list)
                (if find-with-postfix
                    (let ((search-module (%make-module
-                                        sphere: (%module-sphere module)
-                                        id: (string->symbol (string-append
-                                                             (symbol->string (%module-id module))
-                                                             find-with-postfix))
-                                        version: (%module-version module))))
+                                         sphere: (%module-sphere module)
+                                         id: (string->symbol (string-append
+                                                              (symbol->string (%module-id module))
+                                                              find-with-postfix))
+                                         version: (%module-version module))))
                      (if (file-exists?
                           (string-append (%module-path-src search-module)
                                          (%module-filename-scm search-module)))
                          ;; Add if file exists and another version is not already in the list
                          (let recur ((lis dependency-list))
-                                (cond ((null? lis) (cons search-module dependency-list))
-                                      ((%module~=? module search-module) dependency-list)
-                                      (else (recur (cdr lis)))))
+                           (cond ((null? lis) (cons search-module dependency-list))
+                                 ((%module~=? module search-module) dependency-list)
+                                 (else (recur (cdr lis)))))
                          dependency-list))
                    dependency-list))))
         ;; Try first with versioned module
@@ -780,40 +795,40 @@ fig.scm file"))
                         (set! *included-modules* (cons (%module-normalize module override-version: '()) *included-modules*))
                         (expander:include (%module-filename-scm module)))))))))
        (load-single-module
-          (lambda (module options)
-            (%check-module module '##load-module-and-dependencies#load-single-module)
-            (let ((verbose (and (memq 'verbose options) #t))
-                  (includes (and (memq 'includes options) #t))
-                  (sphere (%module-sphere module)))
-              (let ((header-module (%module-header module)))
-                (if header-module
-                    (expander:include (string-append (%module-path-src header-module)
-                                                     (%module-filename-scm header-module))))
-                (if includes
-                    (for-each (lambda (m) (include-single-module m '(verbose)))
-                              (%module-shallow-dependencies-to-include module)))
-                (if sphere
-                    (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
-                          (file-scm (string-append (%sphere-path sphere) (default-source-directory) (%module-filename-scm module))))
-                      (cond ((file-exists? file-o)
-                             (if verbose
-                                 (display (string-append "-- object loaded -- " (object->string module) "\n")))
-                             (load file-o)
-                                        ;(pp file-o)
-                             file-o)
-                            ((file-exists? file-scm)
-                             (load file-scm)
-                             (if verbose
-                                 (display (string-append "-- source loaded -- " (object->string module) "\n")))
-                             file-scm)
-                            (else
-                             (error (string-append "Module: "
-                                                   (object->string module)
-                                                   " cannot be found in current sphere's path"))))
-                      (set! *loaded-modules* (cons (%module-normalize module override-version: '()) *loaded-modules*)))
-                    (begin (if verbose
+        (lambda (module options)
+          (%check-module module '##load-module-and-dependencies#load-single-module)
+          (let ((verbose (and (memq 'verbose options) #t))
+                (includes (and (memq 'includes options) #t))
+                (sphere (%module-sphere module)))
+            (let ((header-module (%module-header module)))
+              (if header-module
+                  (expander:include (string-append (%module-path-src header-module)
+                                                   (%module-filename-scm header-module))))
+              (if includes
+                  (for-each (lambda (m) (include-single-module m '(verbose)))
+                            (%module-shallow-dependencies-to-include module)))
+              (if sphere
+                  (let ((file-o (string-append (%sphere-path sphere) (default-lib-directory) (%module-filename-o module)))
+                        (file-scm (string-append (%sphere-path sphere) (default-source-directory) (%module-filename-scm module))))
+                    (cond ((file-exists? file-o)
+                           (if verbose
                                (display (string-append "-- object loaded -- " (object->string module) "\n")))
-                           (load (%module-filename-scm module)))))))))
+                           (load file-o)
+                                        ;(pp file-o)
+                           file-o)
+                          ((file-exists? file-scm)
+                           (load file-scm)
+                           (if verbose
+                               (display (string-append "-- source loaded -- " (object->string module) "\n")))
+                           file-scm)
+                          (else
+                           (error (string-append "Module: "
+                                                 (object->string module)
+                                                 " cannot be found in current sphere's path"))))
+                    (set! *loaded-modules* (cons (%module-normalize module override-version: '()) *loaded-modules*)))
+                  (begin (if verbose
+                             (display (string-append "-- object loaded -- " (object->string module) "\n")))
+                         (load (%module-filename-scm module)))))))))
   (set!
    ##include-module-and-dependencies
    (lambda (root-module options)
