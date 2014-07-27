@@ -420,14 +420,14 @@
 (define (sake#link-flat link-file
                         modules
                         #!key
-                        (directory (current-build-directory))
+                        (dir (current-build-directory))
                         (version '())
                         (verbose #f))
   (info/color 'green (string-append "generating flat link file: " link-file))
-  (let* ((output-file (string-append directory link-file))
+  (let* ((output-file (string-append dir link-file))
          (code
           `((link-flat
-             ',(map (lambda (m) (string-append directory (%module-filename-c m version: version))) modules)
+             ',(map (lambda (m) (string-append dir (%module-filename-c m version: version))) modules)
              output: ,output-file
              warnings?: ,verbose))))
     (if verbose (pp code))
@@ -439,14 +439,14 @@
 (define (sake#link-incremental link-file
                                modules
                                #!key
-                               (directory (current-build-directory))
+                               (dir (current-build-directory))
                                (version '())
                                (verbose #f))
   (info/color 'green (string-append "generating an incremental link file: " link-file))
-  (let* ((output-file (string-append directory link-file))
+  (let* ((output-file (string-append dir link-file))
          (code
           `((link-incremental
-             ',(map (lambda (m) (string-append directory (%module-filename-c m version: version))) modules)
+             ',(map (lambda (m) (string-append dir (%module-filename-c m version: version))) modules)
              output: ,output-file
              warnings?: ,verbose))))
     (if verbose (pp code))
