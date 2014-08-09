@@ -355,7 +355,7 @@
         (ld-options (or override-ld-options
                         (%process-ld-options (apply append
                                                     (if (eq? (sake#host-platform) 'osx)
-                                                        (cons '("-Wl,-no_compact_unwind") (map %module-deep-dependencies-ld-options modules))
+                                                        (cons '("-Wl") (map %module-deep-dependencies-ld-options modules))
                                                         (map %module-deep-dependencies-ld-options modules)))))))
 
     (info "compiling modules to exe: ")
