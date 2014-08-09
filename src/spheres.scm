@@ -683,8 +683,11 @@ fig.scm file"))
                    (cons (cadar result) (recur (cdr result))))
                   (else (recur (cdr result)))))))
     ;; Append free strings at the beginning of the ld-options
-    (string-append (apply string-append
-                          (reverse (cons " " free-strings)))
+    (string-append " "
+                   (let recur ((fstr free-strings))
+                     (if (null? fstr)
+                         ""
+                         (string-append (car fstr) " " (recur (cdr fstr)))))
                    (if (null? pkg-config--cflags-list)
                        ""
                        (let ((p (open-process
@@ -717,8 +720,11 @@ fig.scm file"))
                    (cons (cadar result) (recur (cdr result))))
                   (else (recur (cdr result)))))))
     ;; Append free strings at the beginning of the ld-options
-    (string-append (apply string-append
-                          (reverse (cons " " free-strings)))
+    (string-append " "
+                   (let recur ((fstr free-strings))
+                     (if (null? fstr)
+                         ""
+                         (string-append (car fstr) " " (recur (cdr fstr)))))
                    (if (null? pkg-config--libs-list)
                        ""
                        (let ((p (open-process
