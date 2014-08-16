@@ -353,10 +353,7 @@
   (let ((cc-options (or override-cc-options
                         (%process-cc-options (apply append (map %module-deep-dependencies-cc-options modules)))))
         (ld-options (or override-ld-options
-                        (%process-ld-options (apply append
-                                                    (if (eq? (sake#host-platform) 'osx)
-                                                        (cons '("-Wl") (map %module-deep-dependencies-ld-options modules))
-                                                        (map %module-deep-dependencies-ld-options modules)))))))
+                        (%process-ld-options (apply append (map %module-deep-dependencies-ld-options modules))))))
 
     (info "compiling modules to exe: ")
     (for-each (lambda (m) (info "    * " (object->string m) "  -> " (object->string (%module-normalize m))))
