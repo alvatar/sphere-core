@@ -1,6 +1,8 @@
 [![Spheres Release](http://img.shields.io/github/release/alvatar/sphere-core.svg)](http://schemespheres.org)
 [![Gambit Version Supported](http://img.shields.io/badge/supported Gambit version-4.7.3-blue.svg)](http://schemespheres.org)
 
+# Experimental version: [Spheres Experimental](https://github.com/alvatar/spheres-experimental)
+
 
 ## Installation and Quickstart
 Please read the [quickstart guide](http://www.schemespheres.org/guides/en/quickstart)
