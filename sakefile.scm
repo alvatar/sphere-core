@@ -132,7 +132,6 @@
   '(base
     functional
     ffi
-    lazy
     testing
     ))
 
